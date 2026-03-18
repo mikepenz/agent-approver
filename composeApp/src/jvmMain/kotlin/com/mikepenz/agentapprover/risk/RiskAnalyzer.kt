@@ -76,6 +76,7 @@ class RiskAnalyzer(
         val process = try {
             ProcessBuilder(claudePath, "--model", "haiku", "-p", prompt, "--output-format", "json")
                 .redirectErrorStream(false)
+                .redirectInput(ProcessBuilder.Redirect.from(java.io.File("/dev/null")))
                 .start()
         } catch (e: Exception) {
             Logger.e("RiskAnalyzer") { "CLI not found: ${e.message}" }
@@ -117,19 +118,24 @@ class RiskAnalyzer(
             output
         }
 
+        Logger.d("RiskAnalyzer") { "Inner JSON after envelope extraction: $innerJson" }
+
         val jsonStr = extractJson(innerJson) ?: run {
             Logger.e("RiskAnalyzer") { "Could not extract JSON from: $innerJson" }
             throw IllegalStateException("Error")
         }
+
+        Logger.d("RiskAnalyzer") { "Extracted JSON object: $jsonStr" }
+
         return try {
             val obj = json.parseToJsonElement(jsonStr).jsonObject
             val risk = obj["risk"]?.jsonPrimitive?.int
-                ?: throw IllegalStateException("Missing risk field")
+                ?: throw IllegalStateException("Missing risk field in: $jsonStr")
             val message = obj["message"]?.jsonPrimitive?.content
-                ?: throw IllegalStateException("Missing message field")
+                ?: throw IllegalStateException("Missing message field in: $jsonStr")
             RiskAnalysis(risk = risk.coerceIn(1, 5), message = message)
         } catch (e: Exception) {
-            Logger.e("RiskAnalyzer") { "Failed to parse JSON: ${e.message}, input: $jsonStr" }
+            Logger.e("RiskAnalyzer") { "Failed to parse: ${e.message}" }
             throw IllegalStateException("Error")
         }
     }
