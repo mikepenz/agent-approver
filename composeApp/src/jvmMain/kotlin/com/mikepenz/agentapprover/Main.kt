@@ -46,13 +46,19 @@ fun getAppDataDir(): String {
 }
 
 private fun createTrayIcon(): BufferedImage {
-    val size = 16
+    // macOS menu bar icons should be 22x22 (or 44x44 for retina)
+    val size = 22
     val image = BufferedImage(size, size, BufferedImage.TYPE_INT_ARGB)
     val g = image.createGraphics()
-    g.color = java.awt.Color(100, 180, 255)
-    g.fillOval(1, 1, size - 2, size - 2)
+    g.setRenderingHint(java.awt.RenderingHints.KEY_ANTIALIASING, java.awt.RenderingHints.VALUE_ANTIALIAS_ON)
+    // Shield outline
+    g.color = java.awt.Color(140, 92, 246) // Purple matching primary
+    g.fillRoundRect(3, 2, 16, 18, 6, 6)
+    // Checkmark
     g.color = java.awt.Color.WHITE
-    g.fillOval(5, 5, size - 10, size - 10)
+    g.stroke = java.awt.BasicStroke(2.2f, java.awt.BasicStroke.CAP_ROUND, java.awt.BasicStroke.JOIN_ROUND)
+    g.drawLine(7, 12, 10, 15)
+    g.drawLine(10, 15, 15, 7)
     g.dispose()
     return image
 }
