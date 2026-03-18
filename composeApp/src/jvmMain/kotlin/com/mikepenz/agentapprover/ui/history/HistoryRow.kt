@@ -133,11 +133,13 @@ fun HistoryRow(
                         color = rColor.copy(alpha = 0.2f),
                     ) {
                         Text(
-                            text = "Risk ${result.riskAnalysis.risk}",
+                            text = "Risk ${result.riskAnalysis.risk} — ${result.riskAnalysis.message}",
                             modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
                             color = rColor,
                             fontSize = 10.sp,
                             style = MaterialTheme.typography.labelSmall,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
                         )
                     }
                 }
@@ -164,6 +166,36 @@ fun HistoryRow(
                 ) {
                     SelectionContainer {
                         Column {
+                            if (result.riskAnalysis != null) {
+                                Text(
+                                    text = "Risk Assessment:",
+                                    fontSize = 10.sp,
+                                    color = Color.Gray,
+                                    style = MaterialTheme.typography.labelSmall,
+                                )
+                                Text(
+                                    text = "Level ${result.riskAnalysis.risk} (${riskLabel(result.riskAnalysis.risk)}) — ${result.riskAnalysis.message}",
+                                    fontFamily = FontFamily.Monospace,
+                                    fontSize = 10.sp,
+                                    color = riskColor(result.riskAnalysis.risk),
+                                )
+                                Spacer(Modifier.height(8.dp))
+                            }
+                            if (result.feedback != null) {
+                                Text(
+                                    text = "Feedback:",
+                                    fontSize = 10.sp,
+                                    color = Color.Gray,
+                                    style = MaterialTheme.typography.labelSmall,
+                                )
+                                Text(
+                                    text = result.feedback,
+                                    fontFamily = FontFamily.Monospace,
+                                    fontSize = 10.sp,
+                                    color = Color(0xFFCCCCCC),
+                                )
+                                Spacer(Modifier.height(8.dp))
+                            }
                             Text(
                                 text = "Request:",
                                 fontSize = 10.sp,
