@@ -53,7 +53,7 @@ fun decisionColor(decision: Decision): Color = when (decision) {
     Decision.TIMEOUT -> Color(0xFFFF9800)
     Decision.AUTO_APPROVED -> Color(0xFF2196F3)
     Decision.AUTO_DENIED -> Color(0xFFB71C1C)
-    Decision.ALWAYS_ALLOWED -> Color(0xFF2196F3)
+    Decision.ALWAYS_ALLOWED -> Color(0xFF00ACC1)
     Decision.CANCELLED_BY_CLIENT -> Color(0xFF9E9E9E)
 }
 
