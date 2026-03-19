@@ -37,11 +37,11 @@ import com.mikepenz.agentapprover.storage.HistoryStorage
 import com.mikepenz.agentapprover.storage.SettingsStorage
 import com.mikepenz.agentapprover.ui.App
 import com.mikepenz.agentapprover.ui.detail.ContentDetailWindow
+import com.mikepenz.agentapprover.platform.AppIcon
 import com.mikepenz.agentapprover.ui.theme.AgentApproverTheme
 import com.mikepenz.agentapprover.ui.theme.configureLogging
 import androidx.compose.ui.graphics.painter.BitmapPainter
 import androidx.compose.ui.graphics.toComposeImageBitmap
-import java.awt.image.BufferedImage
 import java.io.File
 import java.net.BindException
 
@@ -55,23 +55,6 @@ fun getAppDataDir(): String {
     }
 }
 
-private fun createTrayIcon(): BufferedImage {
-    // macOS menu bar icons should be 22x22 (or 44x44 for retina)
-    val size = 22
-    val image = BufferedImage(size, size, BufferedImage.TYPE_INT_ARGB)
-    val g = image.createGraphics()
-    g.setRenderingHint(java.awt.RenderingHints.KEY_ANTIALIASING, java.awt.RenderingHints.VALUE_ANTIALIAS_ON)
-    // Shield outline
-    g.color = java.awt.Color(140, 92, 246) // Purple matching primary
-    g.fillRoundRect(3, 2, 16, 18, 6, 6)
-    // Checkmark
-    g.color = java.awt.Color.WHITE
-    g.stroke = java.awt.BasicStroke(2.2f, java.awt.BasicStroke.CAP_ROUND, java.awt.BasicStroke.JOIN_ROUND)
-    g.drawLine(7, 12, 10, 15)
-    g.drawLine(10, 15, 15, 7)
-    g.dispose()
-    return image
-}
 
 private const val DEFAULT_WINDOW_WIDTH = 420
 private const val DEFAULT_WINDOW_HEIGHT = 480
@@ -151,17 +134,40 @@ fun main() {
             )
         }
 
-        val trayIcon = remember { BitmapPainter(createTrayIcon().toComposeImageBitmap()) }
-        Tray(
-            icon = trayIcon,
-            tooltip = "Agent Approver",
-            menu = {
-                Item("Show/Hide") { isVisible = !isVisible }
-                Item("Quit") { exitApplication() }
-            },
-        )
-
         val state by stateManager.state.collectAsState()
+        val pendingCount = state.pendingApprovals.size
+
+        // Use AWT SystemTray directly for proper MultiResolutionImage HiDPI support
+        val exitApp = ::exitApplication
+        DisposableEffect(Unit) {
+            val systemTray = if (java.awt.SystemTray.isSupported()) java.awt.SystemTray.getSystemTray() else null
+            val trayIcon = if (systemTray != null) {
+                val icon = java.awt.TrayIcon(AppIcon.createTrayIconMultiRes(0))
+                icon.isImageAutoSize = false
+                icon.toolTip = "Agent Approver"
+                icon.addActionListener { isVisible = !isVisible }
+
+                val popup = java.awt.PopupMenu()
+                popup.add(java.awt.MenuItem("Show/Hide").apply { addActionListener { isVisible = !isVisible } })
+                popup.add(java.awt.MenuItem("Quit").apply { addActionListener { exitApp() } })
+                icon.popupMenu = popup
+
+                systemTray.add(icon)
+                icon
+            } else null
+            onDispose { trayIcon?.let { systemTray?.remove(it) } }
+        }
+
+        // Update tray icon when pending count changes
+        LaunchedEffect(pendingCount) {
+            if (java.awt.SystemTray.isSupported()) {
+                val systemTray = java.awt.SystemTray.getSystemTray()
+                systemTray.trayIcons.firstOrNull()?.let { icon ->
+                    icon.image = AppIcon.createTrayIconMultiRes(pendingCount)
+                    icon.toolTip = if (pendingCount > 0) "Agent Approver ($pendingCount pending)" else "Agent Approver"
+                }
+            }
+        }
         val settings = state.settings
 
         // Keep risk analyzer in sync with settings
