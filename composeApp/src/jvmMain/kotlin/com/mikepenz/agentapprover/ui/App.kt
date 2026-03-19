@@ -151,6 +151,15 @@ fun App(
                         rawResponseJson = null,
                     )
                 },
+                onAlwaysAllow = { requestId ->
+                    stateManager.resolve(
+                        requestId = requestId,
+                        decision = Decision.ALWAYS_ALLOWED,
+                        feedback = "Always allowed",
+                        riskAnalysis = null,
+                        rawResponseJson = null,
+                    )
+                },
                 onDeny = { requestId, feedback ->
                     stateManager.resolve(
                         requestId = requestId,

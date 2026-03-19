@@ -2,6 +2,10 @@ package com.mikepenz.agentapprover.ui.approvals
 
 import androidx.compose.desktop.ui.tooling.preview.Preview
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -10,16 +14,19 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.mikepenz.agentapprover.model.*
+import com.mikepenz.agentapprover.model.PermissionSuggestion
 import com.mikepenz.agentapprover.ui.theme.AgentApproverTheme
 import com.mikepenz.markdown.m3.Markdown
 import kotlinx.datetime.Clock
 import kotlinx.serialization.json.*
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DefaultCard(
     request: ApprovalRequest,
     onApprove: (String?) -> Unit,
     onDeny: (String) -> Unit,
+    onAlwaysAllow: () -> Unit = {},
     onPopOut: ((title: String, content: String) -> Unit)? = null,
 ) {
     var denyFeedback by remember { mutableStateOf("") }
@@ -77,6 +84,7 @@ fun DefaultCard(
 
         // Buttons: hide Approve when denial reason is entered
         val hasDenyText = denyFeedback.isNotBlank()
+        val hasSuggestions = request.hookInput.permissionSuggestions.isNotEmpty()
 
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -89,6 +97,61 @@ fun DefaultCard(
                     colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
                 ) {
                     Text("Deny")
+                }
+            } else if (hasSuggestions) {
+                OutlinedButton(
+                    onClick = { onDeny("") },
+                    modifier = Modifier.weight(1f),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
+                ) {
+                    Text("Deny")
+                }
+
+                // Split button: Approve + dropdown arrow for "Always allow"
+                var showMenu by remember { mutableStateOf(false) }
+                val tooltipText = remember(request) { formatPermissionTooltip(request.hookInput.permissionSuggestions) }
+
+                Row(modifier = Modifier.weight(1f)) {
+                    Button(
+                        onClick = { onApprove(null) },
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(topStartPercent = 50, bottomStartPercent = 50, topEndPercent = 0, bottomEndPercent = 0),
+                        contentPadding = PaddingValues(horizontal = 8.dp),
+                    ) {
+                        Text("Approve")
+                    }
+                    Box {
+                        Button(
+                            onClick = { showMenu = true },
+                            modifier = Modifier.width(32.dp),
+                            shape = RoundedCornerShape(topStartPercent = 0, bottomStartPercent = 0, topEndPercent = 50, bottomEndPercent = 50),
+                            contentPadding = PaddingValues(0.dp),
+                        ) {
+                            Text("▾")
+                        }
+                        DropdownMenu(
+                            expanded = showMenu,
+                            onDismissRequest = { showMenu = false },
+                        ) {
+                            TooltipBox(
+                                positionProvider = TooltipDefaults.rememberTooltipPositionProvider(),
+                                tooltip = {
+                                    PlainTooltip {
+                                        Text(tooltipText)
+                                    }
+                                },
+                                state = rememberTooltipState(),
+                            ) {
+                                DropdownMenuItem(
+                                    text = { Text("Always allow") },
+                                    onClick = {
+                                        showMenu = false
+                                        onAlwaysAllow()
+                                    },
+                                )
+                            }
+                        }
+                    }
                 }
             } else {
                 OutlinedButton(
@@ -107,6 +170,25 @@ fun DefaultCard(
             }
         }
     }
+}
+
+private fun formatPermissionTooltip(suggestions: List<PermissionSuggestion>): String {
+    return suggestions.flatMap { suggestion ->
+        val destination = when (suggestion.destination) {
+            "projectSettings" -> "project"
+            "userSettings" -> "user"
+            "localSettings" -> "local"
+            else -> suggestion.destination ?: "session"
+        }
+        suggestion.rules?.map { rule ->
+            val ruleText = if (rule.ruleContent.isNotBlank()) {
+                "${rule.toolName}(${rule.ruleContent})"
+            } else {
+                rule.toolName
+            }
+            "$ruleText — $destination"
+        } ?: emptyList()
+    }.joinToString("\n")
 }
 
 private fun formatContent(request: ApprovalRequest): String {

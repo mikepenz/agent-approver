@@ -33,6 +33,7 @@ fun ApprovalCard(
     timeoutSeconds: Int,
     onApprove: (String?) -> Unit,
     onDeny: (String) -> Unit,
+    onAlwaysAllow: () -> Unit,
     onApproveWithInput: (Map<String, JsonElement>) -> Unit,
     onDismiss: () -> Unit,
     autoDenyActive: Boolean,
@@ -123,6 +124,7 @@ fun ApprovalCard(
                             request = request,
                             onApprove = onApprove,
                             onDeny = onDeny,
+                            onAlwaysAllow = onAlwaysAllow,
                             onPopOut = onPopOut,
                         )
                     }
@@ -298,7 +300,7 @@ private fun PreviewAnalyzing() {
             riskStatus = RiskStatus.ANALYZING,
             riskError = null,
             timeoutSeconds = 120,
-            onApprove = {}, onDeny = {}, onApproveWithInput = {}, onDismiss = {},
+            onApprove = {}, onDeny = {}, onAlwaysAllow = {}, onApproveWithInput = {}, onDismiss = {},
             autoDenyActive = false, onCancelAutoDeny = {},
         )
     }
@@ -314,7 +316,7 @@ private fun PreviewRisk1() {
             riskStatus = RiskStatus.COMPLETED,
             riskError = null,
             timeoutSeconds = 120,
-            onApprove = {}, onDeny = {}, onApproveWithInput = {}, onDismiss = {},
+            onApprove = {}, onDeny = {}, onAlwaysAllow = {}, onApproveWithInput = {}, onDismiss = {},
             autoDenyActive = false, onCancelAutoDeny = {},
         )
     }
@@ -334,7 +336,7 @@ private fun PreviewRisk3() {
             riskStatus = RiskStatus.COMPLETED,
             riskError = null,
             timeoutSeconds = 120,
-            onApprove = {}, onDeny = {}, onApproveWithInput = {}, onDismiss = {},
+            onApprove = {}, onDeny = {}, onAlwaysAllow = {}, onApproveWithInput = {}, onDismiss = {},
             autoDenyActive = false, onCancelAutoDeny = {},
         )
     }
@@ -352,7 +354,7 @@ private fun PreviewRisk5() {
             riskStatus = RiskStatus.COMPLETED,
             riskError = null,
             timeoutSeconds = 120,
-            onApprove = {}, onDeny = {}, onApproveWithInput = {}, onDismiss = {},
+            onApprove = {}, onDeny = {}, onAlwaysAllow = {}, onApproveWithInput = {}, onDismiss = {},
             autoDenyActive = true, onCancelAutoDeny = {},
         )
     }
