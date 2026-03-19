@@ -9,6 +9,8 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -22,6 +24,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.mikepenz.agentapprover.model.*
 import com.mikepenz.agentapprover.ui.approvals.ToolBadge
+import com.mikepenz.agentapprover.ui.icons.LucideCopy
 import com.mikepenz.agentapprover.ui.theme.*
 import kotlinx.serialization.json.Json
 import kotlinx.datetime.Clock
@@ -180,15 +183,54 @@ fun HistoryRow(
 
             // Expanded detail
             AnimatedVisibility(visible = isExpanded) {
+                val clipboardManager = androidx.compose.ui.platform.LocalClipboardManager.current
+                val fullText = buildString {
+                    if (result.riskAnalysis != null) {
+                        appendLine("Risk Assessment: Level ${result.riskAnalysis.risk} (${riskLabel(result.riskAnalysis.risk)}) — ${result.riskAnalysis.message}")
+                    }
+                    if (result.request.hookInput.cwd.isNotBlank()) {
+                        appendLine("Working Directory: ${result.request.hookInput.cwd}")
+                    }
+                    if (result.feedback != null) {
+                        appendLine("Feedback: ${result.feedback}")
+                    }
+                    appendLine("Request:\n${prettyPrintJson(result.request.rawRequestJson)}")
+                    if (result.rawResponseJson != null) {
+                        appendLine("Response:\n${prettyPrintJson(result.rawResponseJson)}")
+                    }
+                }
+
                 Column(
                     modifier = Modifier
                         .padding(top = 8.dp)
                         .fillMaxWidth()
                         .background(Color(0xFF0D0D0D), RoundedCornerShape(6.dp))
-                        .padding(8.dp)
-                        .heightIn(max = 300.dp)
-                        .verticalScroll(rememberScrollState()),
+                        .padding(8.dp),
                 ) {
+                    // Copy button row
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.End,
+                    ) {
+                        IconButton(
+                            onClick = { clipboardManager.setText(androidx.compose.ui.text.AnnotatedString(fullText)) },
+                            modifier = Modifier.size(24.dp),
+                        ) {
+                            Icon(
+                                imageVector = LucideCopy,
+                                contentDescription = "Copy to clipboard",
+                                modifier = Modifier.size(14.dp),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
+
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(max = 280.dp)
+                            .verticalScroll(rememberScrollState()),
+                    ) {
                     SelectionContainer {
                         Column {
                             if (result.riskAnalysis != null) {
@@ -264,6 +306,7 @@ fun HistoryRow(
                                 )
                             }
                         }
+                    }
                     }
                 }
             }
