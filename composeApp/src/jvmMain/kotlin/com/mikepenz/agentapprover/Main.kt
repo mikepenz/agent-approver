@@ -82,14 +82,18 @@ fun main() {
         var popOutState by remember { mutableStateOf<Pair<String, String>?>(null) }
         var showLicenses by remember { mutableStateOf(false) }
 
-        // Handle macOS Quit (dock right-click → Quit, Cmd+Q)
+        // Handle macOS dock icon click and Quit
         val exitApp = ::exitApplication
         LaunchedEffect(Unit) {
             if (java.awt.Desktop.isDesktopSupported()) {
-                java.awt.Desktop.getDesktop().setQuitHandler { _, response ->
+                val desktop = java.awt.Desktop.getDesktop()
+                desktop.setQuitHandler { _, response ->
                     exitApp()
                     response.performQuit()
                 }
+                desktop.addAppEventListener(java.awt.desktop.AppReopenedListener {
+                    isVisible = true
+                })
             }
         }
 
