@@ -14,6 +14,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.mikepenz.agentapprover.model.AppSettings
@@ -256,6 +257,16 @@ fun SettingsTab(
             label = "Default timeout (seconds)",
             value = settings.defaultTimeoutSeconds.toString(),
             onValueChange = { it.toIntOrNull()?.let { timeout -> onSettingsChange(settings.copy(defaultTimeoutSeconds = timeout)) } },
+        )
+
+        // -- About --
+        Spacer(modifier = Modifier.height(8.dp))
+        Text(
+            text = "Agent Approver v${com.mikepenz.agentapprover.VERSION}",
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f),
+            modifier = Modifier.fillMaxWidth(),
+            textAlign = TextAlign.Center,
         )
 
         Spacer(modifier = Modifier.height(8.dp))
