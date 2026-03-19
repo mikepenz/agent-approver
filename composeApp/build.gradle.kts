@@ -1,4 +1,4 @@
-import org.jetbrains.compose.desktop.application.dsl.TargetFormat
+import io.github.kdroidfilter.nucleus.desktop.application.dsl.TargetFormat
 
 abstract class VersionTask : Sync() {
     @get:Input
@@ -89,24 +89,32 @@ kotlin {
 }
 
 
-compose.desktop {
-    application {
-        mainClass = "com.mikepenz.agentapprover.MainKt"
+nucleus.application {
+    mainClass = "com.mikepenz.agentapprover.MainKt"
 
-        nativeDistributions {
-            targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb)
-            packageName = "AgentApprover"
-            packageVersion = appVersion
+    nativeDistributions {
+        targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb)
+        packageName = "AgentApprover"
+        packageVersion = appVersion
+        description = "Centralized approval UI for AI agent tool requests"
+        vendor = "mikepenz"
 
-            macOS {
-                iconFile.set(project.file("../icons/app.icns"))
-            }
-            windows {
-                iconFile.set(project.file("../icons/app.ico"))
-            }
-            linux {
-                iconFile.set(project.file("../icons/app.png"))
-            }
+        cleanupNativeLibs = true
+
+        macOS {
+            iconFile.set(project.file("../icons/app.icns"))
+            layeredIconDir.set(project.file("../icons/AgentApprover.icon"))
+            bundleID = "com.mikepenz.agentapprover"
+            dockName = "Agent Approver"
+            appCategory = "public.app-category.developer-tools"
+        }
+        windows {
+            iconFile.set(project.file("../icons/app.ico"))
+            console = false
+            perUserInstall = true
+        }
+        linux {
+            iconFile.set(project.file("../icons/app.png"))
         }
     }
 }
