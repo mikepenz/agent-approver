@@ -117,16 +117,11 @@ fun HistoryRow(
                 )
             }
 
-            // Agent + cwd info
+            // Agent info (no cwd in compact view)
             val agentType = result.request.hookInput.agentType
-            val cwd = result.request.hookInput.cwd
-            if (agentType != null || cwd.isNotBlank()) {
+            if (agentType != null) {
                 Text(
-                    text = buildString {
-                        if (agentType != null) append("Agent: $agentType")
-                        if (agentType != null && cwd.isNotBlank()) append(" · ")
-                        if (cwd.isNotBlank()) append(cwd)
-                    },
+                    text = "Agent: $agentType",
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
                     maxLines = 1,
