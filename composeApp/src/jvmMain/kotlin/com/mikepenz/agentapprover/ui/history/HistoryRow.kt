@@ -200,35 +200,17 @@ fun HistoryRow(
                     }
                 }
 
-                Column(
+                Box(
                     modifier = Modifier
                         .padding(top = 8.dp)
                         .fillMaxWidth()
                         .background(Color(0xFF0D0D0D), RoundedCornerShape(6.dp))
-                        .padding(8.dp),
+                        .padding(8.dp)
+                        .heightIn(max = 300.dp),
                 ) {
-                    // Copy button row
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.End,
-                    ) {
-                        IconButton(
-                            onClick = { clipboardManager.setText(androidx.compose.ui.text.AnnotatedString(fullText)) },
-                            modifier = Modifier.size(24.dp),
-                        ) {
-                            Icon(
-                                imageVector = LucideCopy,
-                                contentDescription = "Copy to clipboard",
-                                modifier = Modifier.size(14.dp),
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
-                    }
-
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .heightIn(max = 280.dp)
                             .verticalScroll(rememberScrollState()),
                     ) {
                     SelectionContainer {
@@ -307,6 +289,22 @@ fun HistoryRow(
                             }
                         }
                     }
+                    }
+
+                    // Overlapping copy button top-right
+                    IconButton(
+                        onClick = { clipboardManager.setText(androidx.compose.ui.text.AnnotatedString(fullText)) },
+                        modifier = Modifier
+                            .align(Alignment.TopEnd)
+                            .size(28.dp)
+                            .background(Color(0xFF0D0D0D).copy(alpha = 0.8f), RoundedCornerShape(4.dp)),
+                    ) {
+                        Icon(
+                            imageVector = LucideCopy,
+                            contentDescription = "Copy to clipboard",
+                            modifier = Modifier.size(14.dp),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
                     }
                 }
             }
