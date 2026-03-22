@@ -24,6 +24,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.mikepenz.agentapprover.model.*
 import com.mikepenz.agentapprover.ui.approvals.ToolBadge
+import com.mikepenz.agentapprover.ui.approvals.ToolContentSummary
 import com.mikepenz.agentapprover.ui.icons.LucideCopy
 import com.mikepenz.agentapprover.ui.theme.*
 import kotlinx.serialization.json.Json
@@ -72,8 +73,16 @@ private fun summaryText(request: ApprovalRequest): String = when {
         request.hookInput.toolInput["command"]?.jsonPrimitive?.content ?: request.hookInput.toolName
 
     request.hookInput.toolName.equals("Edit", ignoreCase = true) ||
-        request.hookInput.toolName.equals("Write", ignoreCase = true) ->
+        request.hookInput.toolName.equals("Write", ignoreCase = true) ||
+        request.hookInput.toolName.equals("Read", ignoreCase = true) ->
         request.hookInput.toolInput["file_path"]?.jsonPrimitive?.content ?: request.hookInput.toolName
+
+    request.hookInput.toolName.equals("WebFetch", ignoreCase = true) ->
+        request.hookInput.toolInput["url"]?.jsonPrimitive?.content ?: request.hookInput.toolName
+
+    request.hookInput.toolName.equals("Grep", ignoreCase = true) ||
+        request.hookInput.toolName.equals("Glob", ignoreCase = true) ->
+        request.hookInput.toolInput["pattern"]?.jsonPrimitive?.content ?: request.hookInput.toolName
 
     request.toolType == ToolType.ASK_USER_QUESTION ->
         request.hookInput.toolInput["question"]?.jsonPrimitive?.content?.take(80) ?: "Question"
@@ -262,6 +271,13 @@ fun HistoryRow(
                                 )
                                 Spacer(Modifier.height(8.dp))
                             }
+                            Spacer(Modifier.height(8.dp))
+                            ToolContentSummary(
+                                toolName = result.request.hookInput.toolName,
+                                toolInput = result.request.hookInput.toolInput,
+                                cwd = result.request.hookInput.cwd,
+                            )
+                            Spacer(Modifier.height(8.dp))
                             Text(
                                 text = "Request:",
                                 fontSize = 10.sp,
