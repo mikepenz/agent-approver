@@ -2,8 +2,9 @@ package com.mikepenz.agentapprover.ui.history
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.desktop.ui.tooling.preview.Preview
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -101,20 +102,28 @@ private fun relativeTimestamp(instant: Instant): String {
     }
 }
 
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
 fun HistoryRow(
     result: ApprovalResult,
     isExpanded: Boolean,
     onToggleExpand: () -> Unit,
+    onReplay: ((ApprovalResult) -> Unit)? = null,
 ) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        onClick = onToggleExpand,
         shape = RoundedCornerShape(8.dp),
         color = MaterialTheme.colorScheme.surface,
         tonalElevation = if (isExpanded) 2.dp else 0.dp,
     ) {
-        Column(modifier = Modifier.padding(8.dp)) {
+        Column(
+            modifier = Modifier
+                .combinedClickable(
+                    onClick = onToggleExpand,
+                    onLongClick = if (onReplay != null) {{ onReplay(result) }} else null,
+                )
+                .padding(8.dp),
+        ) {
             // Top line: tool badge + summary
             Row(
                 verticalAlignment = Alignment.CenterVertically,

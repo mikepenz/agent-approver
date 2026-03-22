@@ -2,6 +2,7 @@ package com.mikepenz.agentapprover
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Button
@@ -62,8 +63,10 @@ private const val DEFAULT_WINDOW_WIDTH = 420
 private const val DEFAULT_WINDOW_HEIGHT = 480
 
 @OptIn(FlowPreview::class)
-fun main() {
+fun main(args: Array<String>) {
     configureLogging()
+
+    val devMode = "--dev" in args || System.getProperty("agentapprover.devmode") == "true"
 
     val dataDir = getAppDataDir()
     File(dataDir).mkdirs()
@@ -274,11 +277,30 @@ fun main() {
                         window.isAlwaysOnTop = settings.alwaysOnTop
                     }
                     MaterialTitleBar {
-                        Text(
-                            "Agent Approver",
-                            color = MaterialTheme.colorScheme.onSurface,
-                            style = MaterialTheme.typography.titleSmall,
-                        )
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            modifier = Modifier.align(Alignment.CenterHorizontally),
+                        ) {
+                            Text(
+                                "Agent Approver",
+                                color = MaterialTheme.colorScheme.onSurface,
+                                style = MaterialTheme.typography.titleSmall,
+                            )
+                            if (devMode) {
+                                Surface(
+                                    shape = androidx.compose.foundation.shape.RoundedCornerShape(4.dp),
+                                    color = MaterialTheme.colorScheme.tertiary.copy(alpha = 0.2f),
+                                ) {
+                                    Text(
+                                        "DEV",
+                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 1.dp),
+                                        color = MaterialTheme.colorScheme.tertiary,
+                                        style = MaterialTheme.typography.labelSmall,
+                                    )
+                                }
+                            }
+                        }
                     }
                     Surface(
                         modifier = Modifier.fillMaxSize(),
@@ -286,6 +308,7 @@ fun main() {
                     ) {
                         App(
                             stateManager, hookRegistrar, riskAnalyzer,
+                            devMode = devMode,
                             onPopOut = { title, content -> popOutState = title to content },
                             onShowLicenses = { showLicenses = true },
                         )

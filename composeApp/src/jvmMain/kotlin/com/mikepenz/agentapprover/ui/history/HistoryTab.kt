@@ -20,7 +20,7 @@ import kotlin.time.Duration.Companion.hours
 import kotlin.time.Duration.Companion.minutes
 
 @Composable
-fun HistoryTab(history: List<ApprovalResult>) {
+fun HistoryTab(history: List<ApprovalResult>, onReplay: ((ApprovalResult) -> Unit)? = null) {
     var filterText by remember { mutableStateOf("") }
     var expandedId by remember { mutableStateOf<String?>(null) }
 
@@ -74,6 +74,7 @@ fun HistoryTab(history: List<ApprovalResult>) {
                         onToggleExpand = {
                             expandedId = if (expandedId == result.request.id) null else result.request.id
                         },
+                        onReplay = onReplay,
                     )
                 }
             }

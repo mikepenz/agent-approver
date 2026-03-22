@@ -105,6 +105,11 @@ aboutLibraries {
 nucleus.application {
     mainClass = "com.mikepenz.agentapprover.MainKt"
 
+    jvmArgs += listOf()
+    if (providers.gradleProperty("devMode").isPresent) {
+        args += listOf("--dev")
+    }
+
     nativeDistributions {
         targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb)
         packageName = "AgentApprover"

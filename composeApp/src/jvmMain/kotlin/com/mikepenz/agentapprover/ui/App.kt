@@ -43,6 +43,7 @@ fun App(
     stateManager: AppStateManager,
     hookRegistrar: HookRegistrar,
     riskAnalyzer: RiskAnalyzer,
+    devMode: Boolean = false,
     onPopOut: ((title: String, content: String) -> Unit)? = null,
     onShowLicenses: () -> Unit = {},
 ) {
@@ -208,7 +209,17 @@ fun App(
                 onPopOut = onPopOut,
             )
 
-            1 -> HistoryTab(history = state.history)
+            1 -> HistoryTab(
+                history = state.history,
+                onReplay = if (devMode) { result ->
+                    val cloned = result.request.copy(
+                        id = java.util.UUID.randomUUID().toString(),
+                        timestamp = kotlinx.datetime.Clock.System.now(),
+                    )
+                    stateManager.addPending(cloned)
+                    selectedTab = 0
+                } else null,
+            )
 
             2 -> {
                 var isHookRegistered by remember { mutableStateOf(hookRegistrar.isRegistered(state.settings.serverPort)) }
