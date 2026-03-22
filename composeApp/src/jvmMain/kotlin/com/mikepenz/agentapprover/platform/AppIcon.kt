@@ -55,7 +55,7 @@ object AppIcon {
         val claudeShape = buildClaudeLogoShape(padding, padding, logoSize)
 
         // Badge geometry
-        val badgeRadius = size * 0.28f
+        val badgeRadius = size * 0.19f
         val badgeCenterX = size - badgeRadius - size * 0.04f
         val badgeCenterY = size - badgeRadius - size * 0.04f
         val cutoutRadius = badgeRadius + size * 0.04f // Gap around badge
