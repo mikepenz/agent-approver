@@ -171,6 +171,7 @@ fun main() {
         val pendingCount = state.pendingApprovals.size
 
         // Use AWT SystemTray directly for proper MultiResolutionImage HiDPI support
+        val showHideItem = remember { java.awt.MenuItem(if (isVisible) "Hide" else "Show") }
         DisposableEffect(Unit) {
             val systemTray = if (java.awt.SystemTray.isSupported()) java.awt.SystemTray.getSystemTray() else null
             val trayIcon = if (systemTray != null) {
@@ -180,7 +181,8 @@ fun main() {
                 icon.addActionListener { isVisible = !isVisible }
 
                 val popup = java.awt.PopupMenu()
-                popup.add(java.awt.MenuItem("Show/Hide").apply { addActionListener { isVisible = !isVisible } })
+                showHideItem.addActionListener { isVisible = !isVisible }
+                popup.add(showHideItem)
                 popup.add(java.awt.MenuItem("Quit").apply { addActionListener { exitApp() } })
                 icon.popupMenu = popup
 
@@ -190,7 +192,10 @@ fun main() {
             onDispose { trayIcon?.let { systemTray?.remove(it) } }
         }
 
-        // Update tray icon when pending count changes
+        // Update tray menu label and icon when state changes
+        LaunchedEffect(isVisible) {
+            showHideItem.label = if (isVisible) "Hide" else "Show"
+        }
         LaunchedEffect(pendingCount) {
             if (java.awt.SystemTray.isSupported()) {
                 val systemTray = java.awt.SystemTray.getSystemTray()
