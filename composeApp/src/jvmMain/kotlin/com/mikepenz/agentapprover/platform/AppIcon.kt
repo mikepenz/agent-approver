@@ -5,14 +5,14 @@ import java.awt.Color
 import java.awt.Font
 import java.awt.RenderingHints
 import java.awt.geom.Area
-import java.awt.geom.Ellipse2D
 import java.awt.geom.GeneralPath
 import java.awt.image.BufferedImage
+import kotlin.math.*
 
 /**
  * Generates the app/tray icon: white Claude logo filling the icon with a small
- * badge (shield + checkmark) in the bottom right. The badge cuts out from the
- * Claude logo with a small gap around it.
+ * badge (Lucide badge-check outline + checkmark) in the bottom right. The badge
+ * cuts out from the Claude logo with a small gap around it.
  *
  * When pendingCount > 0, the badge turns red and shows the count.
  */
@@ -21,11 +21,6 @@ object AppIcon {
     private val BADGE_GREEN = Color(0x4C, 0xAF, 0x50)
     private val BADGE_RED = Color(0xF4, 0x43, 0x36)
 
-    /**
-     * Creates a tray icon as a MultiResolutionImage for HiDPI.
-     * macOS menu bar icons are 22pt; we provide 22px (1x) and 44px (2x).
-     * macOS template images must be black — the OS handles light/dark adaptation.
-     */
     /**
      * Creates a tray icon as a MultiResolutionImage for HiDPI (1x + 2x).
      * macOS template images must be black — the OS handles light/dark adaptation.
@@ -54,38 +49,27 @@ object AppIcon {
         // Build the Claude logo shape (filled area)
         val claudeShape = buildClaudeLogoShape(padding, padding, logoSize)
 
-        // Badge geometry
-        val badgeRadius = size * 0.23f
+        // Badge geometry — diameter determines badge-check outline size
+        val badgeDiameter = size * 0.46f
+        val badgeRadius = badgeDiameter / 2f
         val badgeCenterX = size - badgeRadius - size * 0.04f
         val badgeCenterY = size - badgeRadius - size * 0.04f
-        val cutoutRadius = badgeRadius + size * 0.04f // Gap around badge
 
-        // Cut out the badge area from the Claude logo
-        val cutoutCircle = Ellipse2D.Float(
-            badgeCenterX - cutoutRadius,
-            badgeCenterY - cutoutRadius,
-            cutoutRadius * 2,
-            cutoutRadius * 2,
-        )
+        // Cut out the badge area from the Claude logo (circle cutout with gap)
+        val cutoutRadius = badgeRadius + size * 0.04f
+        val cutoutShape = buildBadgeOutline(badgeCenterX, badgeCenterY, (cutoutRadius * 2))
         val logoArea = Area(claudeShape)
-        logoArea.subtract(Area(cutoutCircle))
+        logoArea.subtract(Area(cutoutShape))
 
         // Draw Claude logo with cutout
-        // macOS tray uses black (template image), app icon uses white
         g.color = if (trayMode) Color.BLACK else Color.WHITE
         g.fill(logoArea)
 
-        // Draw badge circle
+        // Draw badge shape (filled badge-check outline)
+        val badgeShape = buildBadgeOutline(badgeCenterX, badgeCenterY, badgeDiameter)
         val badgeColor = if (pendingCount > 0) BADGE_RED else BADGE_GREEN
         g.color = badgeColor
-        g.fill(
-            Ellipse2D.Float(
-                badgeCenterX - badgeRadius,
-                badgeCenterY - badgeRadius,
-                badgeRadius * 2,
-                badgeRadius * 2,
-            )
-        )
+        g.fill(badgeShape)
 
         // Badge content
         g.color = Color.WHITE
@@ -120,6 +104,159 @@ object AppIcon {
 
         g.dispose()
         return image
+    }
+
+    /**
+     * Builds the Lucide badge-check outline shape centered at (cx, cy) with given diameter.
+     * SVG path: M3.85 8.62 a4 4 0 0 1 4.78-4.77 ... Z (viewBox 0 0 24 24)
+     */
+    private fun buildBadgeOutline(cx: Float, cy: Float, diameter: Float): java.awt.Shape {
+        val scale = diameter.toDouble() / 24.0
+        val ox = cx.toDouble() - 12.0 * scale
+        val oy = cy.toDouble() - 12.0 * scale
+        val r = 4.0 * scale
+
+        val path = GeneralPath()
+        path.moveTo((ox + 3.85 * scale).toFloat(), (oy + 8.62 * scale).toFloat())
+
+        // 8 arc segments — absolute endpoints in 24x24 viewBox coordinates
+        // All: rx=4, ry=4, rotation=0, large-arc=false, sweep=true
+        val endpoints = doubleArrayOf(
+            8.63, 3.85,
+            15.37, 3.85,
+            20.15, 8.63,
+            20.15, 15.37,
+            15.38, 20.15,
+            8.63, 20.15,
+            3.85, 15.38,
+            3.85, 8.62,
+        )
+
+        for (i in endpoints.indices step 2) {
+            svgArcTo(path, r, r, 0.0, largeArc = false, sweep = true,
+                ox + endpoints[i] * scale, oy + endpoints[i + 1] * scale)
+        }
+
+        path.closePath()
+        return path
+    }
+
+    /**
+     * Converts an SVG arc segment to cubic bezier curves and appends to path.
+     * Implements the SVG spec endpoint-to-center arc parametrization (F.6.5–F.6.6).
+     */
+    private fun svgArcTo(
+        path: GeneralPath,
+        rx: Double, ry: Double,
+        xRot: Double,
+        largeArc: Boolean, sweep: Boolean,
+        x2: Double, y2: Double,
+    ) {
+        val pt = path.currentPoint
+        val x1 = pt.x
+        val y1 = pt.y
+
+        if (rx == 0.0 || ry == 0.0) {
+            path.lineTo(x2.toFloat(), y2.toFloat())
+            return
+        }
+
+        val phi = Math.toRadians(xRot)
+        val cosPhi = cos(phi)
+        val sinPhi = sin(phi)
+
+        val dx2 = (x1 - x2) / 2.0
+        val dy2 = (y1 - y2) / 2.0
+        val x1p = cosPhi * dx2 + sinPhi * dy2
+        val y1p = -sinPhi * dx2 + cosPhi * dy2
+
+        var rxA = abs(rx)
+        var ryA = abs(ry)
+        val x1pSq = x1p * x1p
+        val y1pSq = y1p * y1p
+
+        // Adjust radii if needed
+        val lambdaSq = x1pSq / (rxA * rxA) + y1pSq / (ryA * ryA)
+        if (lambdaSq > 1.0) {
+            val lambda = sqrt(lambdaSq)
+            rxA *= lambda
+            ryA *= lambda
+        }
+
+        val rxSq = rxA * rxA
+        val rySq = ryA * ryA
+
+        // Center parametrization
+        var sq = (rxSq * rySq - rxSq * y1pSq - rySq * x1pSq) /
+                (rxSq * y1pSq + rySq * x1pSq)
+        if (sq < 0) sq = 0.0
+        val sign = if (largeArc == sweep) -1.0 else 1.0
+        val coef = sign * sqrt(sq)
+        val cxp = coef * rxA * y1p / ryA
+        val cyp = coef * -ryA * x1p / rxA
+
+        val cx = cosPhi * cxp - sinPhi * cyp + (x1 + x2) / 2.0
+        val cy = sinPhi * cxp + cosPhi * cyp + (y1 + y2) / 2.0
+
+        // Compute angles
+        val theta1 = vecAngle(1.0, 0.0, (x1p - cxp) / rxA, (y1p - cyp) / ryA)
+        var dtheta = vecAngle(
+            (x1p - cxp) / rxA, (y1p - cyp) / ryA,
+            (-x1p - cxp) / rxA, (-y1p - cyp) / ryA,
+        )
+        if (!sweep && dtheta > 0) dtheta -= 2 * PI
+        if (sweep && dtheta < 0) dtheta += 2 * PI
+
+        // Split into bezier segments (max 90° each)
+        val segs = ceil(abs(dtheta) / (PI / 2)).toInt().coerceAtLeast(1)
+        val segAngle = dtheta / segs
+        val alpha = 4.0 / 3.0 * tan(segAngle / 4.0)
+
+        var angle = theta1
+        var curX = x1
+        var curY = y1
+
+        for (i in 0 until segs) {
+            val nextAngle = angle + segAngle
+            val cosA = cos(angle)
+            val sinA = sin(angle)
+            val cosNA = cos(nextAngle)
+            val sinNA = sin(nextAngle)
+
+            // Endpoint
+            val epx = cosPhi * rxA * cosNA - sinPhi * ryA * sinNA + cx
+            val epy = sinPhi * rxA * cosNA + cosPhi * ryA * sinNA + cy
+
+            // Control point 1 (tangent at current)
+            val dx1t = -rxA * sinA
+            val dy1t = ryA * cosA
+            val cp1x = curX + alpha * (cosPhi * dx1t - sinPhi * dy1t)
+            val cp1y = curY + alpha * (sinPhi * dx1t + cosPhi * dy1t)
+
+            // Control point 2 (tangent at end, reversed)
+            val dx2t = -rxA * sinNA
+            val dy2t = ryA * cosNA
+            val cp2x = epx - alpha * (cosPhi * dx2t - sinPhi * dy2t)
+            val cp2y = epy - alpha * (sinPhi * dx2t + cosPhi * dy2t)
+
+            path.curveTo(
+                cp1x.toFloat(), cp1y.toFloat(),
+                cp2x.toFloat(), cp2y.toFloat(),
+                epx.toFloat(), epy.toFloat(),
+            )
+
+            curX = epx
+            curY = epy
+            angle = nextAngle
+        }
+    }
+
+    private fun vecAngle(ux: Double, uy: Double, vx: Double, vy: Double): Double {
+        val dot = ux * vx + uy * vy
+        val len = sqrt(ux * ux + uy * uy) * sqrt(vx * vx + vy * vy)
+        var ang = acos((dot / len).coerceIn(-1.0, 1.0))
+        if (ux * vy - uy * vx < 0) ang = -ang
+        return ang
     }
 
     /**
