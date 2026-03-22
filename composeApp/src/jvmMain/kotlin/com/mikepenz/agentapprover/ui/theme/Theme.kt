@@ -34,6 +34,9 @@ val ToolBashColor = Color(0xFFDEEF33) // Dandelion
 val ToolAskColor = Color(0xFF3082DB) // Windows Blue
 val ToolPlanColor = Color(0xFF339470) // Sea Turtle
 val ToolDefaultColor = Color(0xFF78909C)
+val ToolFileColor = Color(0xFFC792EA)   // Soft purple for file ops
+val ToolSearchColor = Color(0xFF82AAFF) // Soft blue for search
+val ToolWebColor = Color(0xFFFF9E64)    // Warm orange for web
 
 fun riskColor(risk: Int): Color = when (risk) {
     1 -> RiskSafe
@@ -53,10 +56,17 @@ fun riskLabel(risk: Int): String = when (risk) {
     else -> "Medium"
 }
 
-fun toolColor(toolType: ToolType): Color = when (toolType) {
-    ToolType.ASK_USER_QUESTION -> ToolAskColor
-    ToolType.PLAN -> ToolPlanColor
-    ToolType.DEFAULT -> ToolDefaultColor
+fun toolColor(toolName: String, toolType: ToolType): Color = when {
+    toolName.equals("Bash", ignoreCase = true) -> ToolBashColor
+    toolName.equals("Read", ignoreCase = true) ||
+        toolName.equals("Edit", ignoreCase = true) ||
+        toolName.equals("Write", ignoreCase = true) -> ToolFileColor
+    toolName.equals("Grep", ignoreCase = true) ||
+        toolName.equals("Glob", ignoreCase = true) -> ToolSearchColor
+    toolName.equals("WebFetch", ignoreCase = true) -> ToolWebColor
+    toolType == ToolType.ASK_USER_QUESTION -> ToolAskColor
+    toolType == ToolType.PLAN -> ToolPlanColor
+    else -> ToolDefaultColor
 }
 
 // Dark theme — deep cool surfaces, Sea Turtle primary, warm accents

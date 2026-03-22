@@ -198,7 +198,7 @@ fun TimerProgressBar(
 
 @Composable
 fun ToolBadge(toolName: String, toolType: ToolType) {
-    val color = toolColor(toolType)
+    val color = toolColor(toolName, toolType)
     Surface(
         shape = RoundedCornerShape(4.dp),
         color = color.copy(alpha = 0.2f),
