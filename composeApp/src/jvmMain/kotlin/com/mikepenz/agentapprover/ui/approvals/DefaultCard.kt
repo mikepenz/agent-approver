@@ -31,10 +31,10 @@ fun DefaultCard(
     onDeny: (String) -> Unit,
     onAlwaysAllow: () -> Unit = {},
     onPopOut: ((title: String, content: String) -> Unit)? = null,
+    popOutContent: String = "",
+    content: @Composable () -> Unit,
 ) {
     var denyFeedback by remember { mutableStateOf("") }
-
-    val content = remember(request) { formatContent(request) }
 
     Column(modifier = Modifier.fillMaxWidth()) {
         // Session ID + pop-out button
@@ -50,7 +50,7 @@ fun DefaultCard(
             )
             if (onPopOut != null) {
                 IconButton(
-                    onClick = { onPopOut(request.hookInput.toolName, content) },
+                    onClick = { onPopOut(request.hookInput.toolName, popOutContent) },
                     modifier = Modifier.size(20.dp),
                 ) {
                     Text("↗", fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -61,15 +61,7 @@ fun DefaultCard(
         Spacer(Modifier.height(8.dp))
 
         // Content area
-        Surface(
-            modifier = Modifier.fillMaxWidth(),
-            color = Color(0xFF1E1E1E),
-            shape = MaterialTheme.shapes.small,
-        ) {
-            Box(modifier = Modifier.padding(8.dp)) {
-                Markdown(content = content)
-            }
-        }
+        content()
 
         Spacer(Modifier.height(8.dp))
 
@@ -203,30 +195,17 @@ private fun formatPermissionTooltip(suggestions: List<PermissionSuggestion>): St
     }.joinToString("\n")
 }
 
-private fun formatContent(request: ApprovalRequest): String {
-    val toolName = request.hookInput.toolName.lowercase()
-    val input = request.hookInput.toolInput
-    return when {
-        toolName == "bash" -> {
-            val command = input["command"]?.jsonPrimitive?.contentOrNull ?: input.toString()
-            "```bash\n$command\n```"
-        }
-        toolName == "edit" -> {
-            val filePath = input["file_path"]?.jsonPrimitive?.contentOrNull ?: ""
-            val oldStr = input["old_string"]?.jsonPrimitive?.contentOrNull ?: ""
-            val newStr = input["new_string"]?.jsonPrimitive?.contentOrNull ?: ""
-            buildString {
-                appendLine("**File:** `$filePath`")
-                appendLine()
-                appendLine("```diff")
-                oldStr.lines().forEach { appendLine("- $it") }
-                newStr.lines().forEach { appendLine("+ $it") }
-                appendLine("```")
-            }
-        }
-        else -> {
-            val json = Json { prettyPrint = true }
-            "```json\n${json.encodeToString(JsonObject.serializer(), JsonObject(input))}\n```"
+@Composable
+fun FallbackContent(toolInput: Map<String, JsonElement>) {
+    val json = Json { prettyPrint = true }
+    val text = "```json\n${json.encodeToString(JsonObject.serializer(), JsonObject(toolInput))}\n```"
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        color = Color(0xFF1E1E1E),
+        shape = MaterialTheme.shapes.small,
+    ) {
+        Box(modifier = Modifier.padding(8.dp)) {
+            Markdown(content = text)
         }
     }
 }
@@ -253,7 +232,10 @@ private fun PreviewBashCard() {
                     ),
                     onApprove = {},
                     onDeny = {},
-                )
+                    popOutContent = "ls -la",
+                ) {
+                    FallbackContent(mapOf("command" to JsonPrimitive("git status && git diff HEAD")))
+                }
             }
         }
     }

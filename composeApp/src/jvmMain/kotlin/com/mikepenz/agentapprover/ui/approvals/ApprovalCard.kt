@@ -20,7 +20,9 @@ import com.mikepenz.agentapprover.model.*
 import com.mikepenz.agentapprover.ui.theme.*
 import kotlinx.coroutines.delay
 import kotlinx.datetime.Clock
+import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
 
 enum class RiskStatus { IDLE, ANALYZING, COMPLETED, ERROR }
 
@@ -144,13 +146,22 @@ fun ApprovalCard(
                                 onDeny = onDeny,
                                 onPopOut = onPopOut,
                             )
-                        else -> DefaultCard(
-                            request = request,
-                            onApprove = onApprove,
-                            onDeny = onDeny,
-                            onAlwaysAllow = onAlwaysAllow,
-                            onPopOut = onPopOut,
-                        )
+                        else -> {
+                            val popOut = remember(request) {
+                                val json = Json { prettyPrint = true }
+                                "```json\n${json.encodeToString(JsonObject.serializer(), JsonObject(request.hookInput.toolInput))}\n```"
+                            }
+                            DefaultCard(
+                                request = request,
+                                onApprove = onApprove,
+                                onDeny = onDeny,
+                                onAlwaysAllow = onAlwaysAllow,
+                                onPopOut = onPopOut,
+                                popOutContent = popOut,
+                            ) {
+                                FallbackContent(request.hookInput.toolInput)
+                            }
+                        }
                     }
                 }
             }
