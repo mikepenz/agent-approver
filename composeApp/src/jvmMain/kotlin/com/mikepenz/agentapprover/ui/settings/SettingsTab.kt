@@ -163,6 +163,31 @@ fun SettingsTab(
             }
         }
 
+        // macOS dock badge notification setting
+        if (System.getProperty("os.name", "").contains("Mac", ignoreCase = true)) {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+            ) {
+                Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text("Dock Badge", style = MaterialTheme.typography.titleSmall)
+                    }
+                    Text(
+                        "macOS requires badge notifications to be enabled for dock icon badges to appear.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    OutlinedButton(
+                        onClick = { com.mikepenz.agentapprover.platform.MacOsTrayBadge.openNotificationSettings() },
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Text("Open Notification Settings", fontSize = 12.sp)
+                    }
+                }
+            }
+        }
+
         SettingsSwitch(
             label = "Always on top",
             checked = settings.alwaysOnTop,

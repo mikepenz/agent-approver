@@ -130,6 +130,12 @@ nucleus.application {
             bundleID = "com.mikepenz.agentapprover"
             dockName = "Agent Approver"
             appCategory = "public.app-category.developer-tools"
+            infoPlist {
+                extraKeysRawXml = """
+                    <key>NSUserNotificationAlertStyle</key>
+                    <string>banner</string>
+                """.trimIndent()
+            }
         }
         windows {
             iconFile.set(project.file("../icons/app.ico"))

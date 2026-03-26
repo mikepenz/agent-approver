@@ -67,8 +67,23 @@ object MacOsTrayBadge {
         libSystem.getGlobalVariableAddress("_dispatch_main_q")
     }
 
+    /** Returns true if the current thread is the macOS main thread. */
+    private fun isMainThread(): Boolean {
+        return try {
+            val nsThread = cls("NSThread") ?: return false
+            val result = send(nsThread, sel("isMainThread"))
+            Pointer.nativeValue(result) != 0L
+        } catch (_: Exception) {
+            false
+        }
+    }
+
     /** Dispatches a block to the macOS main thread via GCD and waits for completion. */
     private fun runOnMainThread(block: () -> Unit) {
+        if (isMainThread()) {
+            block()
+            return
+        }
         val latch = CountDownLatch(1)
         var thrown: Throwable? = null
         val callback = object : DispatchFunction {
@@ -170,6 +185,39 @@ object MacOsTrayBadge {
             }
         } catch (e: Exception) {
             Logger.w("MacOsTrayBadge", e) { "Failed to update badge overlay" }
+        }
+    }
+
+    /**
+     * Sets the dock icon badge label via NSDockTile.
+     */
+    fun updateDockBadge(count: Int) {
+        if (!isMacOs) return
+        try {
+            runOnMainThread {
+                val nsApp = send(cls("NSApplication") ?: return@runOnMainThread, sel("sharedApplication"))
+                    ?: return@runOnMainThread
+                val dockTile = send(nsApp, sel("dockTile")) ?: return@runOnMainThread
+                val label = if (count > 0) createNSString(count.toString()) else null
+                sendVoid(dockTile, sel("setBadgeLabel:"), label)
+            }
+        } catch (e: Exception) {
+            Logger.w("MacOsTrayBadge", e) { "Failed to update dock badge" }
+        }
+    }
+
+    /**
+     * Opens System Settings → Notifications for this app so the user can enable "Badge application icon".
+     */
+    fun openNotificationSettings() {
+        if (!isMacOs) return
+        try {
+            val bundleId = "com.mikepenz.agentapprover"
+            // x-apple.systempreferences:com.apple.Notifications-Settings.extension?id=<bundleId>
+            val url = "x-apple.systempreferences:com.apple.Notifications-Settings.extension?id=$bundleId"
+            java.awt.Desktop.getDesktop().browse(java.net.URI(url))
+        } catch (e: Exception) {
+            Logger.w("MacOsTrayBadge", e) { "Failed to open notification settings" }
         }
     }
 

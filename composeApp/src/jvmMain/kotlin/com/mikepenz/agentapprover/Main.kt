@@ -232,20 +232,8 @@ fun main(args: Array<String>) {
                     }
                 }
             }
-            // macOS dock icon + badge
-            try {
-                if (java.awt.Taskbar.isTaskbarSupported()) {
-                    val taskbar = java.awt.Taskbar.getTaskbar()
-                    javax.swing.SwingUtilities.invokeLater {
-                        // Show badge count (don't override iconImage — preserves macOS themed icon)
-                        if (taskbar.isSupported(java.awt.Taskbar.Feature.ICON_BADGE_NUMBER)) {
-                            taskbar.setIconBadge(if (pendingCount > 0) pendingCount.toString() else "")
-                        }
-                    }
-                }
-            } catch (e: Exception) {
-                co.touchlab.kermit.Logger.w("Main") { "Dock badge/icon update failed: ${e.message}" }
-            }
+            // macOS dock badge via native API (java.awt.Taskbar is broken on modern macOS JDKs)
+            MacOsTrayBadge.updateDockBadge(pendingCount)
         }
         val settings = state.settings
 
