@@ -3,6 +3,7 @@ package com.mikepenz.agentapprover.platform
 import java.awt.BasicStroke
 import java.awt.Color
 import java.awt.Font
+import java.awt.Graphics2D
 import java.awt.RenderingHints
 import java.awt.geom.Area
 import java.awt.geom.GeneralPath
@@ -23,19 +24,37 @@ object AppIcon {
 
     /**
      * Creates a tray icon as a MultiResolutionImage for HiDPI (1x + 2x).
-     * macOS template images must be black — the OS handles light/dark adaptation.
+     * @param drawBadge If false, skips the badge (logo with cutout only, for template overlay use)
      */
-    fun createTrayIconMultiRes(pendingCount: Int = 0): java.awt.Image {
-        val img1x = create(22, pendingCount, trayMode = true)
-        val img2x = create(44, pendingCount, trayMode = true)
+    fun createTrayIconMultiRes(pendingCount: Int = 0, drawBadge: Boolean = true): java.awt.Image {
+        val img1x = create(22, pendingCount, trayMode = true, drawBadge = drawBadge)
+        val img2x = create(44, pendingCount, trayMode = true, drawBadge = drawBadge)
         return java.awt.image.BaseMultiResolutionImage(img1x, img2x)
     }
 
     /**
-     * Creates the app icon at the given pixel size.
-     * @param trayMode If true, renders the logo in black (macOS template image)
+     * Creates a badge-only image at 2x resolution (44×44 pixels for 22pt tray icon).
+     * Transparent background with just the colored badge and its content.
      */
-    fun create(size: Int, pendingCount: Int = 0, trayMode: Boolean = false): BufferedImage {
+    fun createTrayBadgeImage(pendingCount: Int): BufferedImage {
+        val size = 44 // 2x for 22pt tray icon
+        val image = BufferedImage(size, size, BufferedImage.TYPE_INT_ARGB)
+        val g = image.createGraphics()
+        g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON)
+        g.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY)
+        g.setRenderingHint(RenderingHints.KEY_STROKE_CONTROL, RenderingHints.VALUE_STROKE_PURE)
+        g.setRenderingHint(RenderingHints.KEY_FRACTIONALMETRICS, RenderingHints.VALUE_FRACTIONALMETRICS_ON)
+        drawBadge(g, size, pendingCount, Color.WHITE)
+        g.dispose()
+        return image
+    }
+
+    /**
+     * Creates the app icon at the given pixel size.
+     * @param trayMode If true, renders logo in black for macOS template images
+     * @param drawBadge If false, skips the badge (useful when badge is overlaid natively)
+     */
+    fun create(size: Int, pendingCount: Int = 0, trayMode: Boolean = false, drawBadge: Boolean = true): BufferedImage {
         val image = BufferedImage(size, size, BufferedImage.TYPE_INT_ARGB)
         val g = image.createGraphics()
         g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON)
@@ -65,16 +84,45 @@ object AppIcon {
         g.color = if (trayMode) Color.BLACK else Color.WHITE
         g.fill(logoArea)
 
-        // Draw badge shape (filled badge-check outline)
-        val badgeShape = buildBadgeOutline(badgeCenterX, badgeCenterY, badgeDiameter)
-        val badgeColor = if (pendingCount > 0) BADGE_RED else BADGE_GREEN
-        g.color = badgeColor
-        g.fill(badgeShape)
+        if (drawBadge) {
+            if (trayMode) {
+                // Template image: draw badge in black, cut out content as transparent
+                val badgeShape = buildBadgeOutline(badgeCenterX, badgeCenterY, badgeDiameter)
+                g.color = Color.BLACK
+                g.fill(badgeShape)
+                g.composite = java.awt.AlphaComposite.Clear
+                drawBadgeContent(g, size, pendingCount)
+            } else {
+                drawBadge(g, size, pendingCount, Color.WHITE)
+            }
+        }
 
-        // Badge content
-        g.color = Color.WHITE
+        g.dispose()
+        return image
+    }
+
+    /** Draws the colored badge shape and its content (checkmark or count). */
+    private fun drawBadge(g: Graphics2D, size: Int, pendingCount: Int, contentColor: Color) {
+        val badgeDiameter = size * 0.46f
+        val badgeRadius = badgeDiameter / 2f
+        val badgeCenterX = size - badgeRadius - size * 0.04f
+        val badgeCenterY = size - badgeRadius - size * 0.04f
+
+        val badgeShape = buildBadgeOutline(badgeCenterX, badgeCenterY, badgeDiameter)
+        g.color = if (pendingCount > 0) BADGE_RED else BADGE_GREEN
+        g.fill(badgeShape)
+        g.color = contentColor
+        drawBadgeContent(g, size, pendingCount)
+    }
+
+    /** Draws the badge content (checkmark or number) using the current graphics color. */
+    private fun drawBadgeContent(g: Graphics2D, size: Int, pendingCount: Int) {
+        val badgeDiameter = size * 0.46f
+        val badgeRadius = badgeDiameter / 2f
+        val badgeCenterX = size - badgeRadius - size * 0.04f
+        val badgeCenterY = size - badgeRadius - size * 0.04f
+
         if (pendingCount > 0) {
-            // Number
             val fontSize = (badgeRadius * 1.2f).toInt()
             g.font = Font(Font.SANS_SERIF, Font.BOLD, fontSize)
             val text = if (pendingCount > 9) "9+" else pendingCount.toString()
@@ -83,15 +131,13 @@ object AppIcon {
             val textY = badgeCenterY + (fm.ascent - fm.descent) / 2f
             g.drawString(text, textX, textY)
         } else {
-            // Checkmark (from the Lucide badge-check SVG inner path)
             val stroke = BasicStroke(
                 badgeRadius * 0.22f,
                 BasicStroke.CAP_ROUND,
                 BasicStroke.JOIN_ROUND,
             )
             g.stroke = stroke
-            // Checkmark scaled to badge: m9 12 2 2 4-4 in 24x24 viewBox
-            val bs = badgeRadius / 12f // scale from viewBox center
+            val bs = badgeRadius / 12f
             g.drawLine(
                 (badgeCenterX - bs * 3f).toInt(), (badgeCenterY + bs * 0.5f).toInt(),
                 (badgeCenterX - bs * 0.5f).toInt(), (badgeCenterY + bs * 2.5f).toInt(),
@@ -101,9 +147,6 @@ object AppIcon {
                 (badgeCenterX + bs * 3.5f).toInt(), (badgeCenterY - bs * 2.5f).toInt(),
             )
         }
-
-        g.dispose()
-        return image
     }
 
     /**

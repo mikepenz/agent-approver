@@ -41,6 +41,7 @@ import com.mikepenz.agentapprover.ui.App
 import com.mikepenz.agentapprover.ui.detail.ContentDetailWindow
 import com.mikepenz.agentapprover.ui.detail.LicensesWindow
 import com.mikepenz.agentapprover.platform.AppIcon
+import com.mikepenz.agentapprover.platform.MacOsTrayBadge
 import com.mikepenz.agentapprover.ui.theme.AgentApproverTheme
 import com.mikepenz.agentapprover.ui.theme.configureLogging
 import androidx.compose.ui.graphics.painter.BitmapPainter
@@ -64,6 +65,9 @@ private const val DEFAULT_WINDOW_HEIGHT = 480
 
 @OptIn(FlowPreview::class)
 fun main(args: Array<String>) {
+    // Enable macOS template images so tray icon adapts to menu bar background color
+    System.setProperty("apple.awt.enableTemplateImages", "true")
+
     configureLogging()
 
     val devMode = "--dev" in args || System.getProperty("agentapprover.devmode") == "true"
@@ -174,12 +178,15 @@ fun main(args: Array<String>) {
         val pendingCount = state.pendingApprovals.size
 
         // Use AWT SystemTray directly for proper MultiResolutionImage HiDPI support
+        val isMacOs = remember { System.getProperty("os.name", "").contains("Mac", ignoreCase = true) }
         val showHideItem = remember { java.awt.MenuItem(if (isVisible) "Hide" else "Show") }
         val awayModeItem = remember { java.awt.CheckboxMenuItem("Away Mode", stateManager.state.value.settings.awayMode) }
         DisposableEffect(Unit) {
             val systemTray = if (java.awt.SystemTray.isSupported()) java.awt.SystemTray.getSystemTray() else null
             val trayIcon = if (systemTray != null) {
-                val icon = java.awt.TrayIcon(AppIcon.createTrayIconMultiRes(0))
+                // On macOS: template image (logo only) + native colored badge overlay
+                // On other platforms: full icon with badge baked in
+                val icon = java.awt.TrayIcon(AppIcon.createTrayIconMultiRes(0, drawBadge = !isMacOs))
                 icon.isImageAutoSize = false
                 icon.toolTip = "Agent Approver"
                 icon.addActionListener { isVisible = !isVisible }
@@ -198,6 +205,8 @@ fun main(args: Array<String>) {
                 icon.popupMenu = popup
 
                 systemTray.add(icon)
+                // Add colored badge overlay (macOS only, after tray icon is added so peer exists)
+                if (isMacOs) MacOsTrayBadge.update(icon, 0)
                 icon
             } else null
             onDispose { trayIcon?.let { systemTray?.remove(it) } }
@@ -214,7 +223,8 @@ fun main(args: Array<String>) {
             if (java.awt.SystemTray.isSupported()) {
                 val systemTray = java.awt.SystemTray.getSystemTray()
                 systemTray.trayIcons.firstOrNull()?.let { icon ->
-                    icon.image = AppIcon.createTrayIconMultiRes(pendingCount)
+                    icon.image = AppIcon.createTrayIconMultiRes(pendingCount, drawBadge = !isMacOs)
+                    if (isMacOs) MacOsTrayBadge.update(icon, pendingCount)
                     icon.toolTip = buildString {
                         append("Agent Approver")
                         if (pendingCount > 0) append(" ($pendingCount pending)")
@@ -227,11 +237,7 @@ fun main(args: Array<String>) {
                 if (java.awt.Taskbar.isTaskbarSupported()) {
                     val taskbar = java.awt.Taskbar.getTaskbar()
                     javax.swing.SwingUtilities.invokeLater {
-                        // Update dock icon image to reflect pending count
-                        if (taskbar.isSupported(java.awt.Taskbar.Feature.ICON_IMAGE)) {
-                            taskbar.iconImage = AppIcon.create(128, pendingCount)
-                        }
-                        // Show badge count
+                        // Show badge count (don't override iconImage — preserves macOS themed icon)
                         if (taskbar.isSupported(java.awt.Taskbar.Feature.ICON_BADGE_NUMBER)) {
                             taskbar.setIconBadge(if (pendingCount > 0) pendingCount.toString() else "")
                         }

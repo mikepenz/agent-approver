@@ -84,6 +84,7 @@ kotlin {
             implementation(libs.ktor.serialization.kotlinx.json)
             implementation(libs.markdown.renderer)
             implementation(libs.markdown.renderer.code)
+            implementation(libs.jna)
             implementation(libs.nucleus.darkmode.detector)
             implementation(libs.nucleus.decorated.window.core)
             implementation(libs.nucleus.decorated.window.jni)
@@ -105,7 +106,11 @@ aboutLibraries {
 nucleus.application {
     mainClass = "com.mikepenz.agentapprover.MainKt"
 
-    jvmArgs += listOf()
+    jvmArgs += listOf(
+        "--add-opens", "java.desktop/java.awt=ALL-UNNAMED",
+        "--add-opens", "java.desktop/sun.lwawt.macosx=ALL-UNNAMED",
+        "--add-opens", "java.desktop/sun.lwawt=ALL-UNNAMED",
+    )
     if (providers.gradleProperty("devMode").isPresent) {
         args += listOf("--dev")
     }
