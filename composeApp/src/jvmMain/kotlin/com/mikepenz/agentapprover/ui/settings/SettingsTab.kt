@@ -163,24 +163,86 @@ fun SettingsTab(
             }
         }
 
-        // macOS dock badge notification setting
+        // macOS notification permission
         if (System.getProperty("os.name", "").contains("Mac", ignoreCase = true)) {
+            var permissionStatus by remember { mutableStateOf<String?>(null) }
+            var badgeEnabled by remember { mutableStateOf<Boolean?>(null) }
+
+            // Check current permission status
+            androidx.compose.runtime.LaunchedEffect(Unit) {
+                io.github.kdroidfilter.nucleus.notification.NotificationCenter.getNotificationSettings { settings ->
+                    permissionStatus = settings.authorizationStatus.name
+                    badgeEnabled = settings.badgeSetting == io.github.kdroidfilter.nucleus.notification.NotificationSetting.ENABLED
+                }
+            }
+
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
             ) {
                 Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("Dock Badge", style = MaterialTheme.typography.titleSmall)
-                    Text(
-                        "Enable \"Badge application icon\" in macOS notification settings for dock icon badges to appear.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    OutlinedButton(
-                        onClick = { com.mikepenz.agentapprover.platform.MacOsTrayBadge.openNotificationSettings() },
-                        modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        Text("Open Notification Settings", fontSize = 12.sp)
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text("Notifications", style = MaterialTheme.typography.titleSmall)
+                        permissionStatus?.let { status ->
+                            val isAuthorized = status == "AUTHORIZED"
+                            StatusBadge(
+                                text = if (isAuthorized) "Allowed" else status.lowercase().replace('_', ' ').replaceFirstChar { it.uppercase() },
+                                color = if (isAuthorized) Color(0xFF4CAF50) else Color(0xFFF44336),
+                            )
+                        }
+                    }
+                    if (badgeEnabled == false) {
+                        Text(
+                            "Badge permission is disabled. Enable \"Badge application icon\" in macOS notification settings.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    when (permissionStatus) {
+                        "NOT_DETERMINED" -> {
+                            Text(
+                                "Grant notification permission for dock badge and alerts.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                            OutlinedButton(
+                                onClick = {
+                                    io.github.kdroidfilter.nucleus.notification.NotificationCenter.requestAuthorization(
+                                        setOf(
+                                            io.github.kdroidfilter.nucleus.notification.AuthorizationOption.BADGE,
+                                            io.github.kdroidfilter.nucleus.notification.AuthorizationOption.SOUND,
+                                            io.github.kdroidfilter.nucleus.notification.AuthorizationOption.ALERT,
+                                        )
+                                    ) { granted, _ ->
+                                        io.github.kdroidfilter.nucleus.notification.NotificationCenter.getNotificationSettings { settings ->
+                                            permissionStatus = settings.authorizationStatus.name
+                                            badgeEnabled = settings.badgeSetting == io.github.kdroidfilter.nucleus.notification.NotificationSetting.ENABLED
+                                        }
+                                    }
+                                },
+                                modifier = Modifier.fillMaxWidth(),
+                            ) {
+                                Text("Request Permission", fontSize = 12.sp)
+                            }
+                        }
+                        "DENIED" -> {
+                            Text(
+                                "Notifications were denied. Open System Settings to enable them.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                            OutlinedButton(
+                                onClick = {
+                                    @Suppress("DEPRECATION")
+                                    Runtime.getRuntime().exec(
+                                        arrayOf("open", "x-apple.systempreferences:com.apple.Notifications-Settings.extension")
+                                    )
+                                },
+                                modifier = Modifier.fillMaxWidth(),
+                            ) {
+                                Text("Open Notification Settings", fontSize = 12.sp)
+                            }
+                        }
                     }
                 }
             }

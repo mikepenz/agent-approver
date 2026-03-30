@@ -232,8 +232,8 @@ fun main(args: Array<String>) {
                     }
                 }
             }
-            // macOS dock badge via native API (java.awt.Taskbar is broken on modern macOS JDKs)
-            MacOsTrayBadge.updateDockBadge(pendingCount)
+            // macOS dock badge via Nucleus notification API
+            io.github.kdroidfilter.nucleus.notification.NotificationCenter.setBadgeCount(pendingCount)
         }
         val settings = state.settings
 

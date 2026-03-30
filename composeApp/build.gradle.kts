@@ -89,6 +89,7 @@ kotlin {
             implementation(libs.nucleus.decorated.window.core)
             implementation(libs.nucleus.decorated.window.jni)
             implementation(libs.nucleus.decorated.window.material3)
+            implementation(libs.nucleus.notification.macos)
         }
     }
 }

@@ -188,39 +188,6 @@ object MacOsTrayBadge {
         }
     }
 
-    /**
-     * Sets the dock icon badge label via NSDockTile.
-     */
-    fun updateDockBadge(count: Int) {
-        if (!isMacOs) return
-        try {
-            runOnMainThread {
-                val nsApp = send(cls("NSApplication") ?: return@runOnMainThread, sel("sharedApplication"))
-                    ?: return@runOnMainThread
-                val dockTile = send(nsApp, sel("dockTile")) ?: return@runOnMainThread
-                val label = if (count > 0) createNSString(count.toString()) else null
-                sendVoid(dockTile, sel("setBadgeLabel:"), label)
-            }
-        } catch (e: Exception) {
-            Logger.w("MacOsTrayBadge", e) { "Failed to update dock badge" }
-        }
-    }
-
-    /**
-     * Opens System Settings → Notifications so the user can enable "Badge application icon".
-     */
-    fun openNotificationSettings() {
-        if (!isMacOs) return
-        try {
-            Runtime.getRuntime().exec(
-                arrayOf("open", "x-apple.systempreferences:com.apple.Notifications-Settings.extension")
-            )
-        } catch (e: Exception) {
-            Logger.w("MacOsTrayBadge", e) { "Failed to open notification settings" }
-        }
-    }
-
-
     // --- Internal helpers ---
 
     /**
