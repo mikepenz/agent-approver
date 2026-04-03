@@ -205,7 +205,12 @@ fun HistoryRow(
                         color = rColor.copy(alpha = 0.2f),
                     ) {
                         Text(
-                            text = "Risk ${result.riskAnalysis.risk}",
+                            text = buildString {
+                                append("Risk ${result.riskAnalysis.risk}")
+                                if (result.riskAnalysis.source.isNotEmpty()) {
+                                    append(" via ${result.riskAnalysis.source}")
+                                }
+                            },
                             modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
                             color = rColor,
                             fontSize = 10.sp,
@@ -231,7 +236,8 @@ fun HistoryRow(
                 val clipboardManager = androidx.compose.ui.platform.LocalClipboardManager.current
                 val fullText = buildString {
                     if (result.riskAnalysis != null) {
-                        appendLine("Risk Assessment: Level ${result.riskAnalysis.risk} (${riskLabel(result.riskAnalysis.risk)}) — ${result.riskAnalysis.message}")
+                        val sourceText = if (result.riskAnalysis.source.isNotEmpty()) " (via ${result.riskAnalysis.source})" else ""
+                        appendLine("Risk Assessment$sourceText: Level ${result.riskAnalysis.risk} (${riskLabel(result.riskAnalysis.risk)}) — ${result.riskAnalysis.message}")
                     }
                     if (result.request.hookInput.cwd.isNotBlank()) {
                         appendLine("Working Directory: ${result.request.hookInput.cwd}")
@@ -262,7 +268,13 @@ fun HistoryRow(
                             Column {
                                 if (result.riskAnalysis != null) {
                                     Text(
-                                        text = "Risk Assessment:",
+                                        text = buildString {
+                                            append("Risk Assessment")
+                                            if (result.riskAnalysis.source.isNotEmpty()) {
+                                                append(" (via ${result.riskAnalysis.source})")
+                                            }
+                                            append(":")
+                                        },
                                         fontSize = 10.sp,
                                         color = Color.Gray,
                                         style = MaterialTheme.typography.labelSmall,

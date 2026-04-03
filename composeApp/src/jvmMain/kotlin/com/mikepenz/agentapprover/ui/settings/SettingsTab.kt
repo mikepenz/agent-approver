@@ -44,6 +44,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.mikepenz.agentapprover.model.AppSettings
+import com.mikepenz.agentapprover.model.RiskAnalysisBackend
 import com.mikepenz.agentapprover.platform.StartupManager
 import com.mikepenz.agentapprover.risk.RiskMessageBuilder
 import com.mikepenz.agentapprover.ui.theme.AgentApproverTheme
@@ -278,22 +279,95 @@ fun SettingsTab(
             onCheckedChange = { onSettingsChange(settings.copy(riskAnalysisEnabled = it)) },
         )
 
+        // Backend selector
+        Column(
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Text("Backend", style = MaterialTheme.typography.bodyMedium)
+            val backends = RiskAnalysisBackend.entries
+            SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+                backends.forEachIndexed { index, backend ->
+                    SegmentedButton(
+                        selected = settings.riskAnalysisBackend == backend,
+                        onClick = { onSettingsChange(settings.copy(riskAnalysisBackend = backend)) },
+                        shape = SegmentedButtonDefaults.itemShape(index = index, count = backends.size),
+                        enabled = settings.riskAnalysisEnabled,
+                    ) {
+                        Text(
+                            when (backend) {
+                                RiskAnalysisBackend.CLAUDE -> "Claude"
+                                RiskAnalysisBackend.COPILOT -> "Copilot"
+                            },
+                            fontSize = 12.sp,
+                        )
+                    }
+                }
+            }
+        }
+
         // Model selector
         Column(
             verticalArrangement = Arrangement.spacedBy(4.dp),
             modifier = Modifier.fillMaxWidth(),
         ) {
             Text("Model", style = MaterialTheme.typography.bodyMedium)
-            val models = listOf("haiku", "sonnet", "opus")
-            SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
-                models.forEachIndexed { index, model ->
-                    SegmentedButton(
-                        selected = settings.riskAnalysisModel == model,
-                        onClick = { onSettingsChange(settings.copy(riskAnalysisModel = model)) },
-                        shape = SegmentedButtonDefaults.itemShape(index = index, count = models.size),
-                        enabled = settings.riskAnalysisEnabled,
+            if (settings.riskAnalysisBackend == RiskAnalysisBackend.CLAUDE) {
+                val models = listOf("haiku", "sonnet", "opus")
+                SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+                    models.forEachIndexed { index, model ->
+                        SegmentedButton(
+                            selected = settings.riskAnalysisModel == model,
+                            onClick = { onSettingsChange(settings.copy(riskAnalysisModel = model)) },
+                            shape = SegmentedButtonDefaults.itemShape(index = index, count = models.size),
+                            enabled = settings.riskAnalysisEnabled,
+                        ) {
+                            Text(model.replaceFirstChar { it.uppercase() }, fontSize = 12.sp)
+                        }
+                    }
+                }
+            } else {
+                val copilotModels = listOf(
+                    "gpt-4.1-mini" to "GPT-4.1 Mini",
+                    "gpt-4.1" to "GPT-4.1",
+                    "claude-sonnet-4.5" to "Sonnet 4.5",
+                )
+                SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+                    copilotModels.forEachIndexed { index, (id, label) ->
+                        SegmentedButton(
+                            selected = settings.riskAnalysisCopilotModel == id,
+                            onClick = { onSettingsChange(settings.copy(riskAnalysisCopilotModel = id)) },
+                            shape = SegmentedButtonDefaults.itemShape(index = index, count = copilotModels.size),
+                            enabled = settings.riskAnalysisEnabled,
+                        ) {
+                            Text(label, fontSize = 12.sp)
+                        }
+                    }
+                }
+            }
+        }
+
+        // Copilot auth section
+        AnimatedVisibility(visible = settings.riskAnalysisBackend == RiskAnalysisBackend.COPILOT && settings.riskAnalysisEnabled) {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+            ) {
+                Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        "Requires GitHub Copilot CLI and a Copilot subscription.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    OutlinedButton(
+                        onClick = {
+                            java.awt.Desktop.getDesktop().browse(
+                                java.net.URI("https://docs.github.com/en/copilot/managing-copilot/configure-personal-settings/using-github-copilot-in-the-command-line")
+                            )
+                        },
+                        modifier = Modifier.fillMaxWidth(),
                     ) {
-                        Text(model.replaceFirstChar { it.uppercase() }, fontSize = 12.sp)
+                        Text("Login with GitHub", fontSize = 12.sp)
                     }
                 }
             }
