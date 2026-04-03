@@ -26,6 +26,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.mikepenz.agentapprover.hook.CopilotBridgeInstaller
 import com.mikepenz.agentapprover.hook.HookRegistrar
 import com.mikepenz.agentapprover.model.Decision
 import com.mikepenz.agentapprover.model.ToolType
@@ -51,6 +52,7 @@ fun App(
     val state by stateManager.state.collectAsState()
     var selectedTab by remember { mutableIntStateOf(0) }
     val coroutineScope = rememberCoroutineScope()
+    var isCopilotInstalled by remember { mutableStateOf(CopilotBridgeInstaller.isInstalled()) }
 
     val riskStatuses = remember { mutableStateMapOf<String, RiskStatus>() }
     val riskErrors = remember { mutableStateMapOf<String, String>() }
@@ -234,6 +236,7 @@ fun App(
                 SettingsTab(
                     settings = state.settings,
                     isHookRegistered = isHookRegistered,
+                    isCopilotInstalled = isCopilotInstalled,
                     historyCount = state.history.size,
                     copilotModels = copilotModels,
                     onSettingsChange = { stateManager.updateSettings(it) },
@@ -245,6 +248,18 @@ fun App(
                         hookRegistrar.unregister(state.settings.serverPort)
                         isHookRegistered = hookRegistrar.isRegistered(state.settings.serverPort)
                     },
+                    onInstallCopilot = {
+                        CopilotBridgeInstaller.install()
+                        isCopilotInstalled = CopilotBridgeInstaller.isInstalled()
+                    },
+                    onUninstallCopilot = {
+                        CopilotBridgeInstaller.uninstall()
+                        isCopilotInstalled = CopilotBridgeInstaller.isInstalled()
+                    },
+                    onRegisterCopilotHook = { path -> CopilotBridgeInstaller.registerHook(path) },
+                    onUnregisterCopilotHook = { path -> CopilotBridgeInstaller.unregisterHook(path) },
+                    isCopilotHookRegistered = { path -> CopilotBridgeInstaller.isHookRegistered(path) },
+                    onCopyCopilotHooksJson = {},
                     onClearHistory = { stateManager.clearHistory() },
                     onShowLicenses = onShowLicenses,
                 )

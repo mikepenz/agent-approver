@@ -53,11 +53,18 @@ import com.mikepenz.agentapprover.ui.theme.AgentApproverTheme
 fun SettingsTab(
     settings: AppSettings,
     isHookRegistered: Boolean,
+    isCopilotInstalled: Boolean = false,
     historyCount: Int,
     copilotModels: List<Pair<String, String>> = emptyList(),
     onSettingsChange: (AppSettings) -> Unit,
     onRegisterHook: () -> Unit,
     onUnregisterHook: () -> Unit,
+    onInstallCopilot: () -> Unit = {},
+    onUninstallCopilot: () -> Unit = {},
+    onRegisterCopilotHook: (String) -> Unit = {},
+    onUnregisterCopilotHook: (String) -> Unit = {},
+    isCopilotHookRegistered: (String) -> Boolean = { false },
+    onCopyCopilotHooksJson: () -> Unit = {},
     onClearHistory: () -> Unit,
     onShowLicenses: () -> Unit = {},
 ) {
@@ -125,12 +132,83 @@ fun SettingsTab(
 
         Card(
             modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.5f)),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         ) {
             Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("GitHub Copilot", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f))
-                    StatusBadge(text = "Coming Soon", color = Color(0xFF9E9E9E))
+                    Text("GitHub Copilot CLI", style = MaterialTheme.typography.titleSmall)
+                    StatusBadge(
+                        text = if (isCopilotInstalled) "Installed" else "Not installed",
+                        color = if (isCopilotInstalled) Color(0xFF4CAF50) else Color(0xFF9E9E9E),
+                    )
+                }
+                Text(
+                    "Bridge script in ~/.agent-approver/",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                    Button(
+                        onClick = if (isCopilotInstalled) onUninstallCopilot else onInstallCopilot,
+                        modifier = Modifier.weight(1f),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = if (isCopilotInstalled) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
+                        ),
+                    ) {
+                        Text(if (isCopilotInstalled) "Uninstall" else "Install")
+                    }
+                    if (isCopilotInstalled) {
+                        OutlinedButton(onClick = onInstallCopilot) {
+                            Text("Reinstall")
+                        }
+                    }
+                }
+
+                OutlinedButton(
+                    onClick = onCopyCopilotHooksJson,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text("Copy hooks.json snippet", fontSize = 12.sp)
+                }
+
+                // Per-project hook registration
+                AnimatedVisibility(visible = isCopilotInstalled) {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text("Register hook in project", style = MaterialTheme.typography.bodySmall)
+                        var projectPath by remember { mutableStateOf("") }
+                        val isRegistered = remember(projectPath) {
+                            if (projectPath.isNotBlank()) isCopilotHookRegistered(projectPath) else false
+                        }
+
+                        OutlinedTextField(
+                            value = projectPath,
+                            onValueChange = { projectPath = it },
+                            modifier = Modifier.fillMaxWidth(),
+                            placeholder = { Text("/path/to/project", fontSize = 12.sp) },
+                            textStyle = MaterialTheme.typography.bodySmall,
+                            singleLine = true,
+                            trailingIcon = {
+                                if (isRegistered) {
+                                    StatusBadge(text = "Registered", color = Color(0xFF4CAF50))
+                                }
+                            },
+                        )
+
+                        if (projectPath.isNotBlank()) {
+                            Button(
+                                onClick = {
+                                    if (isRegistered) onUnregisterCopilotHook(projectPath) else onRegisterCopilotHook(projectPath)
+                                },
+                                modifier = Modifier.fillMaxWidth(),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = if (isRegistered) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
+                                ),
+                            ) {
+                                Text(if (isRegistered) "Unregister" else "Register")
+                            }
+                        }
+                    }
                 }
             }
         }
