@@ -349,25 +349,66 @@ fun SettingsTab(
 
         // Copilot auth section
         AnimatedVisibility(visible = settings.riskAnalysisBackend == RiskAnalysisBackend.COPILOT && settings.riskAnalysisEnabled) {
+            var ghAuthStatus by remember { mutableStateOf<String?>(null) }
+            var ghAuthOk by remember { mutableStateOf<Boolean?>(null) }
+
+            androidx.compose.runtime.LaunchedEffect(Unit) {
+                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                    try {
+                        val process = ProcessBuilder("gh", "auth", "status").apply {
+                            redirectErrorStream(true)
+                        }.start()
+                        val output = process.inputStream.bufferedReader().readText().trim()
+                        val exitCode = process.waitFor()
+                        ghAuthOk = exitCode == 0
+                        ghAuthStatus = if (exitCode == 0) "Authenticated" else "Not authenticated"
+                    } catch (_: Exception) {
+                        ghAuthOk = false
+                        ghAuthStatus = "gh CLI not found"
+                    }
+                }
+            }
+
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
             ) {
                 Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text("GitHub Auth", style = MaterialTheme.typography.titleSmall)
+                        ghAuthStatus?.let { status ->
+                            StatusBadge(
+                                text = status,
+                                color = if (ghAuthOk == true) Color(0xFF4CAF50) else Color(0xFFF44336),
+                            )
+                        }
+                    }
                     Text(
-                        "Requires GitHub Copilot CLI and a Copilot subscription.",
+                        "Requires GitHub CLI (gh) and a Copilot subscription.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     OutlinedButton(
                         onClick = {
                             java.awt.Desktop.getDesktop().browse(
-                                java.net.URI("https://docs.github.com/en/copilot/managing-copilot/configure-personal-settings/using-github-copilot-in-the-command-line")
+                                java.net.URI("https://cli.github.com/")
                             )
                         },
                         modifier = Modifier.fillMaxWidth(),
                     ) {
-                        Text("Login with GitHub", fontSize = 12.sp)
+                        Text("Install GitHub CLI", fontSize = 12.sp)
+                    }
+                    if (ghAuthOk != true) {
+                        OutlinedButton(
+                            onClick = {
+                                java.awt.Desktop.getDesktop().browse(
+                                    java.net.URI("https://cli.github.com/manual/gh_auth_login")
+                                )
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            Text("Login with GitHub (gh auth login)", fontSize = 12.sp)
+                        }
                     }
                 }
             }
