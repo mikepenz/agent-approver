@@ -4,6 +4,7 @@ import co.touchlab.kermit.Logger
 import com.github.copilot.sdk.CopilotClient
 import com.github.copilot.sdk.SystemMessageMode
 import com.github.copilot.sdk.json.MessageOptions
+import com.github.copilot.sdk.json.PermissionHandler
 import com.github.copilot.sdk.json.SessionConfig
 import com.github.copilot.sdk.json.SystemMessageConfig
 import com.mikepenz.agentapprover.model.HookInput
@@ -55,6 +56,7 @@ class CopilotRiskAnalyzer(
                     .setModel(model)
                     .setStreaming(false)
                     .setTools(emptyList())
+                    .setOnPermissionRequest(PermissionHandler.APPROVE_ALL)
                     .setSystemMessage(
                         SystemMessageConfig()
                             .setMode(SystemMessageMode.REPLACE)
