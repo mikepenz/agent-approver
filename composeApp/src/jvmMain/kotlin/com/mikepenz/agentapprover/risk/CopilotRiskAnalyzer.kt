@@ -3,11 +3,13 @@ package com.mikepenz.agentapprover.risk
 import co.touchlab.kermit.Logger
 import com.github.copilot.sdk.CopilotClient
 import com.github.copilot.sdk.SystemMessageMode
+import com.github.copilot.sdk.json.CopilotClientOptions
 import com.github.copilot.sdk.json.MessageOptions
+import com.github.copilot.sdk.json.ModelInfo
 import com.github.copilot.sdk.json.PermissionHandler
 import com.github.copilot.sdk.json.SessionConfig
 import com.github.copilot.sdk.json.SystemMessageConfig
-import com.github.copilot.sdk.json.ModelInfo
+import java.io.File
 import com.mikepenz.agentapprover.model.HookInput
 import com.mikepenz.agentapprover.model.RiskAnalysis
 import kotlinx.coroutines.Dispatchers
@@ -38,7 +40,17 @@ class CopilotRiskAnalyzer(
 
     fun start() {
         log.i { "Starting CopilotClient" }
-        val c = CopilotClient()
+        val options = CopilotClientOptions()
+            .setLogLevel("error")
+        // Resolve copilot CLI path — packaged apps don't inherit the user's shell PATH
+        val cliPath = findCopilotCli()
+        if (cliPath != null) {
+            log.i { "Found Copilot CLI at: $cliPath" }
+            options.setCliPath(cliPath)
+        } else {
+            log.w { "Copilot CLI not found in common paths, relying on SDK default" }
+        }
+        val c = CopilotClient(options)
         client = c
         c.start()
         log.d { "CopilotClient started" }
@@ -137,6 +149,29 @@ class CopilotRiskAnalyzer(
     companion object {
         private const val TIMEOUT_MS = 30_000L
         private const val SEND_TIMEOUT_MS = 25_000L
+
+        /** Search common binary paths for the copilot CLI. */
+        private fun findCopilotCli(): String? {
+            val home = System.getProperty("user.home")
+            val candidates = listOf(
+                "/usr/local/bin/copilot",
+                "/opt/homebrew/bin/copilot",
+                "$home/.local/bin/copilot",
+                "$home/bin/copilot",
+            )
+            // Also check PATH via `which`
+            return candidates.firstOrNull { File(it).canExecute() }
+                ?: runCatching {
+                    val process = ProcessBuilder("/bin/sh", "-c", "which copilot").apply {
+                        val path = environment()["PATH"] ?: ""
+                        val extraPaths = listOf("/usr/local/bin", "/opt/homebrew/bin", "$home/.local/bin", "$home/bin")
+                        environment()["PATH"] = (extraPaths + path.split(":")).distinct().joinToString(":")
+                    }.start()
+                    val result = process.inputStream.bufferedReader().readText().trim()
+                    process.waitFor()
+                    result.ifBlank { null }
+                }.getOrNull()
+        }
 
         private const val JSON_FORMAT_INSTRUCTION =
             """Respond ONLY with a JSON object in this exact format (no markdown, no explanation outside JSON):
