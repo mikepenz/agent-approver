@@ -136,84 +136,11 @@ fun SettingsTab(
         ) {
             Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("GitHub Copilot CLI", style = MaterialTheme.typography.titleSmall)
+                    Text("GitHub Copilot", style = MaterialTheme.typography.titleSmall)
                     StatusBadge(
-                        text = if (isCopilotInstalled) "Installed" else "Not installed",
-                        color = if (isCopilotInstalled) Color(0xFF4CAF50) else Color(0xFF9E9E9E),
+                        text = "Coming soon",
+                        color = Color(0xFF9E9E9E),
                     )
-                }
-                Text(
-                    "Bridge script in ~/.agent-approver/",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                    Button(
-                        onClick = if (isCopilotInstalled) onUninstallCopilot else onInstallCopilot,
-                        modifier = Modifier.weight(1f),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = if (isCopilotInstalled) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
-                        ),
-                    ) {
-                        Text(if (isCopilotInstalled) "Uninstall" else "Install")
-                    }
-                    if (isCopilotInstalled) {
-                        OutlinedButton(onClick = onInstallCopilot) {
-                            Text("Reinstall")
-                        }
-                    }
-                }
-
-                val copilotClipboardManager = LocalClipboardManager.current
-                OutlinedButton(
-                    onClick = {
-                        copilotClipboardManager.setText(AnnotatedString(com.mikepenz.agentapprover.hook.CopilotBridgeInstaller.hooksJsonSnippet()))
-                    },
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Text("Copy hooks.json snippet", fontSize = 12.sp)
-                }
-
-                // Per-project hook registration
-                AnimatedVisibility(visible = isCopilotInstalled) {
-                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text("Register hook in project", style = MaterialTheme.typography.bodySmall)
-                        var projectPath by remember { mutableStateOf("") }
-                        var registrationKey by remember { mutableIntStateOf(0) }
-                        val isRegistered = remember(projectPath, registrationKey) {
-                            if (projectPath.isNotBlank()) isCopilotHookRegistered(projectPath) else false
-                        }
-
-                        OutlinedTextField(
-                            value = projectPath,
-                            onValueChange = { projectPath = it },
-                            modifier = Modifier.fillMaxWidth(),
-                            placeholder = { Text("/path/to/project", fontSize = 12.sp) },
-                            textStyle = MaterialTheme.typography.bodySmall,
-                            singleLine = true,
-                            trailingIcon = {
-                                if (isRegistered) {
-                                    StatusBadge(text = "Registered", color = Color(0xFF4CAF50))
-                                }
-                            },
-                        )
-
-                        if (projectPath.isNotBlank()) {
-                            Button(
-                                onClick = {
-                                    if (isRegistered) onUnregisterCopilotHook(projectPath) else onRegisterCopilotHook(projectPath)
-                                    registrationKey++
-                                },
-                                modifier = Modifier.fillMaxWidth(),
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = if (isRegistered) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
-                                ),
-                            ) {
-                                Text(if (isRegistered) "Unregister" else "Register")
-                            }
-                        }
-                    }
                 }
             }
         }
