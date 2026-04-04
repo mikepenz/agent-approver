@@ -4,7 +4,6 @@ import co.touchlab.kermit.Logger
 import com.mikepenz.agentapprover.model.*
 import com.mikepenz.agentapprover.protection.ProtectionEngine
 import com.mikepenz.agentapprover.state.AppStateManager
-import com.mikepenz.agentapprover.storage.DatabaseStorage
 import io.ktor.http.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
@@ -14,7 +13,6 @@ import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.datetime.Clock
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
-import java.util.UUID
 import kotlin.coroutines.cancellation.CancellationException
 
 private val logger = Logger.withTag("PreToolUseRoute")
@@ -23,7 +21,6 @@ fun Route.preToolUseRoute(
     stateManager: AppStateManager,
     adapter: ClaudeCodeAdapter,
     protectionEngine: ProtectionEngine,
-    databaseStorage: DatabaseStorage?,
     onNewApproval: () -> Unit,
 ) {
     post("/pre-tool-use") {
@@ -44,11 +41,11 @@ fun Route.preToolUseRoute(
 
         val severity = protectionEngine.highestSeverity(hits)
         val combinedMessage = hits.joinToString("; ") { "[${it.moduleId}/${it.ruleId}] ${it.message}" }
-        val primaryHit = hits.first()
+        val primaryHit = hits.first()  // used for protection metadata in logProtectionHit
 
         when (severity) {
             ProtectionMode.AUTO_BLOCK -> {
-                logProtectionHit(databaseStorage, request, Decision.PROTECTION_BLOCKED, primaryHit, combinedMessage)
+                logProtectionHit(stateManager, request, Decision.PROTECTION_BLOCKED, primaryHit, combinedMessage)
                 val responseJson = buildJsonObject { put("error", combinedMessage) }.toString()
                 call.respondText(responseJson, contentType = ContentType.Application.Json)
             }
@@ -56,9 +53,7 @@ fun Route.preToolUseRoute(
             ProtectionMode.ASK_AUTO_BLOCK -> {
                 handleAskMode(
                     stateManager = stateManager,
-                    databaseStorage = databaseStorage,
                     request = request,
-                    primaryHit = primaryHit,
                     combinedMessage = combinedMessage,
                     timeoutMs = stateManager.state.value.settings.defaultTimeoutSeconds * 1000L,
                     onNewApproval = onNewApproval,
@@ -69,9 +64,7 @@ fun Route.preToolUseRoute(
             ProtectionMode.ASK -> {
                 handleAskMode(
                     stateManager = stateManager,
-                    databaseStorage = databaseStorage,
                     request = request,
-                    primaryHit = primaryHit,
                     combinedMessage = combinedMessage,
                     timeoutMs = Long.MAX_VALUE,
                     onNewApproval = onNewApproval,
@@ -80,7 +73,7 @@ fun Route.preToolUseRoute(
             }
 
             ProtectionMode.LOG_ONLY -> {
-                logProtectionHit(databaseStorage, request, Decision.PROTECTION_LOGGED, primaryHit, combinedMessage)
+                logProtectionHit(stateManager, request, Decision.PROTECTION_LOGGED, primaryHit, combinedMessage)
                 call.respondText("{}", contentType = ContentType.Application.Json)
             }
 
@@ -94,9 +87,7 @@ fun Route.preToolUseRoute(
 
 private suspend fun handleAskMode(
     stateManager: AppStateManager,
-    databaseStorage: DatabaseStorage?,
     request: ApprovalRequest,
-    primaryHit: ProtectionHit,
     combinedMessage: String,
     timeoutMs: Long,
     onNewApproval: () -> Unit,
@@ -114,8 +105,7 @@ private suspend fun handleAskMode(
         }
 
         if (result == null) {
-            // Timeout — auto-deny
-            logProtectionHit(databaseStorage, request, Decision.PROTECTION_BLOCKED, primaryHit, combinedMessage)
+            // Timeout — auto-deny; resolve() handles DB + state
             val responseJson = buildJsonObject { put("error", combinedMessage) }.toString()
             stateManager.resolve(
                 requestId = request.id,
@@ -131,7 +121,7 @@ private suspend fun handleAskMode(
         when (result.decision) {
             Decision.APPROVED, Decision.AUTO_APPROVED, Decision.ALWAYS_ALLOWED,
             Decision.PROTECTION_OVERRIDDEN -> {
-                logProtectionHit(databaseStorage, request, Decision.PROTECTION_OVERRIDDEN, primaryHit, combinedMessage)
+                // resolve() already wrote to DB + state; just update raw response
                 val responseJson = "{}"
                 stateManager.updateHistoryRawResponse(request.id, responseJson)
                 try {
@@ -143,8 +133,8 @@ private suspend fun handleAskMode(
 
             Decision.DENIED, Decision.AUTO_DENIED, Decision.TIMEOUT,
             Decision.PROTECTION_BLOCKED -> {
-                logProtectionHit(databaseStorage, request, Decision.PROTECTION_BLOCKED, primaryHit, combinedMessage)
-                val responseJson = buildJsonObject { put("error", result.feedback ?: combinedMessage) }.toString()
+                // resolve() already wrote to DB + state; just update raw response
+                val responseJson = buildJsonObject { put("error", result.feedback?.takeIf { it.isNotBlank() } ?: combinedMessage) }.toString()
                 stateManager.updateHistoryRawResponse(request.id, responseJson)
                 try {
                     call.respondText(responseJson, contentType = ContentType.Application.Json)
@@ -158,7 +148,7 @@ private suspend fun handleAskMode(
             }
 
             Decision.PROTECTION_LOGGED -> {
-                logProtectionHit(databaseStorage, request, Decision.PROTECTION_LOGGED, primaryHit, combinedMessage)
+                // resolve() already wrote to DB + state; just update raw response
                 val responseJson = "{}"
                 stateManager.updateHistoryRawResponse(request.id, responseJson)
                 try {
@@ -184,7 +174,7 @@ private suspend fun handleAskMode(
 }
 
 private fun logProtectionHit(
-    databaseStorage: DatabaseStorage?,
+    stateManager: AppStateManager,
     request: ApprovalRequest,
     decision: Decision,
     hit: ProtectionHit,
@@ -201,5 +191,5 @@ private fun logProtectionHit(
         protectionRule = hit.ruleId,
         protectionDetail = message,
     )
-    databaseStorage?.insert(result)
+    stateManager.addToHistory(result)
 }

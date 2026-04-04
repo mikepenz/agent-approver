@@ -103,6 +103,17 @@ class AppStateManager(
         settingsStorage?.save(settings)
     }
 
+    fun addToHistory(result: ApprovalResult) {
+        databaseStorage?.insert(result)
+        _state.update { current ->
+            val newHistory = (listOf(result) + current.history).let { list ->
+                val max = current.settings.maxHistoryEntries
+                if (list.size > max) list.take(max) else list
+            }
+            current.copy(history = newHistory)
+        }
+    }
+
     fun clearHistory() {
         _state.update { it.copy(history = emptyList()) }
         databaseStorage?.clearAll()

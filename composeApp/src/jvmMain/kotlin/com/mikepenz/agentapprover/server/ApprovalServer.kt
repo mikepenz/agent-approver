@@ -40,7 +40,7 @@ class ApprovalServer(
                 routing {
                     approvalRoute(stateManager, adapter, onNewApproval)
                     copilotApprovalRoute(stateManager, copilotAdapter, onNewApproval)
-                    preToolUseRoute(stateManager, adapter, protectionEngine, databaseStorage, onNewApproval)
+                    preToolUseRoute(stateManager, adapter, protectionEngine, onNewApproval)
                 }
             },
         ).start(wait = false)
