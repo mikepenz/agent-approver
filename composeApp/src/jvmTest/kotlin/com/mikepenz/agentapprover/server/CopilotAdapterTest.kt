@@ -18,7 +18,7 @@ class CopilotAdapterTest {
         val json = """{"toolName":"bash","toolArgs":"{\"command\":\"npm test\",\"description\":\"Run tests\"}","timestamp":1704614600000,"cwd":"/tmp"}"""
         val result = adapter.parse(json)
         assertNotNull(result)
-        assertEquals("bash", result.hookInput.toolName)
+        assertEquals("Bash", result.hookInput.toolName)
         assertEquals(ToolType.DEFAULT, result.toolType)
         assertEquals("/tmp", result.hookInput.cwd)
         assertEquals(Source.COPILOT, result.source)
@@ -32,9 +32,36 @@ class CopilotAdapterTest {
         val json = """{"toolName":"edit","toolArgs":"{\"file\":\"src/main.kt\",\"content\":\"hello\"}","timestamp":1704614600000,"cwd":"/project"}"""
         val result = adapter.parse(json)
         assertNotNull(result)
-        assertEquals("edit", result.hookInput.toolName)
+        assertEquals("Edit", result.hookInput.toolName)
         assertEquals(ToolType.DEFAULT, result.toolType)
         assertEquals(Source.COPILOT, result.source)
+    }
+
+    @Test
+    fun normalizesRunTerminalCmdToBash() {
+        val json = """{"toolName":"run_terminal_cmd","toolArgs":"{\"command\":\"rm -rf dist\"}","timestamp":0,"cwd":""}"""
+        val result = adapter.parse(json)
+        assertNotNull(result)
+        assertEquals("Bash", result.hookInput.toolName)
+        assertEquals(JsonPrimitive("rm -rf dist"), result.hookInput.toolInput["command"])
+    }
+
+    @Test
+    fun normalizesCreateFileToWriteAndRemapsPath() {
+        val json = """{"toolName":"create_file","toolArgs":"{\"path\":\"src/Foo.kt\",\"content\":\"class Foo\"}","timestamp":0,"cwd":""}"""
+        val result = adapter.parse(json)
+        assertNotNull(result)
+        assertEquals("Write", result.hookInput.toolName)
+        assertEquals(JsonPrimitive("src/Foo.kt"), result.hookInput.toolInput["file_path"])
+        assertTrue("path" !in result.hookInput.toolInput)
+    }
+
+    @Test
+    fun unknownToolNamePassesThrough() {
+        val json = """{"toolName":"some_unknown_tool","toolArgs":"{}","timestamp":0,"cwd":""}"""
+        val result = adapter.parse(json)
+        assertNotNull(result)
+        assertEquals("some_unknown_tool", result.hookInput.toolName)
     }
 
     @Test

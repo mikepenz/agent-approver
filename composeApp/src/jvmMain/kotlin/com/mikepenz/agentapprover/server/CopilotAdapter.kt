@@ -19,6 +19,35 @@ private data class CopilotHookInput(
     val cwd: String = "",
 )
 
+private val TOOL_NAME_MAP = mapOf(
+    // Official GitHub Copilot agent tool names
+    "run_terminal_cmd"       to "Bash",
+    "create_file"            to "Write",
+    "replace_string_in_file" to "Edit",
+    "insert_edit_into_file"  to "Edit",
+    "read_file"              to "Read",
+    "list_dir"               to "LS",
+    "file_search"            to "Glob",
+    "grep_search"            to "Grep",
+    "fetch"                  to "WebFetch",
+    // Lowercase aliases (older versions / tests)
+    "bash"   to "Bash",
+    "edit"   to "Edit",
+    "create" to "Write",
+    "view"   to "Read",
+)
+
+private fun normalizeToolInput(toolName: String, input: Map<String, JsonElement>): Map<String, JsonElement> {
+    return when (toolName) {
+        "Write", "Edit", "Read" -> {
+            if ("file_path" !in input && "path" in input) {
+                input.toMutableMap().also { it["file_path"] = it.remove("path")!! }
+            } else input
+        }
+        else -> input
+    }
+}
+
 class CopilotAdapter {
 
     private val logger = Logger.withTag("CopilotAdapter")
@@ -33,16 +62,20 @@ class CopilotAdapter {
                 return null
             }
 
+            val canonicalToolName = TOOL_NAME_MAP[input.toolName] ?: input.toolName
+
             val toolInput: Map<String, JsonElement> = try {
                 json.decodeFromString(input.toolArgs)
             } catch (_: Exception) {
                 emptyMap()
             }
 
+            val normalizedInput = normalizeToolInput(canonicalToolName, toolInput)
+
             val hookInput = HookInput(
                 sessionId = UUID.randomUUID().toString(),
-                toolName = input.toolName,
-                toolInput = toolInput,
+                toolName = canonicalToolName,
+                toolInput = normalizedInput,
                 cwd = input.cwd,
                 hookEventName = "preToolUse",
             )

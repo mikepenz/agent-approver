@@ -38,7 +38,7 @@ object CopilotBridgeInstaller {
         # Fail-open: if server is unreachable, exits 0 so Copilot proceeds normally.
 
         PORT="${'$'}{AGENT_APPROVER_PORT:-$DEFAULT_PORT}"
-        URL="http://localhost:${'$'}PORT/approve-copilot"
+        URL="http://localhost:${'$'}PORT/pre-tool-use-copilot"
         INPUT=$(cat)
 
         RESPONSE=$(echo "${'$'}INPUT" | curl -s --max-time 300 \

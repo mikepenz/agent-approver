@@ -105,14 +105,10 @@ fun Route.copilotApprovalRoute(
 }
 
 private fun copilotAllowResponse() = buildJsonObject {
-    put("hookSpecificOutput", buildJsonObject {
-        put("permissionDecision", "allow")
-    })
+    put("permissionDecision", "allow")
 }
 
 private fun copilotDenyResponse(reason: String) = buildJsonObject {
-    put("hookSpecificOutput", buildJsonObject {
-        put("permissionDecision", "deny")
-        put("permissionDecisionReason", reason)
-    })
+    put("permissionDecision", "deny")
+    put("permissionDecisionReason", reason)
 }
