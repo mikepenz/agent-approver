@@ -37,6 +37,8 @@ import com.mikepenz.agentapprover.risk.ClaudeCliRiskAnalyzer
 import com.mikepenz.agentapprover.risk.CopilotRiskAnalyzer
 import com.mikepenz.agentapprover.risk.RiskAnalyzer
 import com.mikepenz.agentapprover.risk.RiskMessageBuilder
+import com.mikepenz.agentapprover.protection.ProtectionEngine
+import com.mikepenz.agentapprover.protection.modules.*
 import com.mikepenz.agentapprover.server.ApprovalServer
 import com.mikepenz.agentapprover.state.AppStateManager
 import com.mikepenz.agentapprover.storage.DatabaseStorage
@@ -87,6 +89,21 @@ fun main(args: Array<String>) {
     val stateManager = AppStateManager(databaseStorage = databaseStorage, settingsStorage = settingsStorage)
     stateManager.initialize()
 
+    val protectionEngine = ProtectionEngine(
+        modules = listOf(
+            DestructiveCommandsModule,
+            SensitiveFilesModule,
+            SupplyChainRceModule,
+            ToolBypassModule,
+            InlineScriptsModule,
+            PipeAbuseModule,
+            UncommittedFilesModule,
+            PythonVenvModule,
+            AbsolutePathsModule,
+        ),
+        settingsProvider = { stateManager.state.value.settings.protectionSettings },
+    )
+
     val hookRegistrar = HookRegistrar
 
     application {
@@ -121,7 +138,7 @@ fun main(args: Array<String>) {
         var copilotModels by remember { mutableStateOf<List<Pair<String, String>>>(emptyList()) }
 
         val server = remember {
-            ApprovalServer(stateManager, onNewApproval = {
+            ApprovalServer(stateManager, protectionEngine = protectionEngine, databaseStorage = databaseStorage, onNewApproval = {
                 isVisible = true
                 // On macOS, try to bring window to front
                 if (System.getProperty("os.name").lowercase().contains("mac")) {
@@ -377,6 +394,7 @@ fun main(args: Array<String>) {
                             devMode = devMode,
                             onPopOut = { title, content -> popOutState = title to content },
                             onShowLicenses = { showLicenses = true },
+                            protectionModules = protectionEngine.modules,
                         )
                     }
                 }

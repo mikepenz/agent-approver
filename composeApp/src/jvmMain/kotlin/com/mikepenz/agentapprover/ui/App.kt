@@ -30,6 +30,7 @@ import com.mikepenz.agentapprover.hook.CopilotBridgeInstaller
 import com.mikepenz.agentapprover.hook.HookRegistrar
 import com.mikepenz.agentapprover.model.Decision
 import com.mikepenz.agentapprover.model.ToolType
+import com.mikepenz.agentapprover.protection.ProtectionModule
 import com.mikepenz.agentapprover.risk.RiskAnalyzer
 import com.mikepenz.agentapprover.state.AppStateManager
 import com.mikepenz.agentapprover.ui.approvals.ApprovalsTab
@@ -48,6 +49,7 @@ fun App(
     devMode: Boolean = false,
     onPopOut: ((title: String, content: String) -> Unit)? = null,
     onShowLicenses: () -> Unit = {},
+    protectionModules: List<ProtectionModule> = emptyList(),
 ) {
     val state by stateManager.state.collectAsState()
     var selectedTab by remember { mutableIntStateOf(0) }
@@ -261,6 +263,10 @@ fun App(
                     isCopilotHookRegistered = { path -> CopilotBridgeInstaller.isHookRegistered(path) },
                     onClearHistory = { stateManager.clearHistory() },
                     onShowLicenses = onShowLicenses,
+                    protectionModules = protectionModules,
+                    onProtectionSettingsChange = { newProtectionSettings ->
+                        stateManager.updateSettings(state.settings.copy(protectionSettings = newProtectionSettings))
+                    },
                 )
             }
         }
