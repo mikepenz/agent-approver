@@ -100,6 +100,7 @@ fun main(args: Array<String>) {
             UncommittedFilesModule,
             PythonVenvModule,
             AbsolutePathsModule,
+            PipedTailHeadModule,
         ),
         settingsProvider = { stateManager.state.value.settings.protectionSettings },
     )
