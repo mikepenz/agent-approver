@@ -1,7 +1,9 @@
 package com.mikepenz.agentapprover.server
 
 import co.touchlab.kermit.Logger
+import com.mikepenz.agentapprover.protection.ProtectionEngine
 import com.mikepenz.agentapprover.state.AppStateManager
+import com.mikepenz.agentapprover.storage.DatabaseStorage
 import io.ktor.serialization.kotlinx.json.*
 import io.ktor.server.application.*
 import io.ktor.server.engine.*
@@ -12,6 +14,8 @@ import kotlinx.serialization.json.Json
 
 class ApprovalServer(
     private val stateManager: AppStateManager,
+    private val protectionEngine: ProtectionEngine,
+    private val databaseStorage: DatabaseStorage?,
     private val onNewApproval: () -> Unit,
 ) {
     private val logger = Logger.withTag("ApprovalServer")
@@ -36,6 +40,7 @@ class ApprovalServer(
                 routing {
                     approvalRoute(stateManager, adapter, onNewApproval)
                     copilotApprovalRoute(stateManager, copilotAdapter, onNewApproval)
+                    preToolUseRoute(stateManager, adapter, protectionEngine, databaseStorage, onNewApproval)
                 }
             },
         ).start(wait = false)
