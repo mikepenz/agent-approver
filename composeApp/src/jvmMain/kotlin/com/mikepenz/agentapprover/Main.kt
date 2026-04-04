@@ -39,7 +39,7 @@ import com.mikepenz.agentapprover.risk.RiskAnalyzer
 import com.mikepenz.agentapprover.risk.RiskMessageBuilder
 import com.mikepenz.agentapprover.server.ApprovalServer
 import com.mikepenz.agentapprover.state.AppStateManager
-import com.mikepenz.agentapprover.storage.HistoryStorage
+import com.mikepenz.agentapprover.storage.DatabaseStorage
 import com.mikepenz.agentapprover.storage.SettingsStorage
 import com.mikepenz.agentapprover.ui.App
 import com.mikepenz.agentapprover.ui.detail.ContentDetailWindow
@@ -81,8 +81,10 @@ fun main(args: Array<String>) {
 
     val appScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     val settingsStorage = SettingsStorage(dataDir)
-    val historyStorage = HistoryStorage(dataDir, appScope)
-    val stateManager = AppStateManager(historyStorage, settingsStorage)
+    val maxEntries = settingsStorage.load().maxHistoryEntries
+    val databaseStorage = DatabaseStorage(dataDir, maxEntries = maxEntries)
+    databaseStorage.migrateFromJson(dataDir)
+    val stateManager = AppStateManager(databaseStorage = databaseStorage, settingsStorage = settingsStorage)
     stateManager.initialize()
 
     val hookRegistrar = HookRegistrar
@@ -152,7 +154,7 @@ fun main(args: Array<String>) {
             onDispose {
                 server.stop()
                 copilotAnalyzer?.shutdown()
-                historyStorage.shutdown()
+                databaseStorage.close()
                 appScope.cancel()
             }
         }

@@ -1,7 +1,7 @@
 package com.mikepenz.agentapprover.state
 
 import com.mikepenz.agentapprover.model.*
-import com.mikepenz.agentapprover.storage.HistoryStorage
+import com.mikepenz.agentapprover.storage.DatabaseStorage
 import com.mikepenz.agentapprover.storage.SettingsStorage
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -19,7 +19,7 @@ data class AppState(
 )
 
 class AppStateManager(
-    private val historyStorage: HistoryStorage? = null,
+    private val databaseStorage: DatabaseStorage? = null,
     private val settingsStorage: SettingsStorage? = null,
 ) {
     private val _state = MutableStateFlow(AppState())
@@ -30,7 +30,7 @@ class AppStateManager(
 
     fun initialize() {
         val settings = settingsStorage?.load() ?: AppSettings()
-        val history = historyStorage?.load() ?: emptyList()
+        val history = databaseStorage?.loadAll() ?: emptyList()
         _state.value = AppState(settings = settings, history = history)
     }
 
@@ -64,8 +64,11 @@ class AppStateManager(
                 rawResponseJson = rawResponseJson,
                 decidedAt = Clock.System.now(),
             )
-            val newHistory = listOf(result) + current.history
-            historyStorage?.save(newHistory)
+            databaseStorage?.insert(result)
+            val newHistory = (listOf(result) + current.history).let { list ->
+                val max = current.settings.maxHistoryEntries
+                if (list.size > max) list.take(max) else list
+            }
             pendingDeferreds.remove(requestId)?.complete(result)
             current.copy(
                 pendingApprovals = current.pendingApprovals.filter { it.id != requestId },
@@ -80,11 +83,11 @@ class AppStateManager(
     }
 
     fun updateHistoryRawResponse(requestId: String, rawResponseJson: String) {
+        databaseStorage?.updateRawResponse(requestId, rawResponseJson)
         _state.update { current ->
             val updatedHistory = current.history.map { result ->
                 if (result.request.id == requestId) result.copy(rawResponseJson = rawResponseJson) else result
             }
-            historyStorage?.save(updatedHistory)
             current.copy(history = updatedHistory)
         }
     }
@@ -100,6 +103,6 @@ class AppStateManager(
 
     fun clearHistory() {
         _state.update { it.copy(history = emptyList()) }
-        historyStorage?.save(emptyList())
+        databaseStorage?.clearAll()
     }
 }
