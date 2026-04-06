@@ -7,6 +7,7 @@ local.properties
 .superpowers/
 .kotlin/
 template/
+docs/
 
 .claude/*.local.json
 .claude/*.local.md
