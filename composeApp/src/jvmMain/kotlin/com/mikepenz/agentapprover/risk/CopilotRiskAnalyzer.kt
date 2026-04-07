@@ -74,10 +74,8 @@ class CopilotRiskAnalyzer(
             withTimeout(TIMEOUT_MS) {
                 val c = client ?: run {
                     log.w { "CopilotClient not started, starting now" }
-                    val newClient = CopilotClient()
-                    client = newClient
-                    newClient.start()
-                    newClient
+                    start()
+                    client ?: throw RuntimeException("CopilotClient failed to start")
                 }
 
                 val userMessage = RiskMessageBuilder.buildUserMessage(hookInput)
@@ -178,8 +176,9 @@ class CopilotRiskAnalyzer(
             if (alreadyAvailable) return null
 
             val nodeDir = findNodeBinDir() ?: return null
-            val currentPath = System.getenv("PATH") ?: ""
-            return mapOf("PATH" to "$nodeDir:$currentPath")
+            val currentPath = System.getenv("PATH").orEmpty()
+            val newPath = if (currentPath.isNotEmpty()) "$nodeDir:$currentPath" else nodeDir
+            return mapOf("PATH" to newPath)
         }
 
         /** Find the directory containing the `node` binary. */
@@ -190,13 +189,7 @@ class CopilotRiskAnalyzer(
                 "/opt/homebrew/bin/node",
                 "$home/.local/bin/node",
             )
-            // NVM-managed installs
-            val nvmDir = File("$home/.nvm/versions/node")
-            if (nvmDir.isDirectory) {
-                nvmDir.listFiles()
-                    ?.sortedByDescending { it.name }
-                    ?.forEach { candidates.add("${it.absolutePath}/bin/node") }
-            }
+            addNvmBinCandidates(home, "node", candidates)
             val found = candidates.firstOrNull { File(it).canExecute() }
             return found?.let { File(it).parent }
         }
@@ -211,12 +204,7 @@ class CopilotRiskAnalyzer(
                 "$home/bin/copilot",
             )
             // Add NVM-managed node bin directories
-            val nvmDir = File("$home/.nvm/versions/node")
-            if (nvmDir.isDirectory) {
-                nvmDir.listFiles()
-                    ?.sortedByDescending { it.name } // newest version first
-                    ?.forEach { candidates.add("${it.absolutePath}/bin/copilot") }
-            }
+            addNvmBinCandidates(home, "copilot", candidates)
             // Check static candidates first
             val found = candidates.firstOrNull { File(it).canExecute() }
             if (found != null) return found
@@ -231,6 +219,20 @@ class CopilotRiskAnalyzer(
                 process.waitFor()
                 result.ifBlank { null }
             }.getOrNull()
+        }
+
+        /** Add NVM-managed bin candidates for [binary], sorted newest version first. */
+        private fun addNvmBinCandidates(home: String, binary: String, candidates: MutableList<String>) {
+            val nvmDir = File("$home/.nvm/versions/node")
+            if (nvmDir.isDirectory) {
+                nvmDir.listFiles()
+                    ?.sortedByDescending { dir ->
+                        // Parse "v18.17.1" as list of ints for proper numeric comparison
+                        dir.name.removePrefix("v").split(".").mapNotNull { it.toIntOrNull() }
+                            .let { parts -> parts.getOrElse(0) { 0 } * 1_000_000 + parts.getOrElse(1) { 0 } * 1_000 + parts.getOrElse(2) { 0 } }
+                    }
+                    ?.forEach { candidates.add("${it.absolutePath}/bin/$binary") }
+            }
         }
 
         private const val JSON_FORMAT_INSTRUCTION =
