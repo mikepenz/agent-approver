@@ -34,22 +34,77 @@ class PipedTailHeadModuleTest {
         assertEquals(2, module.rules.size)
     }
 
-    // --- piped_tail ---
+    // --- piped_tail: allowed (fast commands) ---
 
     @Test
-    fun pipedTailDetected() {
-        assertNotNull(evaluateRule("piped_tail", "cat file.txt | tail -n 20"))
+    fun pipedTailFromCatAllowed() {
+        assertNull(evaluateRule("piped_tail", "cat file.txt | tail -n 20"))
     }
 
     @Test
-    fun pipedTailWithSpaces() {
-        assertNotNull(evaluateRule("piped_tail", "grep foo bar.log |  tail -5"))
+    fun pipedTailFromGrepAllowed() {
+        assertNull(evaluateRule("piped_tail", "grep foo bar.log | tail -5"))
     }
 
     @Test
-    fun pipedTailInChain() {
-        assertNotNull(evaluateRule("piped_tail", "find . -name '*.kt' | sort | tail -20"))
+    fun pipedTailFromGrepWithSpacesAllowed() {
+        assertNull(evaluateRule("piped_tail", "grep foo bar.log |  tail -5"))
     }
+
+    @Test
+    fun pipedTailFromRgAllowed() {
+        assertNull(evaluateRule("piped_tail", "rg pattern src/ | tail -20"))
+    }
+
+    @Test
+    fun pipedTailFromFindSortAllowed() {
+        assertNull(evaluateRule("piped_tail", "find . -name '*.kt' | sort | tail -20"))
+    }
+
+    @Test
+    fun pipedTailFromSedAllowed() {
+        assertNull(evaluateRule("piped_tail", "sed -n '1,10p' file.txt | tail -5"))
+    }
+
+    @Test
+    fun pipedTailFromJqAllowed() {
+        assertNull(evaluateRule("piped_tail", "cat data.json | jq '.items[]' | tail -10"))
+    }
+
+    // --- piped_tail: blocked (expensive commands) ---
+
+    @Test
+    fun pipedTailFromCurlBlocked() {
+        assertNotNull(evaluateRule("piped_tail", "curl -s https://example.com | tail -20"))
+    }
+
+    @Test
+    fun pipedTailFromBuildBlocked() {
+        assertNotNull(evaluateRule("piped_tail", "./gradlew build | tail -50"))
+    }
+
+    @Test
+    fun pipedTailFromMvnBlocked() {
+        assertNotNull(evaluateRule("piped_tail", "mvn test 2>&1 | tail -30"))
+    }
+
+    @Test
+    fun pipedTailFromMakeBlocked() {
+        assertNotNull(evaluateRule("piped_tail", "make all | tail -20"))
+    }
+
+    @Test
+    fun pipedTailFromDockerBlocked() {
+        assertNotNull(evaluateRule("piped_tail", "docker build . | tail -10"))
+    }
+
+    @Test
+    fun pipedTailMixedPipelineBlocked() {
+        // curl is expensive even though sort is fast
+        assertNotNull(evaluateRule("piped_tail", "curl -s https://example.com | sort | tail -20"))
+    }
+
+    // --- piped_tail: file usage (no pipe, always allowed) ---
 
     @Test
     fun tailOnFileAllowed() {
@@ -61,22 +116,51 @@ class PipedTailHeadModuleTest {
         assertNull(evaluateRule("piped_tail", "tail -f server.log"))
     }
 
-    // --- piped_head ---
+    // --- piped_head: allowed (fast commands) ---
 
     @Test
-    fun pipedHeadDetected() {
-        assertNotNull(evaluateRule("piped_head", "cat file.txt | head -n 10"))
+    fun pipedHeadFromCatAllowed() {
+        assertNull(evaluateRule("piped_head", "cat file.txt | head -n 10"))
     }
 
     @Test
-    fun pipedHeadWithSpaces() {
-        assertNotNull(evaluateRule("piped_head", "ls -la |  head -5"))
+    fun pipedHeadFromLsAllowed() {
+        assertNull(evaluateRule("piped_head", "ls -la | head -5"))
     }
 
     @Test
-    fun pipedHeadInChain() {
-        assertNotNull(evaluateRule("piped_head", "find . -type f | sort | head -20"))
+    fun pipedHeadFromLsWithSpacesAllowed() {
+        assertNull(evaluateRule("piped_head", "ls -la |  head -5"))
     }
+
+    @Test
+    fun pipedHeadFromFindSortAllowed() {
+        assertNull(evaluateRule("piped_head", "find . -type f | sort | head -20"))
+    }
+
+    @Test
+    fun pipedHeadFromGrepAllowed() {
+        assertNull(evaluateRule("piped_head", "grep -r TODO src/ | head -10"))
+    }
+
+    // --- piped_head: blocked (expensive commands) ---
+
+    @Test
+    fun pipedHeadFromCurlBlocked() {
+        assertNotNull(evaluateRule("piped_head", "curl -s https://example.com/api | head -5"))
+    }
+
+    @Test
+    fun pipedHeadFromNpmBlocked() {
+        assertNotNull(evaluateRule("piped_head", "npm install 2>&1 | head -20"))
+    }
+
+    @Test
+    fun pipedHeadFromPythonBlocked() {
+        assertNotNull(evaluateRule("piped_head", "python3 script.py | head -10"))
+    }
+
+    // --- piped_head: file usage (no pipe, always allowed) ---
 
     @Test
     fun headOnFileAllowed() {
@@ -86,6 +170,35 @@ class PipedTailHeadModuleTest {
     @Test
     fun headWithoutPipeAllowed() {
         assertNull(evaluateRule("piped_head", "head -20 README.md"))
+    }
+
+    // --- Edge cases: multiple occurrences and command chains ---
+
+    @Test
+    fun multipleTailFirstFastSecondExpensiveBlocked() {
+        // Second tail is from an expensive command — should still block
+        assertNotNull(evaluateRule("piped_tail", "cat file | tail -5 ; curl https://example.com | tail -5"))
+    }
+
+    @Test
+    fun multipleTailAllFastAllowed() {
+        assertNull(evaluateRule("piped_tail", "cat file | tail -5 ; grep foo bar | tail -5"))
+    }
+
+    @Test
+    fun logicalOrBeforePipeBlocked() {
+        // || should not be treated as a pipe separator
+        assertNotNull(evaluateRule("piped_tail", "test -f file || curl https://example.com | tail -5"))
+    }
+
+    @Test
+    fun logicalAndBeforeFastPipeAllowed() {
+        assertNull(evaluateRule("piped_head", "cd /tmp && cat file.txt | head -5"))
+    }
+
+    @Test
+    fun logicalOrBeforeFastPipeAllowed() {
+        assertNull(evaluateRule("piped_tail", "test -f file || cat fallback.txt | tail -5"))
     }
 
     // --- Non-Bash tool ---
