@@ -5,14 +5,17 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.MaterialTheme
@@ -38,12 +41,14 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.mikepenz.agentapprover.model.AppSettings
 import com.mikepenz.agentapprover.model.RiskAnalysisBackend
+import com.mikepenz.agentapprover.risk.CopilotInitState
 import com.mikepenz.agentapprover.risk.RiskMessageBuilder
 
 @Composable
 fun RiskAnalysisSettingsContent(
     settings: AppSettings,
     copilotModels: List<Pair<String, String>>,
+    copilotInitState: CopilotInitState = CopilotInitState.IDLE,
     onSettingsChange: (AppSettings) -> Unit,
 ) {
     Column(
@@ -176,8 +181,22 @@ fun RiskAnalysisSettingsContent(
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
             ) {
                 Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    // Copilot init status
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text("GitHub Auth", style = MaterialTheme.typography.titleSmall)
+                        Text("Copilot", style = MaterialTheme.typography.titleSmall)
+                        when (copilotInitState) {
+                            CopilotInitState.LOADING -> {
+                                CircularProgressIndicator(modifier = Modifier.size(14.dp), strokeWidth = 2.dp)
+                                Text("Initializing...", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                            CopilotInitState.READY -> StatusBadge(text = "Connected", color = Color(0xFF4CAF50))
+                            CopilotInitState.ERROR -> StatusBadge(text = "Failed", color = Color(0xFFF44336))
+                            CopilotInitState.IDLE -> {}
+                        }
+                    }
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text("GitHub Auth", style = MaterialTheme.typography.bodyMedium)
+                        Spacer(Modifier.weight(1f))
                         ghAuthStatus?.let { status ->
                             StatusBadge(
                                 text = status,
@@ -220,16 +239,18 @@ fun RiskAnalysisSettingsContent(
                             Text("Login with GitHub (gh auth login)", fontSize = 12.sp)
                         }
                     }
-                    // Copilot CLI path override
-                    OutlinedTextField(
-                        value = settings.riskAnalysisCopilotCliPath,
-                        onValueChange = { onSettingsChange(settings.copy(riskAnalysisCopilotCliPath = it)) },
-                        modifier = Modifier.fillMaxWidth(),
-                        label = { Text("Copilot CLI path", fontSize = 12.sp) },
-                        placeholder = { Text("Auto-detect", fontSize = 12.sp) },
-                        textStyle = MaterialTheme.typography.bodySmall,
-                        singleLine = true,
-                    )
+                    // Copilot CLI path override — hidden when models loaded successfully (auto-detect worked)
+                    AnimatedVisibility(visible = copilotInitState != CopilotInitState.READY || copilotModels.isEmpty()) {
+                        OutlinedTextField(
+                            value = settings.riskAnalysisCopilotCliPath,
+                            onValueChange = { onSettingsChange(settings.copy(riskAnalysisCopilotCliPath = it)) },
+                            modifier = Modifier.fillMaxWidth(),
+                            label = { Text("Copilot CLI path", fontSize = 12.sp) },
+                            placeholder = { Text("Auto-detect", fontSize = 12.sp) },
+                            textStyle = MaterialTheme.typography.bodySmall,
+                            singleLine = true,
+                        )
+                    }
                 }
             }
         }

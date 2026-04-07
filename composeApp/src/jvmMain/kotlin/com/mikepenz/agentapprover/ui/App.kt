@@ -33,6 +33,7 @@ import com.mikepenz.agentapprover.model.Decision
 import com.mikepenz.agentapprover.model.ToolType
 import com.mikepenz.agentapprover.protection.ProtectionEngine
 import com.mikepenz.agentapprover.protection.ProtectionModule
+import com.mikepenz.agentapprover.risk.CopilotInitState
 import com.mikepenz.agentapprover.risk.RiskAnalyzer
 import com.mikepenz.agentapprover.state.AppStateManager
 import com.mikepenz.agentapprover.ui.approvals.ApprovalsTab
@@ -49,6 +50,7 @@ fun App(
     hookRegistrar: HookRegistrar,
     riskAnalyzer: RiskAnalyzer,
     copilotModels: List<Pair<String, String>> = emptyList(),
+    copilotInitState: CopilotInitState = CopilotInitState.IDLE,
     devMode: Boolean = false,
     onPopOut: ((title: String, content: String) -> Unit)? = null,
     onShowLicenses: () -> Unit = {},
@@ -271,6 +273,7 @@ fun App(
                     isCopilotInstalled = isCopilotInstalled,
                     historyCount = state.history.size,
                     copilotModels = copilotModels,
+                    copilotInitState = copilotInitState,
                     onSettingsChange = { stateManager.updateSettings(it) },
                     onRegisterHook = {
                         hookRegistrar.register(state.settings.serverPort)

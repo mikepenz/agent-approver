@@ -34,6 +34,7 @@ import io.github.kdroidfilter.nucleus.window.material.MaterialTitleBar
 import com.mikepenz.agentapprover.hook.HookRegistrar
 import com.mikepenz.agentapprover.model.RiskAnalysisBackend
 import com.mikepenz.agentapprover.risk.ClaudeCliRiskAnalyzer
+import com.mikepenz.agentapprover.risk.CopilotInitState
 import com.mikepenz.agentapprover.risk.CopilotRiskAnalyzer
 import com.mikepenz.agentapprover.risk.RiskAnalyzer
 import com.mikepenz.agentapprover.risk.RiskMessageBuilder
@@ -137,6 +138,7 @@ fun main(args: Array<String>) {
         var copilotAnalyzer by remember { mutableStateOf<CopilotRiskAnalyzer?>(null) }
         var activeRiskAnalyzer by remember { mutableStateOf<RiskAnalyzer>(claudeAnalyzer) }
         var copilotModels by remember { mutableStateOf<List<Pair<String, String>>>(emptyList()) }
+        var copilotInitState by remember { mutableStateOf(CopilotInitState.IDLE) }
 
         val server = remember {
             ApprovalServer(stateManager, protectionEngine = protectionEngine, databaseStorage = databaseStorage, onNewApproval = {
@@ -283,6 +285,7 @@ fun main(args: Array<String>) {
                 RiskAnalysisBackend.COPILOT -> {
                     var analyzer = copilotAnalyzer
                     if (analyzer == null) {
+                        copilotInitState = CopilotInitState.LOADING
                         analyzer = CopilotRiskAnalyzer(
                             model = settings.riskAnalysisCopilotModel,
                             customSystemPrompt = settings.riskAnalysisCustomPrompt,
@@ -295,8 +298,10 @@ fun main(args: Array<String>) {
                             analyzer.listModels().onSuccess { models ->
                                 copilotModels = models
                             }
+                            copilotInitState = CopilotInitState.READY
                         } catch (e: Exception) {
                             co.touchlab.kermit.Logger.withTag("Main").e(e) { "Failed to start Copilot client" }
+                            copilotInitState = CopilotInitState.ERROR
                             activeRiskAnalyzer = claudeAnalyzer
                             return@LaunchedEffect
                         }
@@ -309,6 +314,7 @@ fun main(args: Array<String>) {
                 RiskAnalysisBackend.CLAUDE -> {
                     copilotAnalyzer?.shutdown()
                     copilotAnalyzer = null
+                    copilotInitState = CopilotInitState.IDLE
                     activeRiskAnalyzer = claudeAnalyzer
                 }
             }
@@ -392,6 +398,7 @@ fun main(args: Array<String>) {
                         App(
                             stateManager, hookRegistrar, activeRiskAnalyzer,
                             copilotModels = copilotModels,
+                            copilotInitState = copilotInitState,
                             devMode = devMode,
                             onPopOut = { title, content -> popOutState = title to content },
                             onShowLicenses = { showLicenses = true },

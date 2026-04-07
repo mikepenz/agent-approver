@@ -18,6 +18,7 @@ import androidx.compose.ui.unit.sp
 import com.mikepenz.agentapprover.model.AppSettings
 import com.mikepenz.agentapprover.model.ProtectionSettings
 import com.mikepenz.agentapprover.protection.ProtectionModule
+import com.mikepenz.agentapprover.risk.CopilotInitState
 import com.mikepenz.agentapprover.ui.theme.AgentApproverTheme
 
 @Composable
@@ -27,6 +28,7 @@ fun SettingsTab(
     isCopilotInstalled: Boolean = false,
     historyCount: Int,
     copilotModels: List<Pair<String, String>> = emptyList(),
+    copilotInitState: CopilotInitState = CopilotInitState.IDLE,
     onSettingsChange: (AppSettings) -> Unit,
     onRegisterHook: () -> Unit,
     onUnregisterHook: () -> Unit,
@@ -61,7 +63,7 @@ fun SettingsTab(
         when (selectedTab) {
             0 -> GeneralSettingsContent(settings, historyCount, onSettingsChange, onClearHistory, onShowLicenses)
             1 -> IntegrationsSettingsContent(settings, isHookRegistered, isCopilotInstalled, onRegisterHook, onUnregisterHook, onInstallCopilot, onUninstallCopilot, onRegisterCopilotHook, onUnregisterCopilotHook, isCopilotHookRegistered)
-            2 -> RiskAnalysisSettingsContent(settings, copilotModels, onSettingsChange)
+            2 -> RiskAnalysisSettingsContent(settings, copilotModels, copilotInitState, onSettingsChange)
             3 -> ProtectionsSettingsContent(protectionModules, settings.protectionSettings, onProtectionSettingsChange)
         }
     }
