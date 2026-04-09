@@ -42,7 +42,11 @@ import dev.zacsweers.metrox.viewmodel.LocalMetroViewModelFactory
 import io.github.kdroidfilter.nucleus.window.material.MaterialDecoratedWindow
 import io.github.kdroidfilter.nucleus.window.material.MaterialTitleBar
 import java.awt.Desktop
+import java.awt.Dimension
 import java.awt.desktop.AppReopenedListener
+
+private const val MIN_WINDOW_WIDTH = 360
+private const val MIN_WINDOW_HEIGHT = 360
 
 /**
  * Top-level composable hosting everything inside the desktop `application { }`
@@ -152,6 +156,11 @@ fun AgentApproverShell(graph: AppGraph, devMode: Boolean, exitApplication: () ->
             ) {
                 LaunchedEffect(appState.settings.alwaysOnTop) {
                     window.isAlwaysOnTop = appState.settings.alwaysOnTop
+                }
+                LaunchedEffect(Unit) {
+                    // Enforce a sensible minimum so the tab row and content
+                    // never collapse below their usable width.
+                    window.minimumSize = Dimension(MIN_WINDOW_WIDTH, MIN_WINDOW_HEIGHT)
                 }
                 MaterialTitleBar {
                     Row(

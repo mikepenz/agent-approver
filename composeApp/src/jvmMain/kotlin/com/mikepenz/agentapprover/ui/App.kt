@@ -17,8 +17,8 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.mikepenz.agentapprover.ui.approvals.ApprovalsTabHost
 import com.mikepenz.agentapprover.ui.history.HistoryTabHost
 import com.mikepenz.agentapprover.ui.protectionlog.ProtectionLogTabHost
@@ -76,28 +76,35 @@ fun App(
 @Composable
 private fun TabLabel(tab: AppTab, tabState: TabState) {
     when (tab) {
-        AppTab.Approvals -> if (tabState.pendingCount > 0) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                Text("Approvals")
-                Badge { Text("${tabState.pendingCount}") }
-            }
-        } else {
-            Text("Approvals")
+        AppTab.Approvals -> LabelWithOptionalBadge("Approvals", tabState.pendingCount)
+        AppTab.History -> SingleLineTabText("History")
+        AppTab.Statistics -> SingleLineTabText("Stats")
+        AppTab.ProtectionLog -> LabelWithOptionalBadge("Protection", tabState.protectionLogCount)
+        AppTab.Settings -> SingleLineTabText("Settings")
+    }
+}
+
+@Composable
+private fun SingleLineTabText(text: String, modifier: Modifier = Modifier) {
+    Text(
+        text = text,
+        modifier = modifier,
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis,
+    )
+}
+
+@Composable
+private fun LabelWithOptionalBadge(text: String, count: Int) {
+    if (count > 0) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            SingleLineTabText(text, modifier = Modifier.weight(1f, fill = false))
+            Badge { Text("$count", maxLines = 1) }
         }
-
-        AppTab.History -> Text("History")
-
-        AppTab.Statistics -> Text("Stats")
-
-        AppTab.ProtectionLog -> if (tabState.protectionLogCount > 0) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                Text("Protection Log", fontSize = 12.sp)
-                Badge { Text("${tabState.protectionLogCount}") }
-            }
-        } else {
-            Text("Protection Log", fontSize = 12.sp)
-        }
-
-        AppTab.Settings -> Text("Settings")
+    } else {
+        SingleLineTabText(text)
     }
 }
