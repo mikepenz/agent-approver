@@ -55,6 +55,7 @@ fun ApprovalsTab(
     onDismiss: (requestId: String) -> Unit,
     autoDenyRequests: Set<String>,
     onCancelAutoDeny: (requestId: String) -> Unit,
+    onUserInteraction: (requestId: String) -> Unit = {},
     onPopOut: ((title: String, content: String) -> Unit)? = null,
     onSettingsChange: (AppSettings) -> Unit = {},
 ) {
@@ -118,6 +119,7 @@ fun ApprovalsTab(
                     onDismiss = { onDismiss(request.id) },
                     autoDenyActive = request.id in autoDenyRequests,
                     onCancelAutoDeny = { onCancelAutoDeny(request.id) },
+                    onUserInteraction = { onUserInteraction(request.id) },
                     awayMode = settings.awayMode,
                     now = now,
                     onPopOut = onPopOut,

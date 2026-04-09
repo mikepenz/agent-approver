@@ -66,6 +66,7 @@ fun DefaultCard(
     onApprove: (String?) -> Unit,
     onDeny: (String) -> Unit,
     onAlwaysAllow: () -> Unit = {},
+    onUserInteraction: () -> Unit = {},
     onPopOut: ((title: String, content: String) -> Unit)? = null,
     popOutContent: String = "",
     content: @Composable () -> Unit,
@@ -104,7 +105,10 @@ fun DefaultCard(
         // Deny feedback input
         OutlinedTextField(
             value = denyFeedback,
-            onValueChange = { denyFeedback = it },
+            onValueChange = {
+                denyFeedback = it
+                if (it.isNotEmpty()) onUserInteraction()
+            },
             modifier = Modifier.fillMaxWidth().onPreviewKeyEvent { event ->
                 if (event.key == Key.Enter && event.type == KeyEventType.KeyDown) {
                     onDeny(denyFeedback)
@@ -158,7 +162,10 @@ fun DefaultCard(
                     Spacer(Modifier.width(1.dp))
                     Box {
                         Button(
-                            onClick = { showMenu = true },
+                            onClick = {
+                                showMenu = true
+                                onUserInteraction()
+                            },
                             modifier = Modifier.width(40.dp),
                             shape = RoundedCornerShape(topStartPercent = 0, bottomStartPercent = 0, topEndPercent = 50, bottomEndPercent = 50),
                             contentPadding = PaddingValues(0.dp),
