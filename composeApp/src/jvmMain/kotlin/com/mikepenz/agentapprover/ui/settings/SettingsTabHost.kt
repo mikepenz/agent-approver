@@ -17,6 +17,7 @@ import dev.zacsweers.metrox.viewmodel.metroViewModel
 fun SettingsTabHost(onShowLicenses: () -> Unit) {
     val viewModel: SettingsViewModel = metroViewModel()
     val ui by viewModel.uiState.collectAsState()
+    val copilotHookRegistrations by viewModel.copilotHookRegistrations.collectAsState()
 
     SettingsTab(
         settings = ui.settings,
@@ -32,7 +33,15 @@ fun SettingsTabHost(onShowLicenses: () -> Unit) {
         onUninstallCopilot = viewModel::uninstallCopilot,
         onRegisterCopilotHook = viewModel::registerCopilotHook,
         onUnregisterCopilotHook = viewModel::unregisterCopilotHook,
-        isCopilotHookRegistered = viewModel::isCopilotHookRegistered,
+        // Cached lookup: returns the cached value if seen before, otherwise
+        // returns false and asynchronously populates the cache. After the
+        // background read completes the StateFlow re-emission triggers
+        // recomposition and the lookup returns the real value.
+        isCopilotHookRegistered = { path ->
+            val cached = copilotHookRegistrations[path]
+            if (cached == null) viewModel.queryCopilotHookRegistered(path)
+            cached ?: false
+        },
         onClearHistory = viewModel::clearHistory,
         onShowLicenses = onShowLicenses,
         protectionModules = viewModel.protectionModules,

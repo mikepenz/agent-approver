@@ -1,5 +1,8 @@
 package com.mikepenz.agentapprover.di
 
+import com.mikepenz.agentapprover.app.ApprovalServerRunner
+import com.mikepenz.agentapprover.app.RiskAnalyzerLifecycle
+import com.mikepenz.agentapprover.app.TrayManager
 import com.mikepenz.agentapprover.protection.ProtectionEngine
 import com.mikepenz.agentapprover.risk.ActiveRiskAnalyzerHolder
 import com.mikepenz.agentapprover.risk.ClaudeCliRiskAnalyzer
@@ -33,6 +36,9 @@ interface AppGraph : ViewModelGraph {
     val claudeAnalyzer: ClaudeCliRiskAnalyzer
     val activeRiskAnalyzerHolder: ActiveRiskAnalyzerHolder
     val copilotStateHolder: CopilotStateHolder
+    val trayManager: TrayManager
+    val riskAnalyzerLifecycle: RiskAnalyzerLifecycle
+    val approvalServerRunner: ApprovalServerRunner
 
     @DependencyGraph.Factory
     fun interface Factory {

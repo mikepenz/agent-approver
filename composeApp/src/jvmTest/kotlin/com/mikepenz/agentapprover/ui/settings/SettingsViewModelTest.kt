@@ -118,7 +118,7 @@ class SettingsViewModelTest {
     }
 
     @Test
-    fun `register and unregister copilot hook flow through bridge`() = runTest {
+    fun `register and unregister copilot hook updates cached registrations`() = runTest {
         val bridge = FakeCopilotBridge()
         val (vm, _, _) = newVm(bridge = bridge)
         runCurrent()
@@ -126,13 +126,40 @@ class SettingsViewModelTest {
         vm.registerCopilotHook("/path/a")
         vm.registerCopilotHook("/path/b")
         runCurrent()
-        assertTrue(vm.isCopilotHookRegistered("/path/a"))
-        assertTrue(vm.isCopilotHookRegistered("/path/b"))
+        assertTrue(vm.copilotHookRegistrations.value["/path/a"] == true)
+        assertTrue(vm.copilotHookRegistrations.value["/path/b"] == true)
 
         vm.unregisterCopilotHook("/path/a")
         runCurrent()
-        assertFalse(vm.isCopilotHookRegistered("/path/a"))
-        assertTrue(vm.isCopilotHookRegistered("/path/b"))
+        assertFalse(vm.copilotHookRegistrations.value["/path/a"] == true)
+        assertTrue(vm.copilotHookRegistrations.value["/path/b"] == true)
+    }
+
+    @Test
+    fun `queryCopilotHookRegistered populates the cache asynchronously`() = runTest {
+        val bridge = FakeCopilotBridge(registeredHooks = mutableSetOf("/path/already-registered"))
+        val (vm, _, _) = newVm(bridge = bridge)
+        runCurrent()
+
+        // Cache is empty before any query
+        assertTrue(vm.copilotHookRegistrations.value.isEmpty())
+
+        vm.queryCopilotHookRegistered("/path/already-registered")
+        vm.queryCopilotHookRegistered("/path/not-registered")
+        runCurrent()
+
+        assertEquals(true, vm.copilotHookRegistrations.value["/path/already-registered"])
+        assertEquals(false, vm.copilotHookRegistrations.value["/path/not-registered"])
+    }
+
+    @Test
+    fun `queryCopilotHookRegistered ignores blank paths`() = runTest {
+        val (vm, _, _) = newVm()
+        runCurrent()
+        vm.queryCopilotHookRegistered("")
+        vm.queryCopilotHookRegistered("   ")
+        runCurrent()
+        assertTrue(vm.copilotHookRegistrations.value.isEmpty())
     }
 
     @Test
@@ -199,7 +226,8 @@ class SettingsViewModelTest {
         // value is published.
         runCurrent()
         assertTrue(vm.uiState.value.isHookRegistered)
-        assertTrue(registry.isRegisteredCalls >= 1)
+        // The port-flow collector owns the initial poll; only one read at startup.
+        assertEquals(1, registry.isRegisteredCalls)
     }
 
     @Test

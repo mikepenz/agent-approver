@@ -20,10 +20,12 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -61,6 +63,16 @@ class SettingsViewModel(
     private val isHookRegistered = MutableStateFlow(false)
     private val isCopilotInstalled = MutableStateFlow(false)
 
+    /**
+     * Cached map of project path → "is the Copilot hook registered for this
+     * project". Populated lazily by [queryCopilotHookRegistered] so the UI can
+     * call a synchronous lookup without doing disk I/O during composition.
+     * The cache is invalidated and refreshed by [registerCopilotHook] /
+     * [unregisterCopilotHook] so the UI reflects the new state immediately.
+     */
+    private val _copilotHookRegistrations = MutableStateFlow<Map<String, Boolean>>(emptyMap())
+    val copilotHookRegistrations: StateFlow<Map<String, Boolean>> = _copilotHookRegistrations.asStateFlow()
+
     val uiState: StateFlow<SettingsUiState> = combine(
         stateManager.state,
         isHookRegistered,
@@ -90,18 +102,19 @@ class SettingsViewModel(
     )
 
     init {
-        // Initial poll on IO. Without this the VM blocks the main thread at
-        // startup parsing ~/.claude/settings.json and the Copilot script dir.
+        // Initial poll on IO for the Copilot script-dir check. Without this
+        // the VM blocks the main thread at startup. The hook-registered check
+        // is owned by the port-flow collector below — its first emission of
+        // the StateFlow's current value covers the startup case, so checking
+        // here would duplicate the disk read.
         viewModelScope.launch(ioDispatcher) {
             isCopilotInstalled.value = copilotBridge.isInstalled()
-            isHookRegistered.value = hookRegistry.isRegistered(
-                stateManager.state.value.settings.serverPort,
-            )
         }
 
-        // Re-poll hook registration when the configured port changes — covers
-        // the case where the user edits the port in settings while the hook is
-        // also wired up so the UI reflects the new state.
+        // Poll hook registration whenever the configured port changes. The
+        // first emission of `serverPort` covers app startup; subsequent
+        // emissions cover the case where the user edits the port. Always run
+        // on [ioDispatcher] because the registry parses ~/.claude/settings.json.
         viewModelScope.launch {
             stateManager.state
                 .map { it.settings.serverPort }
@@ -114,12 +127,18 @@ class SettingsViewModel(
     }
 
     fun updateSettings(settings: AppSettings) {
-        stateManager.updateSettings(settings)
+        // AppStateManager.updateSettings persists to disk synchronously, so
+        // dispatch onto IO to avoid blocking the UI thread on every change.
+        viewModelScope.launch(ioDispatcher) {
+            stateManager.updateSettings(settings)
+        }
     }
 
     fun updateProtectionSettings(protectionSettings: ProtectionSettings) {
-        val current = stateManager.state.value.settings
-        stateManager.updateSettings(current.copy(protectionSettings = protectionSettings))
+        viewModelScope.launch(ioDispatcher) {
+            val current = stateManager.state.value.settings
+            stateManager.updateSettings(current.copy(protectionSettings = protectionSettings))
+        }
     }
 
     fun registerHook() {
@@ -153,18 +172,43 @@ class SettingsViewModel(
     }
 
     fun registerCopilotHook(projectPath: String) {
-        viewModelScope.launch(ioDispatcher) { copilotBridge.registerHook(projectPath) }
+        viewModelScope.launch(ioDispatcher) {
+            copilotBridge.registerHook(projectPath)
+            // Refresh the cache from disk so the UI reflects the new state.
+            val now = copilotBridge.isHookRegistered(projectPath)
+            _copilotHookRegistrations.update { it + (projectPath to now) }
+        }
     }
 
     fun unregisterCopilotHook(projectPath: String) {
-        viewModelScope.launch(ioDispatcher) { copilotBridge.unregisterHook(projectPath) }
+        viewModelScope.launch(ioDispatcher) {
+            copilotBridge.unregisterHook(projectPath)
+            val now = copilotBridge.isHookRegistered(projectPath)
+            _copilotHookRegistrations.update { it + (projectPath to now) }
+        }
     }
 
-    fun isCopilotHookRegistered(projectPath: String): Boolean =
-        copilotBridge.isHookRegistered(projectPath)
+    /**
+     * Trigger an asynchronous refresh of the cached registration status for
+     * [projectPath]. The result lands in [copilotHookRegistrations]. Safe to
+     * call from inside Compose composition — it just enqueues a coroutine and
+     * returns. Subsequent calls for the same path while one is in flight are
+     * idempotent (the result simply overwrites the cache).
+     */
+    fun queryCopilotHookRegistered(projectPath: String) {
+        if (projectPath.isBlank()) return
+        viewModelScope.launch(ioDispatcher) {
+            val registered = copilotBridge.isHookRegistered(projectPath)
+            _copilotHookRegistrations.update { it + (projectPath to registered) }
+        }
+    }
 
     fun clearHistory() {
-        stateManager.clearHistory()
+        // AppStateManager.clearHistory does a synchronous DB delete; dispatch
+        // to IO so the UI doesn't stall.
+        viewModelScope.launch(ioDispatcher) {
+            stateManager.clearHistory()
+        }
     }
 }
 
