@@ -40,7 +40,6 @@ import androidx.lifecycle.viewmodel.compose.LocalViewModelStoreOwner
 import dev.zacsweers.metrox.viewmodel.LocalMetroViewModelFactory
 import com.mikepenz.agentapprover.di.AppEnvironment
 import com.mikepenz.agentapprover.di.AppGraph
-import com.mikepenz.agentapprover.hook.HookRegistrar
 import com.mikepenz.agentapprover.ui.approvals.ApprovalsViewModel
 import com.mikepenz.agentapprover.model.RiskAnalysisBackend
 import com.mikepenz.agentapprover.risk.CopilotInitState
@@ -105,7 +104,6 @@ fun main(args: Array<String>) {
     val databaseStorage = graph.databaseStorage
     val stateManager = graph.stateManager
     val protectionEngine = graph.protectionEngine
-    val hookRegistrar = HookRegistrar
 
     application {
         var isVisible by remember { mutableStateOf(true) }
@@ -145,6 +143,12 @@ fun main(args: Array<String>) {
         LaunchedEffect(activeRiskAnalyzer) {
             graph.activeRiskAnalyzerHolder.set(activeRiskAnalyzer)
         }
+        // Mirror Copilot lifecycle state into the DI graph so SettingsViewModel
+        // can render the available models and current init state. Main.kt still
+        // owns the lifecycle itself in Phase 3 — that moves into a manager in
+        // Phase 4.
+        LaunchedEffect(copilotModels) { graph.copilotStateHolder.setModels(copilotModels) }
+        LaunchedEffect(copilotInitState) { graph.copilotStateHolder.setInitState(copilotInitState) }
 
         // Application-scoped ViewModelStoreOwner — lives for the lifetime of the
         // process, NOT just while the main window is visible. This is critical:
@@ -443,14 +447,8 @@ fun main(args: Array<String>) {
                             LocalMetroViewModelFactory provides graph.metroViewModelFactory,
                         ) {
                             App(
-                                stateManager, hookRegistrar,
-                                copilotModels = copilotModels,
-                                copilotInitState = copilotInitState,
-                                devMode = devMode,
                                 onPopOut = { title, content -> popOutState = title to content },
                                 onShowLicenses = { showLicenses = true },
-                                protectionModules = protectionEngine.modules,
-                                protectionEngine = protectionEngine,
                             )
                         }
                     }
