@@ -32,20 +32,17 @@ import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
 import io.github.kdroidfilter.nucleus.window.material.MaterialDecoratedWindow
 import io.github.kdroidfilter.nucleus.window.material.MaterialTitleBar
+import com.mikepenz.agentapprover.di.AppEnvironment
+import com.mikepenz.agentapprover.di.AppGraph
 import com.mikepenz.agentapprover.hook.HookRegistrar
 import com.mikepenz.agentapprover.model.RiskAnalysisBackend
-import com.mikepenz.agentapprover.risk.ClaudeCliRiskAnalyzer
 import com.mikepenz.agentapprover.risk.CopilotInitState
 import com.mikepenz.agentapprover.risk.CopilotRiskAnalyzer
 import com.mikepenz.agentapprover.risk.RiskAnalyzer
 import com.mikepenz.agentapprover.risk.RiskMessageBuilder
-import com.mikepenz.agentapprover.protection.ProtectionEngine
-import com.mikepenz.agentapprover.protection.modules.*
 import com.mikepenz.agentapprover.server.ApprovalServer
-import com.mikepenz.agentapprover.state.AppStateManager
-import com.mikepenz.agentapprover.storage.DatabaseStorage
-import com.mikepenz.agentapprover.storage.SettingsStorage
 import com.mikepenz.agentapprover.ui.App
+import dev.zacsweers.metro.createGraphFactory
 import com.mikepenz.agentapprover.ui.detail.ContentDetailWindow
 import com.mikepenz.agentapprover.ui.detail.LicensesWindow
 import com.mikepenz.agentapprover.platform.AppIcon
@@ -94,29 +91,13 @@ fun main(args: Array<String>) {
     File(dataDir).mkdirs()
 
     val appScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
-    val settingsStorage = SettingsStorage(dataDir)
-    val maxEntries = settingsStorage.load().maxHistoryEntries
-    val databaseStorage = DatabaseStorage(dataDir, maxEntries = maxEntries)
-    databaseStorage.migrateFromJson(dataDir)
-    val stateManager = AppStateManager(databaseStorage = databaseStorage, settingsStorage = settingsStorage, devMode = devMode)
-    stateManager.initialize()
-
-    val protectionEngine = ProtectionEngine(
-        modules = listOf(
-            DestructiveCommandsModule,
-            SensitiveFilesModule,
-            SupplyChainRceModule,
-            ToolBypassModule,
-            InlineScriptsModule,
-            PipeAbuseModule,
-            UncommittedFilesModule,
-            PythonVenvModule,
-            AbsolutePathsModule,
-            PipedTailHeadModule,
-        ),
-        settingsProvider = { stateManager.state.value.settings.protectionSettings },
+    val graph: AppGraph = createGraphFactory<AppGraph.Factory>().create(
+        AppEnvironment(dataDir = dataDir, devMode = devMode, appScope = appScope),
     )
-
+    val settingsStorage = graph.settingsStorage
+    val databaseStorage = graph.databaseStorage
+    val stateManager = graph.stateManager
+    val protectionEngine = graph.protectionEngine
     val hookRegistrar = HookRegistrar
 
     application {
@@ -146,12 +127,7 @@ fun main(args: Array<String>) {
             }
         }
 
-        val claudeAnalyzer = remember {
-            ClaudeCliRiskAnalyzer(
-                model = stateManager.state.value.settings.riskAnalysisModel,
-                customSystemPrompt = stateManager.state.value.settings.riskAnalysisCustomPrompt,
-            )
-        }
+        val claudeAnalyzer = remember { graph.claudeAnalyzer }
         var copilotAnalyzer by remember { mutableStateOf<CopilotRiskAnalyzer?>(null) }
         var activeRiskAnalyzer by remember { mutableStateOf<RiskAnalyzer>(claudeAnalyzer) }
         var copilotModels by remember { mutableStateOf<List<Pair<String, String>>>(emptyList()) }

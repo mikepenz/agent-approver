@@ -31,6 +31,7 @@ plugins {
     alias(libs.plugins.kotlinSerialization)
     alias(libs.plugins.aboutlibraries)
     alias(libs.plugins.nucleus)
+    alias(libs.plugins.metro)
 }
 
 configurations.all {
