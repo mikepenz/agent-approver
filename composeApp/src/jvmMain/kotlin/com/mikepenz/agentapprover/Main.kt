@@ -226,6 +226,7 @@ fun main(args: Array<String>) {
 
         // Use AWT SystemTray directly for proper MultiResolutionImage HiDPI support
         val isMacOs = remember { System.getProperty("os.name", "").contains("Mac", ignoreCase = true) }
+        val isLinux = remember { System.getProperty("os.name", "").contains("Linux", ignoreCase = true) }
         val showHideItem = remember { MenuItem(if (isVisible) "Hide" else "Show") }
         val awayModeItem = remember { CheckboxMenuItem("Away Mode", stateManager.state.value.settings.awayMode) }
         DisposableEffect(Unit) {
@@ -266,6 +267,7 @@ fun main(args: Array<String>) {
         LaunchedEffect(state.settings.awayMode) {
             awayModeItem.state = state.settings.awayMode
         }
+        var previousPendingCount by remember { mutableStateOf(0) }
         LaunchedEffect(pendingCount, state.settings.awayMode) {
             if (SystemTray.isSupported()) {
                 val systemTray = SystemTray.getSystemTray()
@@ -282,8 +284,9 @@ fun main(args: Array<String>) {
             // macOS dock badge via Nucleus notification API
             if (isMacOs) {
                 io.github.kdroidfilter.nucleus.notification.NotificationCenter.setBadgeCount(pendingCount)
-            } else {
-                if (pendingCount > 0) {
+            } else if (isLinux) {
+                // Only notify on meaningful transitions (new pending requests arriving)
+                if (pendingCount > 0 && pendingCount > previousPendingCount) {
                     LinuxNotificationCenter.notify(
                         Notification(
                             summary = "Agent Approver",
@@ -292,6 +295,7 @@ fun main(args: Array<String>) {
                     )
                 }
             }
+            previousPendingCount = pendingCount
         }
         val settings = state.settings
 
