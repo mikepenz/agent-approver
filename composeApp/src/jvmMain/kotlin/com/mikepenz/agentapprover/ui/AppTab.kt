@@ -4,7 +4,7 @@ package com.mikepenz.agentapprover.ui
  * The set of top-level tabs hosted by [App]. The Protection Log tab is only
  * visible in dev mode.
  */
-enum class AppTab { Approvals, History, ProtectionLog, Settings }
+enum class AppTab { Approvals, History, Statistics, ProtectionLog, Settings }
 
 /**
  * Visible tab order computed from [devMode]. Centralised here (rather than
@@ -14,6 +14,7 @@ enum class AppTab { Approvals, History, ProtectionLog, Settings }
 fun visibleTabs(devMode: Boolean): List<AppTab> = buildList {
     add(AppTab.Approvals)
     add(AppTab.History)
+    add(AppTab.Statistics)
     if (devMode) add(AppTab.ProtectionLog)
     add(AppTab.Settings)
 }

@@ -99,6 +99,7 @@ kotlin {
             implementation(libs.kotlinx.coroutines.jdk8)
             implementation(libs.copilot.sdk.java)
             implementation(libs.sqlite.jdbc)
+            implementation(libs.vico.compose)
         }
     }
 }

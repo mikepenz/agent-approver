@@ -23,6 +23,7 @@ import com.mikepenz.agentapprover.ui.approvals.ApprovalsTabHost
 import com.mikepenz.agentapprover.ui.history.HistoryTabHost
 import com.mikepenz.agentapprover.ui.protectionlog.ProtectionLogTabHost
 import com.mikepenz.agentapprover.ui.settings.SettingsTabHost
+import com.mikepenz.agentapprover.ui.statistics.StatisticsTabHost
 import dev.zacsweers.metrox.viewmodel.metroViewModel
 
 /**
@@ -65,6 +66,7 @@ fun App(
         when (resolveTab(selectedTab, tabState.devMode)) {
             AppTab.Approvals -> ApprovalsTabHost(onPopOut = onPopOut)
             AppTab.History -> HistoryTabHost(onJumpToApprovals = { appViewModel.selectTab(0) })
+            AppTab.Statistics -> StatisticsTabHost()
             AppTab.ProtectionLog -> ProtectionLogTabHost()
             AppTab.Settings -> SettingsTabHost(onShowLicenses = onShowLicenses)
         }
@@ -84,6 +86,8 @@ private fun TabLabel(tab: AppTab, tabState: TabState) {
         }
 
         AppTab.History -> Text("History")
+
+        AppTab.Statistics -> Text("Stats")
 
         AppTab.ProtectionLog -> if (tabState.protectionLogCount > 0) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {

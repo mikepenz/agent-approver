@@ -3,6 +3,7 @@ package com.mikepenz.agentapprover.storage
 import co.touchlab.kermit.Logger
 import com.mikepenz.agentapprover.model.*
 import kotlinx.datetime.Instant
+import kotlinx.datetime.LocalDate
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.builtins.MapSerializer
 import kotlinx.serialization.builtins.serializer
@@ -19,6 +20,14 @@ open class DatabaseStorage(
 ) {
     private val logger = Logger.withTag("DatabaseStorage")
     private val connection: Connection
+
+    /**
+     * Serializes ALL access to the shared JDBC [connection]. SQLite JDBC connections
+     * are not thread-safe, and stats queries now run on `Dispatchers.IO` while writes
+     * may originate from coroutine resolves on a different thread. Every public method
+     * that touches `connection` must hold this lock.
+     */
+    private val connectionLock = Any()
 
     private val json = Json {
         ignoreUnknownKeys = true
@@ -88,7 +97,7 @@ open class DatabaseStorage(
         return false
     }
 
-    open fun insert(result: ApprovalResult) {
+    open fun insert(result: ApprovalResult): Unit = synchronized(connectionLock) {
         val type = if (result.protectionModule != null) "protection" else "approval"
         val sql = """
             INSERT OR REPLACE INTO history (
@@ -152,7 +161,7 @@ open class DatabaseStorage(
         }
     }
 
-    fun loadAll(): List<ApprovalResult> {
+    fun loadAll(): List<ApprovalResult> = synchronized(connectionLock) {
         val results = mutableListOf<ApprovalResult>()
         connection.createStatement().use { stmt ->
             stmt.executeQuery("SELECT * FROM history ORDER BY decided_at DESC").use { rs ->
@@ -161,10 +170,10 @@ open class DatabaseStorage(
                 }
             }
         }
-        return results
+        results
     }
 
-    fun loadByType(type: String): List<ApprovalResult> {
+    fun loadByType(type: String): List<ApprovalResult> = synchronized(connectionLock) {
         val results = mutableListOf<ApprovalResult>()
         connection.prepareStatement("SELECT * FROM history WHERE type = ? ORDER BY decided_at DESC").use { ps ->
             ps.setString(1, type)
@@ -174,10 +183,10 @@ open class DatabaseStorage(
                 }
             }
         }
-        return results
+        results
     }
 
-    fun updateRawResponse(requestId: String, rawResponseJson: String) {
+    fun updateRawResponse(requestId: String, rawResponseJson: String): Unit = synchronized(connectionLock) {
         connection.prepareStatement("UPDATE history SET raw_response_json = ? WHERE id = ?").use { ps ->
             ps.setString(1, rawResponseJson)
             ps.setString(2, requestId)
@@ -185,22 +194,163 @@ open class DatabaseStorage(
         }
     }
 
-    fun clearAll() {
+    fun clearAll(): Unit = synchronized(connectionLock) {
         connection.createStatement().use { stmt ->
             stmt.executeUpdate("DELETE FROM history")
         }
     }
 
-    fun count(): Int {
+    fun count(): Int = synchronized(connectionLock) {
         connection.createStatement().use { stmt ->
             stmt.executeQuery("SELECT COUNT(*) FROM history").use { rs ->
                 rs.next()
-                return rs.getInt(1)
+                rs.getInt(1)
             }
         }
     }
 
-    fun close() {
+    /**
+     * Aggregates the `history` table into a [StatsSummary] for the Statistics tab.
+     *
+     * Counts and protection-hit groupings are computed via SQL `GROUP BY`. Latency
+     * percentiles use a Kotlin pass over the deliberated rows (manual + risk auto)
+     * — SQLite has no native percentile and history is bounded by `maxEntries`,
+     * so the in-memory cost is trivial.
+     *
+     * @param since lower bound on `decided_at` (inclusive); pass `null` for all-time.
+     */
+    fun queryStats(since: Instant?): StatsSummary = synchronized(connectionLock) {
+        val sinceClause = if (since != null) "WHERE decided_at >= ?" else ""
+        fun bindSince(ps: java.sql.PreparedStatement, startIndex: Int = 1) {
+            if (since != null) ps.setString(startIndex, since.toString())
+        }
+
+        // 1. Count by Decision (then collapse to DecisionGroup in Kotlin).
+        val byGroup = mutableMapOf<DecisionGroup, Int>()
+        var total = 0
+        connection.prepareStatement(
+            "SELECT decision, COUNT(*) AS c FROM history $sinceClause GROUP BY decision"
+        ).use { ps ->
+            bindSince(ps)
+            ps.executeQuery().use { rs ->
+                while (rs.next()) {
+                    val decisionName = rs.getString("decision")
+                    val count = rs.getInt("c")
+                    val decision = runCatching { Decision.valueOf(decisionName) }.getOrNull() ?: continue
+                    byGroup.merge(decision.group(), count, Int::plus)
+                    total += count
+                }
+            }
+        }
+
+        // 2. Per-day breakdown. SQLite's `date()` understands ISO-8601 strings.
+        val dailyByDate = sortedMapOf<String, MutableMap<DecisionGroup, Int>>()
+        connection.prepareStatement(
+            "SELECT date(decided_at) AS d, decision, COUNT(*) AS c FROM history $sinceClause GROUP BY d, decision ORDER BY d ASC"
+        ).use { ps ->
+            bindSince(ps)
+            ps.executeQuery().use { rs ->
+                while (rs.next()) {
+                    val day = rs.getString("d") ?: continue
+                    val decisionName = rs.getString("decision")
+                    val count = rs.getInt("c")
+                    val decision = runCatching { Decision.valueOf(decisionName) }.getOrNull() ?: continue
+                    val map = dailyByDate.getOrPut(day) { mutableMapOf() }
+                    map.merge(decision.group(), count, Int::plus)
+                }
+            }
+        }
+        val perDay = dailyByDate.mapNotNull { (day, groups) ->
+            runCatching { LocalDate.parse(day) }.getOrNull()?.let { DailyCount(it, groups.toMap()) }
+        }
+
+        // 3. Latency for deliberated decisions only.
+        val latencyByGroupRaw = mutableMapOf<DecisionGroup, MutableList<Double>>()
+        val deliberatedDecisions = Decision.entries.filter { it.group().hasMeaningfulLatency }
+        if (deliberatedDecisions.isNotEmpty()) {
+            val placeholders = deliberatedDecisions.joinToString(",") { "?" }
+            val sinceFilter = if (since != null) " AND decided_at >= ?" else ""
+            connection.prepareStatement(
+                "SELECT decision, requested_at, decided_at FROM history WHERE decision IN ($placeholders)$sinceFilter"
+            ).use { ps ->
+                deliberatedDecisions.forEachIndexed { i, d -> ps.setString(i + 1, d.name) }
+                if (since != null) ps.setString(deliberatedDecisions.size + 1, since.toString())
+                ps.executeQuery().use { rs ->
+                    while (rs.next()) {
+                        val decision = runCatching { Decision.valueOf(rs.getString("decision")) }.getOrNull() ?: continue
+                        val requested = runCatching { Instant.parse(rs.getString("requested_at")) }.getOrNull() ?: continue
+                        val decided = runCatching { Instant.parse(rs.getString("decided_at")) }.getOrNull() ?: continue
+                        val seconds = ((decided - requested).inWholeMilliseconds.coerceAtLeast(0L)) / 1000.0
+                        latencyByGroupRaw.getOrPut(decision.group()) { mutableListOf() }.add(seconds)
+                    }
+                }
+            }
+        }
+
+        val latencyByGroup = latencyByGroupRaw.mapValues { (_, samples) -> samples.toLatencyStats() }
+        val latencyHistogramByGroup = latencyByGroupRaw.mapValues { (_, samples) ->
+            val counts = MutableList(StatsSummary.BUCKET_LABELS.size) { 0 }
+            samples.forEach { counts[StatsSummary.bucketIndex(it)]++ }
+            counts.toList()
+        }
+
+        // 4. Top protection hits.
+        val topProtections = mutableListOf<ProtectionHitCount>()
+        val protectionSinceClause = if (since != null) " AND decided_at >= ?" else ""
+        connection.prepareStatement(
+            """
+            SELECT protection_module AS m, protection_rule AS r, COUNT(*) AS c
+            FROM history
+            WHERE protection_module IS NOT NULL$protectionSinceClause
+            GROUP BY m, r
+            ORDER BY c DESC
+            LIMIT 10
+            """.trimIndent()
+        ).use { ps ->
+            if (since != null) ps.setString(1, since.toString())
+            ps.executeQuery().use { rs ->
+                while (rs.next()) {
+                    topProtections.add(
+                        ProtectionHitCount(
+                            moduleId = rs.getString("m") ?: continue,
+                            ruleId = rs.getString("r") ?: "",
+                            count = rs.getInt("c"),
+                        )
+                    )
+                }
+            }
+        }
+
+        StatsSummary(
+            totalDecisions = total,
+            byGroup = byGroup,
+            perDay = perDay,
+            latencyByGroup = latencyByGroup,
+            latencyHistogramByGroup = latencyHistogramByGroup,
+            topProtections = topProtections,
+        )
+    }
+
+    private fun List<Double>.toLatencyStats(): LatencyStats {
+        if (isEmpty()) return LatencyStats(0, 0.0, 0.0, 0.0)
+        val sorted = sorted()
+        val avg = sorted.average()
+        val p50 = sorted.percentile(0.50)
+        val p90 = sorted.percentile(0.90)
+        return LatencyStats(sorted.size, avg, p50, p90)
+    }
+
+    private fun List<Double>.percentile(p: Double): Double {
+        // Nearest-rank percentile on a pre-sorted list. The rank is `ceil(p * N)`,
+        // converted to a 0-based index by subtracting 1. For N=4 at p50 this yields
+        // rank=2 → index 1 (the second-smallest sample), matching the standard
+        // nearest-rank definition.
+        if (isEmpty()) return 0.0
+        val rank = kotlin.math.ceil(p * size).toInt().coerceIn(1, size)
+        return this[rank - 1]
+    }
+
+    fun close(): Unit = synchronized(connectionLock) {
         try {
             if (!connection.isClosed) {
                 connection.close()
@@ -210,7 +360,7 @@ open class DatabaseStorage(
         }
     }
 
-    fun migrateFromJson(dataDir: String) {
+    fun migrateFromJson(dataDir: String): Unit = synchronized(connectionLock) {
         val historyFile = File(dataDir, "history.json")
         if (!historyFile.exists()) {
             logger.i { "No history.json found, skipping migration" }

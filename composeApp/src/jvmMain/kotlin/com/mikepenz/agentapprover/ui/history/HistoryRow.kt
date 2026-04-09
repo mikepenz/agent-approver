@@ -52,7 +52,9 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonPrimitive
+import kotlin.time.Duration
 import kotlin.time.Duration.Companion.hours
+import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.minutes
 
 private val prettyJson = Json { prettyPrint = true }
@@ -115,6 +117,21 @@ private fun summaryText(request: ApprovalRequest): String = when {
 
     request.toolType == ToolType.PLAN -> "Plan"
     else -> request.hookInput.toolName
+}
+
+/**
+ * Compact human-readable form of how long a request was pending before being
+ * resolved. Returns null when the duration isn't meaningful — protection rules
+ * resolve in microseconds and would just clutter the row.
+ */
+private fun formatDecisionDuration(duration: Duration): String? {
+    if (duration < 500.milliseconds) return null
+    return when {
+        duration < 1.minutes -> "${duration.inWholeSeconds}s"
+        duration < 1.hours -> "${duration.inWholeMinutes}m"
+        duration < 24.hours -> "${duration.inWholeHours}h"
+        else -> "${duration.inWholeDays}d"
+    }
 }
 
 private fun relativeTimestamp(instant: Instant): String {
@@ -320,6 +337,24 @@ fun HistoryRow(
                                     )
                                     Text(
                                         text = result.request.hookInput.cwd,
+                                        fontFamily = FontFamily.Monospace,
+                                        fontSize = 10.sp,
+                                        color = Color(0xFFCCCCCC),
+                                    )
+                                    Spacer(Modifier.height(8.dp))
+                                }
+                                val decisionDuration = formatDecisionDuration(
+                                    result.decidedAt - result.request.timestamp,
+                                )
+                                if (decisionDuration != null) {
+                                    Text(
+                                        text = "Time to decision:",
+                                        fontSize = 10.sp,
+                                        color = Color.Gray,
+                                        style = MaterialTheme.typography.labelSmall,
+                                    )
+                                    Text(
+                                        text = "took $decisionDuration",
                                         fontFamily = FontFamily.Monospace,
                                         fontSize = 10.sp,
                                         color = Color(0xFFCCCCCC),
