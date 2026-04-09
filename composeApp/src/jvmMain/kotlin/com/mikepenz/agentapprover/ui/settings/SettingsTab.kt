@@ -37,6 +37,7 @@ fun SettingsTab(
     onRegisterCopilotHook: (String) -> Unit = {},
     onUnregisterCopilotHook: (String) -> Unit = {},
     isCopilotHookRegistered: (String) -> Boolean = { false },
+    onQueryCopilotHookRegistered: (String) -> Unit = {},
     onClearHistory: () -> Unit,
     onShowLicenses: () -> Unit = {},
     protectionModules: List<ProtectionModule> = emptyList(),
@@ -62,7 +63,7 @@ fun SettingsTab(
 
         when (selectedTab) {
             0 -> GeneralSettingsContent(settings, historyCount, onSettingsChange, onClearHistory, onShowLicenses)
-            1 -> IntegrationsSettingsContent(settings, isHookRegistered, isCopilotInstalled, onRegisterHook, onUnregisterHook, onInstallCopilot, onUninstallCopilot, onRegisterCopilotHook, onUnregisterCopilotHook, isCopilotHookRegistered)
+            1 -> IntegrationsSettingsContent(settings, isHookRegistered, isCopilotInstalled, onRegisterHook, onUnregisterHook, onInstallCopilot, onUninstallCopilot, onRegisterCopilotHook, onUnregisterCopilotHook, isCopilotHookRegistered, onQueryCopilotHookRegistered)
             2 -> RiskAnalysisSettingsContent(settings, copilotModels, copilotInitState, onSettingsChange)
             3 -> ProtectionsSettingsContent(protectionModules, settings.protectionSettings, onProtectionSettingsChange)
         }
