@@ -264,15 +264,6 @@ fun HistoryRow(
 
                 Spacer(Modifier.weight(1f))
 
-                val decisionDuration = formatDecisionDuration(result.decidedAt - result.request.timestamp)
-                if (decisionDuration != null) {
-                    Text(
-                        text = "took $decisionDuration",
-                        fontSize = 10.sp,
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
-                    )
-                }
-
                 Text(
                     text = relativeTimestamp(result.decidedAt),
                     fontSize = 10.sp,
@@ -346,6 +337,24 @@ fun HistoryRow(
                                     )
                                     Text(
                                         text = result.request.hookInput.cwd,
+                                        fontFamily = FontFamily.Monospace,
+                                        fontSize = 10.sp,
+                                        color = Color(0xFFCCCCCC),
+                                    )
+                                    Spacer(Modifier.height(8.dp))
+                                }
+                                val decisionDuration = formatDecisionDuration(
+                                    result.decidedAt - result.request.timestamp,
+                                )
+                                if (decisionDuration != null) {
+                                    Text(
+                                        text = "Time to decision:",
+                                        fontSize = 10.sp,
+                                        color = Color.Gray,
+                                        style = MaterialTheme.typography.labelSmall,
+                                    )
+                                    Text(
+                                        text = "took $decisionDuration",
                                         fontFamily = FontFamily.Monospace,
                                         fontSize = 10.sp,
                                         color = Color(0xFFCCCCCC),
