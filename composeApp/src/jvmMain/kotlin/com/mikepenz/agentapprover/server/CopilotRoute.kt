@@ -104,11 +104,34 @@ fun Route.copilotApprovalRoute(
     }
 }
 
+// Response shape for Copilot CLI's permissionRequest hook (v1.0.16+).
+//
+// The canonical shape is taken from the bundled SDK type definition in the
+// @github/copilot npm package (sdk/index.d.ts):
+//
+//     export declare interface PermissionRequestHookOutput {
+//         behavior?: "allow" | "deny";
+//         message?: string;
+//         interrupt?: boolean;
+//     }
+//
+// It's a **flat** object with `behavior: "allow"` (not `"approve"`!) — the
+// `"approve"` value seen in some third-party bridges (e.g. openpoet's) is the
+// preToolUse hook's protocol with a separate translation layer, not the
+// permissionRequest one. This shape is also distinct from the preToolUse
+// hook's documented `{permissionDecision: ..., permissionDecisionReason: ...}`
+// format, which CopilotPreToolUseRoute uses.
+//
+// `interrupt: true` on deny tells Copilot to abort the tool call entirely
+// (rather than just blocking this specific permission check), which is what
+// we want when the user clicks Deny in the approval card.
+
 private fun copilotAllowResponse() = buildJsonObject {
-    put("permissionDecision", "allow")
+    put("behavior", "allow")
 }
 
 private fun copilotDenyResponse(reason: String) = buildJsonObject {
-    put("permissionDecision", "deny")
-    put("permissionDecisionReason", reason)
+    put("behavior", "deny")
+    put("message", reason)
+    put("interrupt", true)
 }

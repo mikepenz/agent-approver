@@ -17,12 +17,11 @@ import dev.zacsweers.metrox.viewmodel.metroViewModel
 fun SettingsTabHost(onShowLicenses: () -> Unit) {
     val viewModel: SettingsViewModel = metroViewModel()
     val ui by viewModel.uiState.collectAsState()
-    val copilotHookRegistrations by viewModel.copilotHookRegistrations.collectAsState()
 
     SettingsTab(
         settings = ui.settings,
         isHookRegistered = ui.isHookRegistered,
-        isCopilotInstalled = ui.isCopilotInstalled,
+        isCopilotRegistered = ui.isCopilotRegistered,
         historyCount = ui.historyCount,
         copilotModels = ui.copilotModels,
         copilotInitState = ui.copilotInitState,
@@ -31,16 +30,8 @@ fun SettingsTabHost(onShowLicenses: () -> Unit) {
         onSettingsChange = viewModel::updateSettings,
         onRegisterHook = viewModel::registerHook,
         onUnregisterHook = viewModel::unregisterHook,
-        onInstallCopilot = viewModel::installCopilot,
-        onUninstallCopilot = viewModel::uninstallCopilot,
-        onRegisterCopilotHook = viewModel::registerCopilotHook,
-        onUnregisterCopilotHook = viewModel::unregisterCopilotHook,
-        // Pure cache lookup — no side effects from inside composition. The
-        // refresh is triggered exactly once per typed path by a
-        // LaunchedEffect(projectPath) inside CopilotProjectHookSection via
-        // onQueryCopilotHookRegistered below.
-        isCopilotHookRegistered = { path -> copilotHookRegistrations[path] ?: false },
-        onQueryCopilotHookRegistered = viewModel::queryCopilotHookRegistered,
+        onRegisterCopilot = viewModel::registerCopilot,
+        onUnregisterCopilot = viewModel::unregisterCopilot,
         onClearHistory = viewModel::clearHistory,
         onShowLicenses = onShowLicenses,
         protectionModules = viewModel.protectionModules,

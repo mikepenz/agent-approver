@@ -40,24 +40,24 @@ class SettingsViewModelTest {
     }
 
     private class FakeCopilotBridge(
-        var installed: Boolean = false,
-        val registeredHooks: MutableSet<String> = mutableSetOf(),
+        val registeredPorts: MutableSet<Int> = mutableSetOf(),
     ) : CopilotBridge {
-        var installCalls = 0
-        var uninstallCalls = 0
+        var registerCalls = 0
+        var unregisterCalls = 0
+        var isRegisteredCalls = 0
 
-        override fun isInstalled(): Boolean = installed
-        override fun install() {
-            installCalls++
-            installed = true
+        override fun isRegistered(port: Int): Boolean {
+            isRegisteredCalls++
+            return port in registeredPorts
         }
-        override fun uninstall() {
-            uninstallCalls++
-            installed = false
+        override fun register(port: Int) {
+            registerCalls++
+            registeredPorts.add(port)
         }
-        override fun isHookRegistered(projectPath: String): Boolean = projectPath in registeredHooks
-        override fun registerHook(projectPath: String) { registeredHooks.add(projectPath) }
-        override fun unregisterHook(projectPath: String) { registeredHooks.remove(projectPath) }
+        override fun unregister(port: Int) {
+            unregisterCalls++
+            registeredPorts.remove(port)
+        }
     }
 
     private class FakeHookRegistry(
@@ -102,67 +102,50 @@ class SettingsViewModelTest {
     }
 
     @Test
-    fun `installCopilot delegates to bridge and updates uiState`() = runTest {
-        val bridge = FakeCopilotBridge(installed = false)
-        val (vm, _, _) = newVm(bridge = bridge)
-        runCurrent()
-
-        assertFalse(vm.uiState.value.isCopilotInstalled)
-        vm.installCopilot()
-        runCurrent()
-
-        assertEquals(1, bridge.installCalls)
-        assertTrue(vm.uiState.value.isCopilotInstalled)
-
-        vm.uninstallCopilot()
-        runCurrent()
-        assertEquals(1, bridge.uninstallCalls)
-        assertFalse(vm.uiState.value.isCopilotInstalled)
-    }
-
-    @Test
-    fun `register and unregister copilot hook updates cached registrations`() = runTest {
+    fun `registerCopilot delegates to bridge and updates uiState`() = runTest {
         val bridge = FakeCopilotBridge()
         val (vm, _, _) = newVm(bridge = bridge)
         runCurrent()
 
-        vm.registerCopilotHook("/path/a")
-        vm.registerCopilotHook("/path/b")
-        runCurrent()
-        assertTrue(vm.copilotHookRegistrations.value["/path/a"] == true)
-        assertTrue(vm.copilotHookRegistrations.value["/path/b"] == true)
+        assertFalse(vm.uiState.value.isCopilotRegistered)
 
-        vm.unregisterCopilotHook("/path/a")
+        vm.registerCopilot()
         runCurrent()
-        assertFalse(vm.copilotHookRegistrations.value["/path/a"] == true)
-        assertTrue(vm.copilotHookRegistrations.value["/path/b"] == true)
+        assertEquals(1, bridge.registerCalls)
+        assertTrue(vm.uiState.value.isCopilotRegistered)
+
+        vm.unregisterCopilot()
+        runCurrent()
+        assertEquals(1, bridge.unregisterCalls)
+        assertFalse(vm.uiState.value.isCopilotRegistered)
     }
 
     @Test
-    fun `queryCopilotHookRegistered populates the cache asynchronously`() = runTest {
-        val bridge = FakeCopilotBridge(registeredHooks = mutableSetOf("/path/already-registered"))
+    fun `isCopilotRegistered is initially false then populated from bridge on IO`() = runTest {
+        val bridge = FakeCopilotBridge(registeredPorts = mutableSetOf(19532))
         val (vm, _, _) = newVm(bridge = bridge)
+
+        // Before any coroutines run, the seeded value is false (safe default).
+        assertFalse(vm.uiState.value.isCopilotRegistered)
+
         runCurrent()
-
-        // Cache is empty before any query
-        assertTrue(vm.copilotHookRegistrations.value.isEmpty())
-
-        vm.queryCopilotHookRegistered("/path/already-registered")
-        vm.queryCopilotHookRegistered("/path/not-registered")
-        runCurrent()
-
-        assertEquals(true, vm.copilotHookRegistrations.value["/path/already-registered"])
-        assertEquals(false, vm.copilotHookRegistrations.value["/path/not-registered"])
+        assertTrue(vm.uiState.value.isCopilotRegistered)
     }
 
     @Test
-    fun `queryCopilotHookRegistered ignores blank paths`() = runTest {
-        val (vm, _, _) = newVm()
+    fun `port change re-polls copilot registration`() = runTest {
+        val bridge = FakeCopilotBridge()
+        val (vm, state, _) = newVm(bridge = bridge)
         runCurrent()
-        vm.queryCopilotHookRegistered("")
-        vm.queryCopilotHookRegistered("   ")
+        val initialIsRegisteredCalls = bridge.isRegisteredCalls
+
+        // Simulate the user (or the hook flow) marking the new port as registered
+        bridge.registeredPorts.add(20000)
+        state.updateSettings(state.state.value.settings.copy(serverPort = 20000))
         runCurrent()
-        assertTrue(vm.copilotHookRegistrations.value.isEmpty())
+
+        assertTrue(vm.uiState.value.isCopilotRegistered)
+        assertTrue(bridge.isRegisteredCalls > initialIsRegisteredCalls)
     }
 
     @Test
@@ -179,46 +162,6 @@ class SettingsViewModelTest {
         runCurrent()
 
         assertEquals(19003, state.state.value.settings.serverPort)
-    }
-
-    @Test
-    fun `queryCopilotHookRegistered dedupes back-to-back calls for the same path`() = runTest {
-        // Counts every isHookRegistered call so we can assert dedup.
-        var checks = 0
-        val countingBridge = object : CopilotBridge {
-            override fun isInstalled(): Boolean = false
-            override fun install() {}
-            override fun uninstall() {}
-            override fun isHookRegistered(projectPath: String): Boolean {
-                checks++
-                return false
-            }
-            override fun registerHook(projectPath: String) {}
-            override fun unregisterHook(projectPath: String) {}
-        }
-        val state = AppStateManager()
-        val engine = ProtectionEngine(modules = emptyList(), settingsProvider = { ProtectionSettings() })
-        val vm = SettingsViewModel(
-            stateManager = state,
-            copilotBridge = countingBridge,
-            copilotStateHolder = CopilotStateHolder(),
-            ollamaStateHolder = OllamaStateHolder(),
-            protectionEngine = engine,
-            hookRegistry = FakeHookRegistry(),
-            ioDispatcher = mainDispatcher,
-        )
-        runCurrent()
-
-        // Hammer the same path before any of the launched coroutines have run —
-        // only the first call should make it past the in-flight gate.
-        repeat(20) { vm.queryCopilotHookRegistered("/path/x") }
-        runCurrent()
-        assertEquals(1, checks)
-
-        // After completion, the in-flight set is cleared and a new query goes through.
-        vm.queryCopilotHookRegistered("/path/x")
-        runCurrent()
-        assertEquals(2, checks)
     }
 
     @Test

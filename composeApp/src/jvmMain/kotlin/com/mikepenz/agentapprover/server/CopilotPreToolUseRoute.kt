@@ -169,6 +169,22 @@ private suspend fun handleCopilotAskMode(
     }
 }
 
+// Response shape for Copilot CLI's preToolUse hook, per the official
+// docs.github.com "Hooks configuration" reference page:
+//
+//     {"permissionDecision": "allow|deny|ask",
+//      "permissionDecisionReason": "..."}
+//
+// This is **distinct** from the permissionRequest hook output schema
+// (`{behavior, message, interrupt}` — see CopilotRoute.kt). The two hook
+// events share the same protocol family but use different field names.
+//
+// The docs note "(only 'deny' is currently processed)" for preToolUse — so
+// returning "allow" is a no-op and the user will still be prompted at the
+// permissionRequest stage. That's fine for the protection-engine route: we
+// only need it to block (deny) for hits and pass through (allow) otherwise,
+// and the actual user-facing approval is handled by CopilotRoute.
+
 private fun buildCopilotAllowResponse(): String = buildJsonObject {
     put("permissionDecision", "allow")
 }.toString()

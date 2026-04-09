@@ -26,7 +26,7 @@ import com.mikepenz.agentapprover.ui.theme.AgentApproverTheme
 fun SettingsTab(
     settings: AppSettings,
     isHookRegistered: Boolean,
-    isCopilotInstalled: Boolean = false,
+    isCopilotRegistered: Boolean = false,
     historyCount: Int,
     copilotModels: List<Pair<String, String>> = emptyList(),
     copilotInitState: CopilotInitState = CopilotInitState.IDLE,
@@ -35,12 +35,8 @@ fun SettingsTab(
     onSettingsChange: (AppSettings) -> Unit,
     onRegisterHook: () -> Unit,
     onUnregisterHook: () -> Unit,
-    onInstallCopilot: () -> Unit = {},
-    onUninstallCopilot: () -> Unit = {},
-    onRegisterCopilotHook: (String) -> Unit = {},
-    onUnregisterCopilotHook: (String) -> Unit = {},
-    isCopilotHookRegistered: (String) -> Boolean = { false },
-    onQueryCopilotHookRegistered: (String) -> Unit = {},
+    onRegisterCopilot: () -> Unit = {},
+    onUnregisterCopilot: () -> Unit = {},
     onClearHistory: () -> Unit,
     onShowLicenses: () -> Unit = {},
     protectionModules: List<ProtectionModule> = emptyList(),
@@ -66,7 +62,15 @@ fun SettingsTab(
 
         when (selectedTab) {
             0 -> GeneralSettingsContent(settings, historyCount, onSettingsChange, onClearHistory, onShowLicenses)
-            1 -> IntegrationsSettingsContent(settings, isHookRegistered, isCopilotInstalled, onRegisterHook, onUnregisterHook, onInstallCopilot, onUninstallCopilot, onRegisterCopilotHook, onUnregisterCopilotHook, isCopilotHookRegistered, onQueryCopilotHookRegistered)
+            1 -> IntegrationsSettingsContent(
+                settings = settings,
+                isHookRegistered = isHookRegistered,
+                isCopilotRegistered = isCopilotRegistered,
+                onRegisterHook = onRegisterHook,
+                onUnregisterHook = onUnregisterHook,
+                onRegisterCopilot = onRegisterCopilot,
+                onUnregisterCopilot = onUnregisterCopilot,
+            )
             2 -> RiskAnalysisSettingsContent(settings, copilotModels, copilotInitState, ollamaModels, ollamaInitState, onSettingsChange)
             3 -> ProtectionsSettingsContent(protectionModules, settings.protectionSettings, onProtectionSettingsChange)
         }

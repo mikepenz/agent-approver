@@ -25,6 +25,8 @@ class CopilotAdapterTest {
         assertEquals(JsonPrimitive("npm test"), result.hookInput.toolInput["command"])
         assertEquals("preToolUse", result.hookInput.hookEventName)
         assertEquals(json, result.rawRequestJson)
+        assertNotNull(result.hookInput.sessionId)
+        assertTrue(result.hookInput.sessionId.isNotBlank())
     }
 
     @Test
@@ -120,10 +122,99 @@ class CopilotAdapterTest {
     }
 
     @Test
-    fun hookEventNameAlwaysPreToolUse() {
+    fun hookEventNameDefaultsToPreToolUseWhenAbsent() {
         val json = """{"toolName":"bash","toolArgs":"{}","timestamp":0,"cwd":""}"""
         val result = adapter.parse(json)
         assertNotNull(result)
         assertEquals("preToolUse", result.hookInput.hookEventName)
+    }
+
+    // ----- camelCase permissionRequest payload (v1.0.16+ camelCase event keys) -----
+
+    @Test
+    fun parseCamelCasePermissionRequestWithToolInputObject() {
+        // Real payload captured from a live Copilot CLI run with hook key
+        // "permissionRequest" (camelCase). toolInput is an OBJECT, not a
+        // toolArgs string; there's a hookName field; there's permissionSuggestions.
+        val json = """
+            {
+                "hookName": "permissionRequest",
+                "sessionId": "d71c31a6-1907-4551-ab29-036d72da3b83",
+                "timestamp": 1775740932526,
+                "cwd": "/Users/mikepenz/Development/Misc/agent-approver",
+                "toolName": "web_fetch",
+                "toolInput": { "url": "https://www.google.com" },
+                "permissionSuggestions": []
+            }
+        """.trimIndent()
+
+        val result = adapter.parse(json)
+        assertNotNull(result)
+        assertEquals("WebFetch", result.hookInput.toolName)
+        assertEquals("d71c31a6-1907-4551-ab29-036d72da3b83", result.hookInput.sessionId)
+        assertEquals("permissionRequest", result.hookInput.hookEventName)
+        assertEquals(JsonPrimitive("https://www.google.com"), result.hookInput.toolInput["url"])
+        assertEquals("/Users/mikepenz/Development/Misc/agent-approver", result.hookInput.cwd)
+        assertEquals(Source.COPILOT, result.source)
+    }
+
+    // ----- snake_case PascalCase payload (v1.0.21+ VS Code-compatible mode) -----
+
+    @Test
+    fun parseSnakeCasePermissionRequestPayload() {
+        // PascalCase event keys ("PermissionRequest") on copilot-cli ≥ v1.0.21
+        // deliver a snake_case payload identical to Claude Code's hook format.
+        val json = """
+            {
+                "session_id": "abc123",
+                "hook_event_name": "PermissionRequest",
+                "tool_name": "web_fetch",
+                "tool_input": { "url": "https://example.com" },
+                "cwd": "/tmp"
+            }
+        """.trimIndent()
+
+        val result = adapter.parse(json)
+        assertNotNull(result)
+        assertEquals("WebFetch", result.hookInput.toolName)
+        assertEquals("abc123", result.hookInput.sessionId)
+        assertEquals("PermissionRequest", result.hookInput.hookEventName)
+        assertEquals(JsonPrimitive("https://example.com"), result.hookInput.toolInput["url"])
+        assertEquals(Source.COPILOT, result.source)
+    }
+
+    @Test
+    fun parseSnakeCasePreToolUsePayload() {
+        val json = """
+            {
+                "session_id": "xyz",
+                "hook_event_name": "PreToolUse",
+                "tool_name": "run_terminal_cmd",
+                "tool_input": { "command": "ls -la" },
+                "cwd": "/home/user"
+            }
+        """.trimIndent()
+
+        val result = adapter.parse(json)
+        assertNotNull(result)
+        assertEquals("Bash", result.hookInput.toolName)
+        assertEquals("PreToolUse", result.hookInput.hookEventName)
+        assertEquals(JsonPrimitive("ls -la"), result.hookInput.toolInput["command"])
+    }
+
+    @Test
+    fun webFetchAliasMapsToWebFetch() {
+        val json = """{"toolName":"web_fetch","toolInput":{"url":"https://x.io"},"timestamp":0,"cwd":""}"""
+        val result = adapter.parse(json)
+        assertNotNull(result)
+        assertEquals("WebFetch", result.hookInput.toolName)
+    }
+
+    @Test
+    fun fetchAliasStillMapsToWebFetch() {
+        val json = """{"toolName":"fetch","toolArgs":"{\"url\":\"https://x.io\"}","timestamp":0,"cwd":""}"""
+        val result = adapter.parse(json)
+        assertNotNull(result)
+        assertEquals("WebFetch", result.hookInput.toolName)
     }
 }

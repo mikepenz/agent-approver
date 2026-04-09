@@ -57,13 +57,15 @@ Agent Approver integrates via [hooks](https://docs.anthropic.com/en/docs/claude-
 | Hook | Purpose | Claude Code | GitHub Copilot |
 |------|---------|:-----------:|:--------------:|
 | **PreToolUse** | Runs the Protection Engine to block or modify dangerous requests _before_ the agent acts | Supported | Supported |
-| **PermissionRequest** | Presents the request in the Approval UI for interactive human review | Supported | Not available |
+| **PermissionRequest** | Presents the request in the Approval UI for interactive human review | Supported | Supported¹ |
 
-Because Copilot does not support the `PermissionRequest` hook, **interactive approvals are only available with Claude Code**. Copilot users still benefit from the full Protection Engine via `PreToolUse`.
+¹ Requires GitHub Copilot CLI **v1.0.16 or later** (added the `permissionRequest` hook event) and **v0.0.422 or later** for user-scoped hook loading from `~/.copilot/hooks/`.
+
+Both Claude Code and GitHub Copilot now support the full interactive approval flow plus `PreToolUse` Protection Engine pre-checks.
 
 **Claude Code** — In Settings > Integrations, click **Register Hooks** to add both hook entries to `~/.claude/settings.json`.
 
-**GitHub Copilot** — In Settings > Integrations, use the **Copilot Bridge** installer to set up the `PreToolUse` hook script and configure your project's `.github/hooks/hooks.json`.
+**GitHub Copilot** — In Settings > Integrations, click **Register** under GitHub Copilot. This installs the bridge scripts under `~/.agent-approver/` and writes both hook entries (`permissionRequest` + `preToolUse`) into a single user-scoped `~/.copilot/hooks/agent-approver.json` — no per-project setup needed.
 
 ### 3. Review & Approve
 
