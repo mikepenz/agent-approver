@@ -50,6 +50,7 @@ import com.mikepenz.agentapprover.model.RiskAnalysis
 import com.mikepenz.agentapprover.model.Source
 import com.mikepenz.agentapprover.model.SpecialToolParser
 import com.mikepenz.agentapprover.model.ToolType
+import com.mikepenz.agentapprover.ui.AUTO_DENY_COUNTDOWN
 import com.mikepenz.agentapprover.ui.theme.AgentApproverTheme
 import com.mikepenz.agentapprover.ui.theme.RiskCritical
 import com.mikepenz.agentapprover.ui.theme.RiskSafe
@@ -384,7 +385,7 @@ private fun AutoDenyOverlay(onCancel: () -> Unit) {
     var progress by remember { mutableStateOf(1f) }
     val animatedProgress by animateFloatAsState(
         targetValue = progress,
-        animationSpec = tween(durationMillis = 15_000, easing = LinearEasing),
+        animationSpec = tween(durationMillis = AUTO_DENY_COUNTDOWN.inWholeMilliseconds.toInt(), easing = LinearEasing),
     )
 
     LaunchedEffect(Unit) {

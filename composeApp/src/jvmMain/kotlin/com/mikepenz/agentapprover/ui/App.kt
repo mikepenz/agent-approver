@@ -44,6 +44,10 @@ import com.mikepenz.agentapprover.ui.protectionlog.ProtectionLogTab
 import com.mikepenz.agentapprover.ui.settings.SettingsTab
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlin.time.ComparableTimeMark
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.seconds
+import kotlin.time.TimeSource
 
 @Composable
 fun App(
@@ -66,9 +70,10 @@ fun App(
     val riskStatuses = remember { mutableStateMapOf<String, RiskStatus>() }
     val riskErrors = remember { mutableStateMapOf<String, String>() }
     val autoDenyRequests = remember { mutableStateSetOf<String>() }
-    // Last user-interaction timestamp (epoch ms) per request — used to keep auto-actions
-    // paused while the user is interacting and for a 10s quiet period afterward.
-    val userInteractionTimestamps = remember { mutableStateMapOf<String, Long>() }
+    // Last user-interaction time mark per request — used to keep auto-actions paused
+    // while the user is interacting and for a quiet period afterward. Uses a monotonic
+    // time source so wall-clock changes (NTP, manual edits) don't skew the timing.
+    val userInteractionTimestamps = remember { mutableStateMapOf<String, ComparableTimeMark>() }
 
     // Track pending approval IDs to detect new arrivals
     val knownIds = remember { mutableStateSetOf<String>() }
@@ -238,7 +243,7 @@ fun App(
                 autoDenyRequests = autoDenyRequests,
                 onCancelAutoDeny = { requestId -> autoDenyRequests.remove(requestId) },
                 onUserInteraction = { requestId ->
-                    userInteractionTimestamps[requestId] = System.currentTimeMillis()
+                    userInteractionTimestamps[requestId] = TimeSource.Monotonic.markNow()
                 },
                 onPopOut = onPopOut,
                 onSettingsChange = { stateManager.updateSettings(it) },
@@ -313,21 +318,21 @@ fun App(
     }
 }
 
-private const val USER_QUIET_PERIOD_MS = 10_000L
-private const val AUTO_DENY_COUNTDOWN_MS = 15_000L
+internal val USER_QUIET_PERIOD: Duration = 10.seconds
+internal val AUTO_DENY_COUNTDOWN: Duration = 15.seconds
 
 /**
- * Suspends until at least [USER_QUIET_PERIOD_MS] has passed since the user's last
+ * Suspends until at least [USER_QUIET_PERIOD] has passed since the user's last
  * interaction with [approvalId]. If there is no recorded interaction, returns immediately.
  */
 private suspend fun waitUntilUserQuiet(
     approvalId: String,
-    userInteractionTimestamps: Map<String, Long>,
+    userInteractionTimestamps: Map<String, ComparableTimeMark>,
 ) {
     while (true) {
         val last = userInteractionTimestamps[approvalId] ?: return
-        val remaining = USER_QUIET_PERIOD_MS - (System.currentTimeMillis() - last)
-        if (remaining <= 0) return
+        val remaining = USER_QUIET_PERIOD - last.elapsedNow()
+        if (remaining <= Duration.ZERO) return
         delay(remaining)
     }
 }
@@ -341,7 +346,7 @@ private suspend fun runAutoDenyWithRetry(
     approvalId: String,
     analysis: RiskAnalysis,
     autoDenyRequests: MutableSet<String>,
-    userInteractionTimestamps: Map<String, Long>,
+    userInteractionTimestamps: Map<String, ComparableTimeMark>,
     stateManager: AppStateManager,
 ) {
     while (stateManager.state.value.pendingApprovals.any { it.id == approvalId }) {
@@ -349,9 +354,9 @@ private suspend fun runAutoDenyWithRetry(
         if (stateManager.state.value.pendingApprovals.none { it.id == approvalId }) return
 
         autoDenyRequests.add(approvalId)
-        val countdownStartedAt = System.currentTimeMillis()
+        val countdownStartedAt = TimeSource.Monotonic.markNow()
         var interrupted = false
-        while (System.currentTimeMillis() - countdownStartedAt < AUTO_DENY_COUNTDOWN_MS) {
+        while (countdownStartedAt.elapsedNow() < AUTO_DENY_COUNTDOWN) {
             delay(200)
             // Request was resolved manually (or otherwise removed) — stop the countdown.
             if (stateManager.state.value.pendingApprovals.none { it.id == approvalId }) {
