@@ -4,7 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.mikepenz.agentapprover.di.AppScope
 import com.mikepenz.agentapprover.hook.CopilotBridge
-import com.mikepenz.agentapprover.hook.HookRegistrar
+import com.mikepenz.agentapprover.hook.HookRegistry
 import com.mikepenz.agentapprover.model.AppSettings
 import com.mikepenz.agentapprover.model.ProtectionSettings
 import com.mikepenz.agentapprover.protection.ProtectionEngine
@@ -15,14 +15,17 @@ import com.mikepenz.agentapprover.state.AppStateManager
 import dev.zacsweers.metro.ContributesIntoMap
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metrox.viewmodel.ViewModelKey
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.distinctUntilChangedBy
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /**
  * ViewModel backing the Settings tab and its four sub-tabs.
@@ -32,6 +35,10 @@ import kotlinx.coroutines.launch
  * script is installed — into a single [SettingsUiState]. The hook-registered
  * flag is re-polled whenever `serverPort` changes; the Copilot install flag is
  * re-checked after install/uninstall actions.
+ *
+ * All [HookRegistry] calls hit the user's `~/.claude/settings.json` so they
+ * are dispatched to [ioDispatcher] (defaults to [Dispatchers.IO]) to keep the
+ * main thread free at startup and on settings changes.
  */
 @Inject
 @ViewModelKey
@@ -41,19 +48,18 @@ class SettingsViewModel(
     private val copilotBridge: CopilotBridge,
     private val copilotStateHolder: CopilotStateHolder,
     protectionEngine: ProtectionEngine,
+    private val hookRegistry: HookRegistry,
+    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) : ViewModel() {
-
-    // HookRegistrar is a Kotlin object — referenced directly rather than
-    // injected so Metro doesn't need to know about it. Made overridable as a
-    // private property so tests could swap it via reflection if needed.
-    private val hookRegistrar = HookRegistrar
 
     val protectionModules: List<ProtectionModule> = protectionEngine.modules
 
-    private val isHookRegistered = MutableStateFlow(
-        hookRegistrar.isRegistered(stateManager.state.value.settings.serverPort),
-    )
-    private val isCopilotInstalled = MutableStateFlow(copilotBridge.isInstalled())
+    // Initialised to a safe default; the real value is read from disk by the
+    // init block on [ioDispatcher] and re-polled whenever the server port
+    // changes. The Copilot install flag is similarly populated off the main
+    // thread because it shells out to a script directory check.
+    private val isHookRegistered = MutableStateFlow(false)
+    private val isCopilotInstalled = MutableStateFlow(false)
 
     val uiState: StateFlow<SettingsUiState> = combine(
         stateManager.state,
@@ -76,23 +82,33 @@ class SettingsViewModel(
         SettingsUiState(
             settings = stateManager.state.value.settings,
             historyCount = stateManager.state.value.history.size,
-            isHookRegistered = isHookRegistered.value,
-            isCopilotInstalled = isCopilotInstalled.value,
+            isHookRegistered = false,
+            isCopilotInstalled = false,
             copilotModels = copilotStateHolder.models.value,
             copilotInitState = copilotStateHolder.initState.value,
         ),
     )
 
     init {
-        // Re-poll hook registration when the configured port changes — covers the
-        // case where the user edits the port in settings while the hook is also
-        // wired up so the UI reflects the new state.
+        // Initial poll on IO. Without this the VM blocks the main thread at
+        // startup parsing ~/.claude/settings.json and the Copilot script dir.
+        viewModelScope.launch(ioDispatcher) {
+            isCopilotInstalled.value = copilotBridge.isInstalled()
+            isHookRegistered.value = hookRegistry.isRegistered(
+                stateManager.state.value.settings.serverPort,
+            )
+        }
+
+        // Re-poll hook registration when the configured port changes — covers
+        // the case where the user edits the port in settings while the hook is
+        // also wired up so the UI reflects the new state.
         viewModelScope.launch {
             stateManager.state
                 .map { it.settings.serverPort }
-                .distinctUntilChangedBy { it }
+                .distinctUntilChanged()
                 .collect { port ->
-                    isHookRegistered.value = hookRegistrar.isRegistered(port)
+                    val registered = withContext(ioDispatcher) { hookRegistry.isRegistered(port) }
+                    isHookRegistered.value = registered
                 }
         }
     }
@@ -107,33 +123,41 @@ class SettingsViewModel(
     }
 
     fun registerHook() {
-        val port = stateManager.state.value.settings.serverPort
-        hookRegistrar.register(port)
-        isHookRegistered.value = hookRegistrar.isRegistered(port)
+        viewModelScope.launch(ioDispatcher) {
+            val port = stateManager.state.value.settings.serverPort
+            hookRegistry.register(port)
+            isHookRegistered.value = hookRegistry.isRegistered(port)
+        }
     }
 
     fun unregisterHook() {
-        val port = stateManager.state.value.settings.serverPort
-        hookRegistrar.unregister(port)
-        isHookRegistered.value = hookRegistrar.isRegistered(port)
+        viewModelScope.launch(ioDispatcher) {
+            val port = stateManager.state.value.settings.serverPort
+            hookRegistry.unregister(port)
+            isHookRegistered.value = hookRegistry.isRegistered(port)
+        }
     }
 
     fun installCopilot() {
-        copilotBridge.install()
-        isCopilotInstalled.value = copilotBridge.isInstalled()
+        viewModelScope.launch(ioDispatcher) {
+            copilotBridge.install()
+            isCopilotInstalled.value = copilotBridge.isInstalled()
+        }
     }
 
     fun uninstallCopilot() {
-        copilotBridge.uninstall()
-        isCopilotInstalled.value = copilotBridge.isInstalled()
+        viewModelScope.launch(ioDispatcher) {
+            copilotBridge.uninstall()
+            isCopilotInstalled.value = copilotBridge.isInstalled()
+        }
     }
 
     fun registerCopilotHook(projectPath: String) {
-        copilotBridge.registerHook(projectPath)
+        viewModelScope.launch(ioDispatcher) { copilotBridge.registerHook(projectPath) }
     }
 
     fun unregisterCopilotHook(projectPath: String) {
-        copilotBridge.unregisterHook(projectPath)
+        viewModelScope.launch(ioDispatcher) { copilotBridge.unregisterHook(projectPath) }
     }
 
     fun isCopilotHookRegistered(projectPath: String): Boolean =

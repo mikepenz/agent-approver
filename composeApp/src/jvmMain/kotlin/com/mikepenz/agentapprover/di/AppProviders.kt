@@ -2,6 +2,8 @@ package com.mikepenz.agentapprover.di
 
 import com.mikepenz.agentapprover.hook.CopilotBridge
 import com.mikepenz.agentapprover.hook.DefaultCopilotBridge
+import com.mikepenz.agentapprover.hook.DefaultHookRegistry
+import com.mikepenz.agentapprover.hook.HookRegistry
 import com.mikepenz.agentapprover.protection.ProtectionEngine
 import com.mikepenz.agentapprover.protection.modules.AbsolutePathsModule
 import com.mikepenz.agentapprover.protection.modules.DestructiveCommandsModule
@@ -83,6 +85,10 @@ interface AppProviders {
     @Provides
     @SingleIn(AppScope::class)
     fun provideCopilotBridge(): CopilotBridge = DefaultCopilotBridge
+
+    @Provides
+    @SingleIn(AppScope::class)
+    fun provideHookRegistry(): HookRegistry = DefaultHookRegistry
 
     @Provides
     @SingleIn(AppScope::class)
