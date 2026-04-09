@@ -1,5 +1,7 @@
 package com.mikepenz.agentapprover.di
 
+import com.mikepenz.agentapprover.hook.CopilotBridge
+import com.mikepenz.agentapprover.hook.DefaultCopilotBridge
 import com.mikepenz.agentapprover.protection.ProtectionEngine
 import com.mikepenz.agentapprover.protection.modules.AbsolutePathsModule
 import com.mikepenz.agentapprover.protection.modules.DestructiveCommandsModule
@@ -77,6 +79,10 @@ interface AppProviders {
             ),
             settingsProvider = { stateManager.state.value.settings.protectionSettings },
         )
+
+    @Provides
+    @SingleIn(AppScope::class)
+    fun provideCopilotBridge(): CopilotBridge = DefaultCopilotBridge
 
     @Provides
     @SingleIn(AppScope::class)

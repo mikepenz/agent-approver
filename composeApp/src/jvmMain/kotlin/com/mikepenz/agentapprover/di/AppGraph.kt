@@ -3,6 +3,7 @@ package com.mikepenz.agentapprover.di
 import com.mikepenz.agentapprover.protection.ProtectionEngine
 import com.mikepenz.agentapprover.risk.ActiveRiskAnalyzerHolder
 import com.mikepenz.agentapprover.risk.ClaudeCliRiskAnalyzer
+import com.mikepenz.agentapprover.risk.CopilotStateHolder
 import com.mikepenz.agentapprover.state.AppStateManager
 import com.mikepenz.agentapprover.storage.DatabaseStorage
 import com.mikepenz.agentapprover.storage.SettingsStorage
@@ -31,6 +32,7 @@ interface AppGraph : ViewModelGraph {
     val protectionEngine: ProtectionEngine
     val claudeAnalyzer: ClaudeCliRiskAnalyzer
     val activeRiskAnalyzerHolder: ActiveRiskAnalyzerHolder
+    val copilotStateHolder: CopilotStateHolder
 
     @DependencyGraph.Factory
     fun interface Factory {
