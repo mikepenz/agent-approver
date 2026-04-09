@@ -30,6 +30,7 @@ import androidx.compose.ui.unit.sp
 import com.mikepenz.agentapprover.hook.CopilotBridgeInstaller
 import com.mikepenz.agentapprover.hook.HookRegistrar
 import com.mikepenz.agentapprover.model.Decision
+import com.mikepenz.agentapprover.model.RiskAnalysis
 import com.mikepenz.agentapprover.model.ToolType
 import com.mikepenz.agentapprover.protection.ProtectionEngine
 import com.mikepenz.agentapprover.protection.ProtectionModule
@@ -65,7 +66,9 @@ fun App(
     val riskStatuses = remember { mutableStateMapOf<String, RiskStatus>() }
     val riskErrors = remember { mutableStateMapOf<String, String>() }
     val autoDenyRequests = remember { mutableStateSetOf<String>() }
-    val userInteractingIds = remember { mutableStateSetOf<String>() }
+    // Last user-interaction timestamp (epoch ms) per request — used to keep auto-actions
+    // paused while the user is interacting and for a 10s quiet period afterward.
+    val userInteractionTimestamps = remember { mutableStateMapOf<String, Long>() }
 
     // Track pending approval IDs to detect new arrivals
     val knownIds = remember { mutableStateSetOf<String>() }
@@ -86,7 +89,8 @@ fun App(
                             val skipAutoActions = approval.toolType == ToolType.PLAN || approval.toolType == ToolType.ASK_USER_QUESTION
                             if (!skipAutoActions && analysis.risk == 1 && state.settings.autoApproveRisk1) {
                                 delay(500)
-                                if (approval.id !in userInteractingIds) {
+                                waitUntilUserQuiet(approval.id, userInteractionTimestamps)
+                                if (stateManager.state.value.pendingApprovals.any { it.id == approval.id }) {
                                     stateManager.resolve(
                                         requestId = approval.id,
                                         decision = Decision.AUTO_APPROVED,
@@ -96,18 +100,13 @@ fun App(
                                     )
                                 }
                             } else if (!skipAutoActions && !state.settings.awayMode && analysis.risk == 5 && state.settings.autoDenyRisk5) {
-                                autoDenyRequests.add(approval.id)
-                                delay(15_000)
-                                if (approval.id in autoDenyRequests && approval.id !in userInteractingIds) {
-                                    autoDenyRequests.remove(approval.id)
-                                    stateManager.resolve(
-                                        requestId = approval.id,
-                                        decision = Decision.AUTO_DENIED,
-                                        feedback = "Auto-denied: risk level 5",
-                                        riskAnalysis = analysis,
-                                        rawResponseJson = null,
-                                    )
-                                }
+                                runAutoDenyWithRetry(
+                                    approvalId = approval.id,
+                                    analysis = analysis,
+                                    autoDenyRequests = autoDenyRequests,
+                                    userInteractionTimestamps = userInteractionTimestamps,
+                                    stateManager = stateManager,
+                                )
                             }
                         }.onFailure { error ->
                             riskStatuses[approval.id] = RiskStatus.ERROR
@@ -124,7 +123,7 @@ fun App(
         // Clean up IDs that are no longer pending
         val currentIds = state.pendingApprovals.map { it.id }.toSet()
         knownIds.removeAll { it !in currentIds }
-        userInteractingIds.removeAll { it !in currentIds }
+        userInteractionTimestamps.keys.removeAll { it !in currentIds }
     }
 
     Column(modifier = Modifier.fillMaxSize()) {
@@ -237,7 +236,9 @@ fun App(
                 },
                 autoDenyRequests = autoDenyRequests,
                 onCancelAutoDeny = { requestId -> autoDenyRequests.remove(requestId) },
-                onUserInteraction = { requestId -> userInteractingIds.add(requestId) },
+                onUserInteraction = { requestId ->
+                    userInteractionTimestamps[requestId] = System.currentTimeMillis()
+                },
                 onPopOut = onPopOut,
                 onSettingsChange = { stateManager.updateSettings(it) },
             )
@@ -307,6 +308,74 @@ fun App(
                     },
                 )
             }
+        }
+    }
+}
+
+private const val USER_QUIET_PERIOD_MS = 10_000L
+private const val AUTO_DENY_COUNTDOWN_MS = 15_000L
+
+/**
+ * Suspends until at least [USER_QUIET_PERIOD_MS] has passed since the user's last
+ * interaction with [approvalId]. If there is no recorded interaction, returns immediately.
+ */
+private suspend fun waitUntilUserQuiet(
+    approvalId: String,
+    userInteractionTimestamps: Map<String, Long>,
+) {
+    while (true) {
+        val last = userInteractionTimestamps[approvalId] ?: return
+        val remaining = USER_QUIET_PERIOD_MS - (System.currentTimeMillis() - last)
+        if (remaining <= 0) return
+        delay(remaining)
+    }
+}
+
+/**
+ * Runs the auto-deny countdown for a risk-5 request, retrying after a quiet period
+ * whenever the user interacts during the countdown. The overlay (driven by
+ * [autoDenyRequests]) is only shown while a countdown is actually running.
+ */
+private suspend fun runAutoDenyWithRetry(
+    approvalId: String,
+    analysis: RiskAnalysis,
+    autoDenyRequests: MutableSet<String>,
+    userInteractionTimestamps: Map<String, Long>,
+    stateManager: AppStateManager,
+) {
+    while (stateManager.state.value.pendingApprovals.any { it.id == approvalId }) {
+        waitUntilUserQuiet(approvalId, userInteractionTimestamps)
+        if (stateManager.state.value.pendingApprovals.none { it.id == approvalId }) return
+
+        autoDenyRequests.add(approvalId)
+        val countdownStartedAt = System.currentTimeMillis()
+        var interrupted = false
+        while (System.currentTimeMillis() - countdownStartedAt < AUTO_DENY_COUNTDOWN_MS) {
+            delay(200)
+            // User cancelled via the overlay button
+            if (approvalId !in autoDenyRequests) return
+            // User interacted with the card during the countdown — abort and wait for quiet
+            val last = userInteractionTimestamps[approvalId]
+            if (last != null && last >= countdownStartedAt) {
+                autoDenyRequests.remove(approvalId)
+                interrupted = true
+                break
+            }
+        }
+        if (interrupted) continue
+
+        if (approvalId in autoDenyRequests) {
+            autoDenyRequests.remove(approvalId)
+            if (stateManager.state.value.pendingApprovals.any { it.id == approvalId }) {
+                stateManager.resolve(
+                    requestId = approvalId,
+                    decision = Decision.AUTO_DENIED,
+                    feedback = "Auto-denied: risk level 5",
+                    riskAnalysis = analysis,
+                    rawResponseJson = null,
+                )
+            }
+            return
         }
     }
 }
