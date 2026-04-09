@@ -65,33 +65,38 @@ class AppStateManager(
         if (updatedInput != null) {
             pendingUpdatedInputs[requestId] = updatedInput
         }
-        // Build the result outside of `_state.update {}` because that lambda
-        // can be retried under CAS contention — running side effects (DB
-        // insert, deferred completion) inside would duplicate them.
-        val current = _state.value
-        val request = current.pendingApprovals.find { it.id == requestId } ?: return
-        val result = ApprovalResult(
-            request = request,
-            decision = decision,
-            feedback = feedback,
-            riskAnalysis = riskAnalysis ?: current.riskResults[requestId],
-            rawResponseJson = rawResponseJson,
-            decidedAt = Clock.System.now(),
-        )
+        // The whole resolve flow runs inside [persistLock]: snapshot →
+        // claim-and-remove from pending → DB insert → deferred completion.
+        // This makes resolution idempotent under concurrent callers (e.g.
+        // user clicks Approve while the auto-deny countdown completes): the
+        // first thread removes the request, the second sees it gone and
+        // bails, so we get exactly one DB insert and one deferred completion.
         synchronized(persistLock) {
-            databaseStorage?.insert(result)
-        }
-        pendingDeferreds.remove(requestId)?.complete(result)
-        _state.update { snapshot ->
-            val newHistory = (listOf(result) + snapshot.history).let { list ->
-                val max = snapshot.settings.maxHistoryEntries
-                if (list.size > max) list.take(max) else list
-            }
-            snapshot.copy(
-                pendingApprovals = snapshot.pendingApprovals.filter { it.id != requestId },
-                history = newHistory,
-                riskResults = snapshot.riskResults - requestId,
+            val current = _state.value
+            val request = current.pendingApprovals.find { it.id == requestId } ?: return
+            val result = ApprovalResult(
+                request = request,
+                decision = decision,
+                feedback = feedback,
+                riskAnalysis = riskAnalysis ?: current.riskResults[requestId],
+                rawResponseJson = rawResponseJson,
+                decidedAt = Clock.System.now(),
             )
+            // Atomically claim the request before any side effects so a
+            // concurrent caller can't race past the find() above.
+            _state.update { snapshot ->
+                val newHistory = (listOf(result) + snapshot.history).let { list ->
+                    val max = snapshot.settings.maxHistoryEntries
+                    if (list.size > max) list.take(max) else list
+                }
+                snapshot.copy(
+                    pendingApprovals = snapshot.pendingApprovals.filter { it.id != requestId },
+                    history = newHistory,
+                    riskResults = snapshot.riskResults - requestId,
+                )
+            }
+            databaseStorage?.insert(result)
+            pendingDeferreds.remove(requestId)?.complete(result)
         }
     }
 
@@ -102,12 +107,12 @@ class AppStateManager(
     fun updateHistoryRawResponse(requestId: String, rawResponseJson: String) {
         synchronized(persistLock) {
             databaseStorage?.updateRawResponse(requestId, rawResponseJson)
-        }
-        _state.update { current ->
-            val updatedHistory = current.history.map { result ->
-                if (result.request.id == requestId) result.copy(rawResponseJson = rawResponseJson) else result
+            _state.update { current ->
+                val updatedHistory = current.history.map { result ->
+                    if (result.request.id == requestId) result.copy(rawResponseJson = rawResponseJson) else result
+                }
+                current.copy(history = updatedHistory)
             }
-            current.copy(history = updatedHistory)
         }
     }
 
@@ -116,28 +121,34 @@ class AppStateManager(
     }
 
     fun updateSettings(settings: AppSettings) {
-        _state.update { it.copy(settings = settings) }
+        // Take the lock around BOTH the in-memory update and the disk save so
+        // concurrent callers land in the same order in memory and on disk.
+        // Without this, thread A could update memory to A then yield, thread
+        // B could update memory to B and save B to disk, then thread A could
+        // resume and save A to disk — leaving disk with A (older) and memory
+        // with B (newer).
         synchronized(persistLock) {
+            _state.update { it.copy(settings = settings) }
             settingsStorage?.save(settings)
         }
     }
 
     fun addToHistory(result: ApprovalResult) {
         synchronized(persistLock) {
-            databaseStorage?.insert(result)
-        }
-        _state.update { current ->
-            val newHistory = (listOf(result) + current.history).let { list ->
-                val max = current.settings.maxHistoryEntries
-                if (list.size > max) list.take(max) else list
+            _state.update { current ->
+                val newHistory = (listOf(result) + current.history).let { list ->
+                    val max = current.settings.maxHistoryEntries
+                    if (list.size > max) list.take(max) else list
+                }
+                current.copy(history = newHistory)
             }
-            current.copy(history = newHistory)
+            databaseStorage?.insert(result)
         }
     }
 
     fun clearHistory() {
-        _state.update { it.copy(history = emptyList()) }
         synchronized(persistLock) {
+            _state.update { it.copy(history = emptyList()) }
             databaseStorage?.clearAll()
         }
     }

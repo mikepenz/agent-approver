@@ -17,6 +17,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -40,6 +41,7 @@ fun IntegrationsSettingsContent(
     onRegisterCopilotHook: (String) -> Unit,
     onUnregisterCopilotHook: (String) -> Unit,
     isCopilotHookRegistered: (String) -> Boolean,
+    onQueryCopilotHookRegistered: (String) -> Unit = {},
 ) {
     Column(
         modifier = Modifier
@@ -113,6 +115,7 @@ fun IntegrationsSettingsContent(
                         onRegisterCopilotHook = onRegisterCopilotHook,
                         onUnregisterCopilotHook = onUnregisterCopilotHook,
                         isCopilotHookRegistered = isCopilotHookRegistered,
+                        onQueryCopilotHookRegistered = onQueryCopilotHookRegistered,
                     )
                 }
             }
@@ -125,8 +128,17 @@ private fun CopilotProjectHookSection(
     onRegisterCopilotHook: (String) -> Unit,
     onUnregisterCopilotHook: (String) -> Unit,
     isCopilotHookRegistered: (String) -> Boolean,
+    onQueryCopilotHookRegistered: (String) -> Unit = {},
 ) {
     var projectPath by remember { mutableStateOf("") }
+
+    // Trigger an async refresh of the cache exactly once per typed path
+    // (rather than on every recomposition). The cache lookup below stays a
+    // pure read.
+    LaunchedEffect(projectPath) {
+        if (projectPath.isNotBlank()) onQueryCopilotHookRegistered(projectPath)
+    }
+
     val isRegistered = projectPath.isNotBlank() && isCopilotHookRegistered(projectPath)
 
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {

@@ -33,15 +33,12 @@ fun SettingsTabHost(onShowLicenses: () -> Unit) {
         onUninstallCopilot = viewModel::uninstallCopilot,
         onRegisterCopilotHook = viewModel::registerCopilotHook,
         onUnregisterCopilotHook = viewModel::unregisterCopilotHook,
-        // Cached lookup: returns the cached value if seen before, otherwise
-        // returns false and asynchronously populates the cache. After the
-        // background read completes the StateFlow re-emission triggers
-        // recomposition and the lookup returns the real value.
-        isCopilotHookRegistered = { path ->
-            val cached = copilotHookRegistrations[path]
-            if (cached == null) viewModel.queryCopilotHookRegistered(path)
-            cached ?: false
-        },
+        // Pure cache lookup — no side effects from inside composition. The
+        // refresh is triggered exactly once per typed path by a
+        // LaunchedEffect(projectPath) inside CopilotProjectHookSection via
+        // onQueryCopilotHookRegistered below.
+        isCopilotHookRegistered = { path -> copilotHookRegistrations[path] ?: false },
+        onQueryCopilotHookRegistered = viewModel::queryCopilotHookRegistered,
         onClearHistory = viewModel::clearHistory,
         onShowLicenses = onShowLicenses,
         protectionModules = viewModel.protectionModules,

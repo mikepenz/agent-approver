@@ -85,8 +85,14 @@ class TrayManager(
                 add(showHideItem)
 
                 awayModeItem.addItemListener {
-                    val current = stateManager.state.value.settings
-                    stateManager.updateSettings(current.copy(awayMode = awayModeItem.state))
+                    val newAwayMode = awayModeItem.state
+                    // The item listener fires on the AWT EDT and
+                    // updateSettings() does synchronous disk I/O — dispatch
+                    // to appScope to keep the tray responsive.
+                    environment.appScope.launch {
+                        val current = stateManager.state.value.settings
+                        stateManager.updateSettings(current.copy(awayMode = newAwayMode))
+                    }
                 }
                 add(awayModeItem)
 
