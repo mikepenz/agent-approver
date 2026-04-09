@@ -141,17 +141,17 @@ fun AgentApproverShell(graph: AppGraph, devMode: Boolean, exitApplication: () ->
     }
 
     val windowState = rememberPersistedWindowState(stateManager)
-    val settings by stateManager.state.collectAsState()
+    val appState by stateManager.state.collectAsState()
 
     if (isVisible) {
-        AgentApproverTheme(themeMode = settings.settings.themeMode) {
+        AgentApproverTheme(themeMode = appState.settings.themeMode) {
             MaterialDecoratedWindow(
                 onCloseRequest = { trayManager.hide() },
                 title = "Agent Approver",
                 state = windowState,
             ) {
-                LaunchedEffect(settings.settings.alwaysOnTop) {
-                    window.isAlwaysOnTop = settings.settings.alwaysOnTop
+                LaunchedEffect(appState.settings.alwaysOnTop) {
+                    window.isAlwaysOnTop = appState.settings.alwaysOnTop
                 }
                 MaterialTitleBar {
                     Row(

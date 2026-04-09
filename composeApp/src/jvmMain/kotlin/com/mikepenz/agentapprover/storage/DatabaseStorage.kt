@@ -13,7 +13,7 @@ import java.sql.Connection
 import java.sql.DriverManager
 import java.sql.ResultSet
 
-class DatabaseStorage(
+open class DatabaseStorage(
     private val dataDir: String,
     private val maxEntries: Int = 1000,
 ) {
@@ -88,7 +88,7 @@ class DatabaseStorage(
         return false
     }
 
-    fun insert(result: ApprovalResult) {
+    open fun insert(result: ApprovalResult) {
         val type = if (result.protectionModule != null) "protection" else "approval"
         val sql = """
             INSERT OR REPLACE INTO history (

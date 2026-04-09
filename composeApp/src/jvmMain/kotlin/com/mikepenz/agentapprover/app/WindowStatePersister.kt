@@ -62,21 +62,24 @@ fun rememberPersistedWindowState(stateManager: AppStateManager): WindowState {
             .distinctUntilChanged()
             .debounce(WINDOW_STATE_DEBOUNCE_MS)
             .collect { (pos, size) ->
-                if (pos is WindowPosition.Absolute) {
-                    // Dispatch to IO so the synchronous file save inside
-                    // updateSettings doesn't run on the Compose dispatcher
-                    // and jank window drag/resize.
-                    withContext(Dispatchers.IO) {
-                        val current = stateManager.state.value.settings
-                        stateManager.updateSettings(
-                            current.copy(
-                                windowX = pos.x.value.toInt(),
-                                windowY = pos.y.value.toInt(),
-                                windowWidth = size.width.value.toInt(),
-                                windowHeight = size.height.value.toInt(),
-                            ),
-                        )
-                    }
+                // Dispatch to IO so the synchronous file save inside
+                // updateSettings doesn't run on the Compose dispatcher
+                // and jank window drag/resize.
+                withContext(Dispatchers.IO) {
+                    val current = stateManager.state.value.settings
+                    // Always persist size on every change. Only persist
+                    // position when it's Absolute — a PlatformDefault means
+                    // the user hasn't moved the window yet, so we keep the
+                    // previously saved coordinates (or null if never moved).
+                    val absolutePosition = pos as? WindowPosition.Absolute
+                    stateManager.updateSettings(
+                        current.copy(
+                            windowX = absolutePosition?.x?.value?.toInt() ?: current.windowX,
+                            windowY = absolutePosition?.y?.value?.toInt() ?: current.windowY,
+                            windowWidth = size.width.value.toInt(),
+                            windowHeight = size.height.value.toInt(),
+                        ),
+                    )
                 }
             }
     }

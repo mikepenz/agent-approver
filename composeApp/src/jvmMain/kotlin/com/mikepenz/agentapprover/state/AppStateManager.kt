@@ -1,5 +1,6 @@
 package com.mikepenz.agentapprover.state
 
+import co.touchlab.kermit.Logger
 import com.mikepenz.agentapprover.model.*
 import com.mikepenz.agentapprover.storage.DatabaseStorage
 import com.mikepenz.agentapprover.storage.SettingsStorage
@@ -24,6 +25,8 @@ class AppStateManager(
     private val settingsStorage: SettingsStorage? = null,
     val devMode: Boolean = false,
 ) {
+    private val logger = Logger.withTag("AppStateManager")
+
     private val _state = MutableStateFlow(AppState())
     val state: StateFlow<AppState> = _state.asStateFlow()
 
@@ -62,18 +65,23 @@ class AppStateManager(
         rawResponseJson: String?,
         updatedInput: Map<String, JsonElement>? = null,
     ) {
-        if (updatedInput != null) {
-            pendingUpdatedInputs[requestId] = updatedInput
-        }
         // The whole resolve flow runs inside [persistLock]: snapshot →
-        // claim-and-remove from pending → DB insert → deferred completion.
-        // This makes resolution idempotent under concurrent callers (e.g.
-        // user clicks Approve while the auto-deny countdown completes): the
-        // first thread removes the request, the second sees it gone and
-        // bails, so we get exactly one DB insert and one deferred completion.
+        // claim-and-remove from pending → record updated input → DB insert
+        // → deferred completion. This makes resolution idempotent under
+        // concurrent callers (e.g. user clicks Approve while the auto-deny
+        // countdown completes): the first thread removes the request, the
+        // second sees it gone and bails, so we get exactly one DB insert
+        // and one deferred completion.
         synchronized(persistLock) {
             val current = _state.value
             val request = current.pendingApprovals.find { it.id == requestId } ?: return
+            // Record updated input only after we've confirmed we're the
+            // winning resolver, otherwise a losing concurrent caller would
+            // leave a stale entry that getAndClearUpdatedInput could later
+            // pick up.
+            if (updatedInput != null) {
+                pendingUpdatedInputs[requestId] = updatedInput
+            }
             val result = ApprovalResult(
                 request = request,
                 decision = decision,
@@ -95,8 +103,18 @@ class AppStateManager(
                     riskResults = snapshot.riskResults - requestId,
                 )
             }
-            databaseStorage?.insert(result)
-            pendingDeferreds.remove(requestId)?.complete(result)
+            // Always complete the deferred even if the DB write fails: the
+            // HTTP route on the other side is awaiting a decision, so a DB
+            // outage must NOT translate into a hung request. Errors are
+            // logged so they're still visible.
+            val deferred = pendingDeferreds.remove(requestId)
+            try {
+                databaseStorage?.insert(result)
+            } catch (e: Exception) {
+                logger.e(e) { "Failed to persist resolved approval $requestId" }
+            } finally {
+                deferred?.complete(result)
+            }
         }
     }
 
