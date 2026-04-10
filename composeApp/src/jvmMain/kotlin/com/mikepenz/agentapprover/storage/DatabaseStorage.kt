@@ -4,7 +4,6 @@ import co.touchlab.kermit.Logger
 import com.mikepenz.agentapprover.model.*
 import kotlinx.datetime.Instant
 import kotlinx.datetime.LocalDate
-import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.builtins.MapSerializer
 import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.json.Json
@@ -16,7 +15,7 @@ import java.sql.ResultSet
 
 open class DatabaseStorage(
     private val dataDir: String,
-    private val maxEntries: Int = 1000,
+    private val maxEntries: Int = 2500,
 ) {
     private val logger = Logger.withTag("DatabaseStorage")
     private val connection: Connection
@@ -357,30 +356,6 @@ open class DatabaseStorage(
             }
         } catch (e: Exception) {
             logger.w { "Failed to close database connection: ${e.message}" }
-        }
-    }
-
-    fun migrateFromJson(dataDir: String): Unit = synchronized(connectionLock) {
-        val historyFile = File(dataDir, "history.json")
-        if (!historyFile.exists()) {
-            logger.i { "No history.json found, skipping migration" }
-            return
-        }
-
-        try {
-            val serializer = ListSerializer(ApprovalResult.serializer())
-            val entries = json.decodeFromString(serializer, historyFile.readText())
-            logger.i { "Migrating ${entries.size} entries from history.json to SQLite" }
-
-            for (entry in entries) {
-                insert(entry)
-            }
-
-            val migratedFile = File(dataDir, "history.json.migrated")
-            historyFile.renameTo(migratedFile)
-            logger.i { "Migration complete, renamed history.json to history.json.migrated" }
-        } catch (e: Exception) {
-            logger.e { "Failed to migrate history.json: ${e.message}" }
         }
     }
 

@@ -46,9 +46,7 @@ interface AppProviders {
         settingsStorage: SettingsStorage,
     ): DatabaseStorage {
         val maxEntries = settingsStorage.load().maxHistoryEntries
-        return DatabaseStorage(env.dataDir, maxEntries = maxEntries).also {
-            it.migrateFromJson(env.dataDir)
-        }
+        return DatabaseStorage(env.dataDir, maxEntries = maxEntries)
     }
 
     @Provides
