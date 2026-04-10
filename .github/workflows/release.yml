@@ -186,11 +186,30 @@ jobs:
           fi
           echo "Submitting for notarization: $DMG_FILE"
 
+          SUBMIT_LOG="$RUNNER_TEMP/notarytool-submit.log"
           xcrun notarytool submit "$DMG_FILE" \
             --apple-id "$NOTARIZATION_APPLE_ID" \
             --password "$NOTARIZATION_PASSWORD" \
             --team-id "$NOTARIZATION_TEAM_ID" \
-            --wait
+            --wait 2>&1 | tee "$SUBMIT_LOG" || true
+
+          # Extract submission ID for log retrieval
+          SUBMISSION_ID=$(grep -m1 '^\s*id:' "$SUBMIT_LOG" | awk '{print $2}')
+
+          # Check if notarization was accepted
+          if ! grep -q 'status: Accepted' "$SUBMIT_LOG"; then
+            echo "::error::Notarization was not accepted"
+            if [ -n "$SUBMISSION_ID" ]; then
+              echo "Fetching notarization log for submission $SUBMISSION_ID..."
+              xcrun notarytool log "$SUBMISSION_ID" \
+                --apple-id "$NOTARIZATION_APPLE_ID" \
+                --password "$NOTARIZATION_PASSWORD" \
+                --team-id "$NOTARIZATION_TEAM_ID" \
+                "$RUNNER_TEMP/notarization-log.json" || true
+              cat "$RUNNER_TEMP/notarization-log.json" 2>/dev/null || true
+            fi
+            exit 1
+          fi
 
           echo "Stapling notarization ticket..."
           xcrun stapler staple "$DMG_FILE"
