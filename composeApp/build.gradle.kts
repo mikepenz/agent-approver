@@ -41,7 +41,10 @@ configurations.all {
 }
 
 val appVersion = providers.gradleProperty("app.version").get()
-val appPackageVersion = appVersion.substringBefore("-")
+val appPackageVersion = appVersion.replace(Regex("[+-].*"), "")
+require(appPackageVersion.matches(Regex("\\d+\\.\\d+\\.\\d+"))) {
+    "appPackageVersion '$appPackageVersion' derived from app.version '$appVersion' must be MAJOR.MINOR.PATCH"
+}
 
 val generateVersion = project.tasks.register<VersionTask>("generateVersion") {
     packageString.set("com.mikepenz.agentapprover")
@@ -135,6 +138,7 @@ nucleus.application {
         packageVersion = appPackageVersion
         description = "Centralized approval UI for AI agent tool requests"
         vendor = "mikepenz"
+        homepage = "https://github.com/mikepenz/agent-approver"
 
         cleanupNativeLibs = true
 

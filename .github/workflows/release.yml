@@ -70,7 +70,46 @@ jobs:
 
           rm -f "$CERTIFICATE_PATH"
 
-      - name: Build and sign DMG
+      - name: Build distributable app
+        env:
+          MACOS_SIGN: 'true'
+          MACOS_SIGNING_IDENTITY: ${{ secrets.MACOS_SIGNING_IDENTITY }}
+        run: ./gradlew :composeApp:createDistributable --stacktrace
+
+      - name: Sign native libraries inside JARs
+        env:
+          MACOS_SIGNING_IDENTITY: ${{ secrets.MACOS_SIGNING_IDENTITY }}
+        run: |
+          APP_DIR="composeApp/build/compose/binaries/main/app/AgentApprover.app"
+          IDENTITY="$MACOS_SIGNING_IDENTITY"
+
+          echo "Signing native libraries inside JARs..."
+          find "$APP_DIR/Contents/app" -name "*.jar" | while read -r jar; do
+            if jar tf "$jar" | grep -qE '\.(dylib|jnilib)$'; then
+              echo "  Processing: $(basename "$jar")"
+              WORK=$(mktemp -d)
+              pushd "$WORK" > /dev/null
+              jar xf "$jar"
+              find . -type f \( -name "*.dylib" -o -name "*.jnilib" \) | while read -r lib; do
+                echo "    Signing: $lib"
+                codesign --force --options runtime --timestamp --sign "$IDENTITY" "$lib"
+              done
+              jar cf "$jar" .
+              popd > /dev/null
+              rm -rf "$WORK"
+            fi
+          done
+
+          echo "Signing loose native libraries..."
+          find "$APP_DIR" -type f \( -name "*.dylib" -o -name "*.jnilib" \) | while read -r lib; do
+            echo "  Signing: $lib"
+            codesign --force --options runtime --timestamp --sign "$IDENTITY" "$lib"
+          done
+
+          echo "Re-signing app bundle..."
+          codesign --force --deep --options runtime --timestamp --sign "$IDENTITY" "$APP_DIR"
+
+      - name: Package DMG
         env:
           MACOS_SIGN: 'true'
           MACOS_SIGNING_IDENTITY: ${{ secrets.MACOS_SIGNING_IDENTITY }}
