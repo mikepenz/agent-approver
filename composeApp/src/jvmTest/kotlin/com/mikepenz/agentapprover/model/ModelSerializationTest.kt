@@ -151,6 +151,22 @@ class ModelSerializationTest {
     }
 
     @Test
+    fun appSettingsBackwardCompatDefaultsProminentAlwaysAllow() {
+        val oldJson = """{"themeMode":"SYSTEM","serverPort":19532,"alwaysOnTop":true,"defaultTimeoutSeconds":240,"startOnBoot":false,"riskAnalysisEnabled":true,"riskAnalysisModel":"haiku","riskAnalysisCustomPrompt":"","autoApproveRisk1":false,"autoDenyRisk5":false,"awayMode":false,"newestApprovalFirst":false,"windowX":null,"windowY":null,"windowWidth":null,"windowHeight":null}"""
+        val lenientJson = Json { ignoreUnknownKeys = true }
+        val decoded = lenientJson.decodeFromString(AppSettings.serializer(), oldJson)
+        assertEquals(false, decoded.prominentAlwaysAllow)
+    }
+
+    @Test
+    fun appSettingsProminentAlwaysAllowRoundTrip() {
+        val settings = AppSettings(prominentAlwaysAllow = true)
+        val encoded = json.encodeToString(AppSettings.serializer(), settings)
+        val decoded = json.decodeFromString(AppSettings.serializer(), encoded)
+        assertEquals(true, decoded.prominentAlwaysAllow)
+    }
+
+    @Test
     fun appSettingsRoundTrip() {
         val settings = AppSettings()
         val encoded = json.encodeToString(AppSettings.serializer(), settings)

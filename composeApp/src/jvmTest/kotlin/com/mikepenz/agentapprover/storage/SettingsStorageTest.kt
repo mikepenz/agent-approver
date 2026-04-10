@@ -31,4 +31,14 @@ class SettingsStorageTest {
         val loaded = storage.load()
         assertEquals(custom, loaded)
     }
+
+    @Test
+    fun `save and reload preserves prominentAlwaysAllow`() {
+        val dir = "/tmp/test-settings-${System.currentTimeMillis()}"
+        val storage = SettingsStorage(dir)
+        val custom = AppSettings(prominentAlwaysAllow = true)
+        storage.save(custom)
+        val loaded = storage.load()
+        assertEquals(true, loaded.prominentAlwaysAllow)
+    }
 }
