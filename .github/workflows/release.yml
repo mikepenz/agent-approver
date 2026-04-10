@@ -451,7 +451,7 @@ jobs:
       - name: Create GitHub Release
         uses: mikepenz/action-gh-release@5c3d16ffbdc3e0fbfe2c8a69a448798f5d9b30c2 # v2.0.0
         with:
-          body-path: release-body.md
+          body_path: release-body.md
           prerelease: ${{ contains(github.ref, '-rc') || contains(github.ref, '-b') || contains(github.ref, '-a') }}
           files: release-assets/*
         env:
