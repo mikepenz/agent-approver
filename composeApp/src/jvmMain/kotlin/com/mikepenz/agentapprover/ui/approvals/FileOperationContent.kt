@@ -28,7 +28,11 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.mikepenz.agentapprover.ui.theme.AgentApproverTheme
+import com.mikepenz.markdown.compose.components.markdownComponents
+import com.mikepenz.markdown.compose.elements.highlightedCodeBlock
+import com.mikepenz.markdown.compose.elements.highlightedCodeFence
 import com.mikepenz.markdown.m3.Markdown
+import com.mikepenz.markdown.m3.markdownColor
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.booleanOrNull
@@ -125,8 +129,15 @@ private fun EditDetail(toolInput: Map<String, JsonElement>, extension: String) {
         color = Color(0xFF1E1E1E),
         shape = MaterialTheme.shapes.small,
     ) {
-        Box(modifier = Modifier.padding(8.dp)) {
-            Markdown(content = diffContent)
+        Box(modifier = Modifier.padding(horizontal = 8.dp)) {
+            Markdown(
+                content = diffContent,
+                colors = markdownColor(codeBackground = Color.Transparent),
+                components = markdownComponents(
+                    codeFence = highlightedCodeFence,
+                    codeBlock = highlightedCodeBlock,
+                ),
+            )
         }
     }
 }
@@ -148,8 +159,15 @@ private fun WriteDetail(toolInput: Map<String, JsonElement>, extension: String) 
             color = Color(0xFF1E1E1E),
             shape = MaterialTheme.shapes.small,
         ) {
-            Box(modifier = Modifier.padding(8.dp)) {
-                Markdown(content = codeBlock)
+            Box(modifier = Modifier.padding(horizontal = 8.dp)) {
+                Markdown(
+                    content = codeBlock,
+                    colors = markdownColor(codeBackground = Color.Transparent),
+                    components = markdownComponents(
+                        codeFence = highlightedCodeFence,
+                        codeBlock = highlightedCodeBlock,
+                    ),
+                )
             }
         }
     } else {
@@ -160,7 +178,7 @@ private fun WriteDetail(toolInput: Map<String, JsonElement>, extension: String) 
             color = Color(0xFF1E1E1E),
             shape = MaterialTheme.shapes.small,
         ) {
-            Box(modifier = Modifier.padding(8.dp)) {
+            Box(modifier = Modifier.padding(horizontal = 8.dp)) {
                 Text(
                     text = content,
                     style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
