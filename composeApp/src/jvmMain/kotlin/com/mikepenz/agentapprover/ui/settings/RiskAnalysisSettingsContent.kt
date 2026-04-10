@@ -111,6 +111,23 @@ fun RiskAnalysisSettingsContent(
             }
         }
 
+        // Claude backend macOS file-access warning
+        AnimatedVisibility(visible = settings.riskAnalysisBackend == RiskAnalysisBackend.CLAUDE && settings.riskAnalysisEnabled) {
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                color = Color(0xFFFF9800).copy(alpha = 0.10f),
+                shape = MaterialTheme.shapes.small,
+            ) {
+                Text(
+                    "On macOS, the Claude CLI may trigger file-access permission prompts. " +
+                        "These can safely be denied \u2014 the app does not need file access to perform risk analysis.",
+                    modifier = Modifier.padding(8.dp),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Color(0xFFFF9800),
+                )
+            }
+        }
+
         // Model selector
         Column(
             verticalArrangement = Arrangement.spacedBy(4.dp),
