@@ -131,14 +131,22 @@ jobs:
               --entitlements "$ENTITLEMENTS" --sign "$IDENTITY" "$exe"
           done
 
-          # [5/7] Sign runtime executables
+          # [5/7] Sign runtime executables (bin/ and lib/ non-dylib executables like jspawnhelper, simengine)
           echo "[5/7] Signing runtime executables..."
-          if [ -d "$APP_DIR/Contents/runtime/Contents/Home/bin" ]; then
-            find "$APP_DIR/Contents/runtime/Contents/Home/bin" -type f | while read -r exe; do
-              echo "  Signing: ${exe#$APP_DIR/}"
-              codesign --force --options runtime --timestamp --sign "$IDENTITY" "$exe"
-            done
-          fi
+          for dir in "$APP_DIR/Contents/runtime/Contents/Home/bin" "$APP_DIR/Contents/runtime/Contents/Home/lib"; do
+            if [ -d "$dir" ]; then
+              find "$dir" -type f ! -name "*.dylib" ! -name "*.jnilib" ! -name "*.jar" \
+                  ! -name "*.properties" ! -name "*.cfg" ! -name "*.dat" ! -name "*.txt" \
+                  ! -name "*.conf" ! -name "*.plist" ! -name "modules" ! -name "*.map" \
+                  ! -name "classlist" ! -name "jrt-fs.jar" | while read -r exe; do
+                # Only sign Mach-O binaries
+                if file "$exe" | grep -q "Mach-O"; then
+                  echo "  Signing: ${exe#$APP_DIR/}"
+                  codesign --force --options runtime --timestamp --sign "$IDENTITY" "$exe"
+                fi
+              done
+            fi
+          done
 
           # [6/7] Sign runtime bundle
           echo "[6/7] Signing runtime bundle..."
