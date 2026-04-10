@@ -114,15 +114,14 @@ jobs:
 
           echo "Re-signing app bundle with entitlements..."
           ENTITLEMENTS=$(find "$(pwd)/composeApp/build/compose" -type f -name "default-entitlements.plist" -print -quit)
-          if [ -n "$ENTITLEMENTS" ]; then
-            echo "  Using entitlements: $ENTITLEMENTS"
-            codesign --force --options runtime --timestamp \
-              --entitlements "$ENTITLEMENTS" \
-              --sign "$IDENTITY" "$APP_DIR"
-          else
-            echo "  WARNING: No entitlements file found, signing without entitlements"
-            codesign --force --options runtime --timestamp --sign "$IDENTITY" "$APP_DIR"
+          if [ -z "$ENTITLEMENTS" ]; then
+            echo "ERROR: No entitlements file found. The app requires JVM entitlements (allow-jit, disable-library-validation) to function."
+            exit 1
           fi
+          echo "  Using entitlements: $ENTITLEMENTS"
+          codesign --force --options runtime --timestamp \
+            --entitlements "$ENTITLEMENTS" \
+            --sign "$IDENTITY" "$APP_DIR"
 
           echo "Verifying app bundle signature..."
           codesign --verify --deep --strict --verbose=2 "$APP_DIR"
