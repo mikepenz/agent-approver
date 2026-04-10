@@ -149,7 +149,11 @@ jobs:
           NOTARIZATION_TEAM_ID: ${{ secrets.NOTARIZATION_TEAM_ID }}
         run: |
           set -euo pipefail
-          DMG_FILE=$(find "$(pwd)/composeApp/build/compose/binaries/main/dmg" -name "*.dmg" -print -quit)
+          DMG_FILE="$(pwd)/composeApp/build/compose/binaries/main/dmg/AgentApprover-${{ matrix.arch }}.dmg"
+          if [ ! -f "$DMG_FILE" ]; then
+            echo "ERROR: DMG not found at $DMG_FILE"
+            exit 1
+          fi
           echo "Submitting for notarization: $DMG_FILE"
 
           xcrun notarytool submit "$DMG_FILE" \
