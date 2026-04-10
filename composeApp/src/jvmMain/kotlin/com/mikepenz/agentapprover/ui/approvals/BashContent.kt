@@ -16,7 +16,11 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.mikepenz.agentapprover.ui.theme.AgentApproverTheme
+import com.mikepenz.markdown.compose.components.markdownComponents
+import com.mikepenz.markdown.compose.elements.highlightedCodeBlock
+import com.mikepenz.markdown.compose.elements.highlightedCodeFence
 import com.mikepenz.markdown.m3.Markdown
+import com.mikepenz.markdown.m3.markdownColor
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
@@ -51,8 +55,15 @@ fun BashContent(toolInput: Map<String, JsonElement>, cwd: String = "") {
             color = Color(0xFF1E1E1E),
             shape = MaterialTheme.shapes.small,
         ) {
-            Box(modifier = Modifier.padding(8.dp)) {
-                Markdown(content = "```bash\n$command\n```")
+            Box(modifier = Modifier.padding(horizontal = 8.dp)) {
+                Markdown(
+                    content = "```bash\n$command\n```",
+                    colors = markdownColor(codeBackground = Color.Transparent),
+                    components = markdownComponents(
+                        codeFence = highlightedCodeFence,
+                        codeBlock = highlightedCodeBlock,
+                    ),
+                )
             }
         }
     }

@@ -4,6 +4,7 @@ import com.mikepenz.agentapprover.model.*
 import kotlinx.datetime.Clock
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.jsonPrimitive
 import java.io.File
 import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
@@ -222,5 +223,132 @@ class DatabaseStorageTest {
 
         val loaded = storage.loadAll().single()
         assertEquals(grepInput, loaded.request.hookInput.toolInput)
+    }
+
+    @Test
+    fun toolInputRoundTripFromCopilotAdapter() {
+        // Simulate the exact Copilot flow: parse camelCase permissionRequest,
+        // create ApprovalResult, store in DB, load back, verify command is present.
+        val adapter = com.mikepenz.agentapprover.server.CopilotAdapter()
+        val rawJson = """
+            {
+                "hookName": "permissionRequest",
+                "sessionId": "dae8d1b3-a912-450d-8379-69ed2f9259e1",
+                "timestamp": 1775825147685,
+                "cwd": "/home/user/projects/example-app",
+                "toolName": "bash",
+                "toolInput": {
+                    "command": "find /home/user/projects/example-app -type f -name '*.kt' | head -20"
+                },
+                "permissionSuggestions": []
+            }
+        """.trimIndent()
+
+        val request = adapter.parse(rawJson)!!
+        assertEquals("Bash", request.hookInput.toolName)
+        assertEquals(
+            JsonPrimitive("find /home/user/projects/example-app -type f -name '*.kt' | head -20"),
+            request.hookInput.toolInput["command"],
+        )
+
+        val result = ApprovalResult(
+            request = request,
+            decision = Decision.AUTO_APPROVED,
+            feedback = "Auto-approved: risk level 1",
+            riskAnalysis = RiskAnalysis(risk = 1, label = "Safe", message = "Read-only"),
+            rawResponseJson = """{"behavior":"allow"}""",
+            decidedAt = kotlinx.datetime.Clock.System.now(),
+        )
+
+        storage.insert(result)
+
+        val loaded = storage.loadAll().single()
+        assertEquals("Bash", loaded.request.hookInput.toolName)
+        val loadedCommand = loaded.request.hookInput.toolInput["command"]
+        assertNotNull(loadedCommand, "tool_input_json should contain 'command' key after DB round-trip")
+        assertEquals(
+            "find /home/user/projects/example-app -type f -name '*.kt' | head -20",
+            loadedCommand.jsonPrimitive.content,
+        )
+    }
+
+    @Test
+    fun toolInputRoundTripFromClaudeCodeAdapter() {
+        // Simulate the Claude Code flow
+        val adapter = com.mikepenz.agentapprover.server.ClaudeCodeAdapter()
+        val rawJson = """
+            {
+                "session_id": "28777844-8497-45d3-99be-e50c85cb7e97",
+                "cwd": "/home/user/projects/example-app",
+                "tool_name": "Bash",
+                "tool_input": {
+                    "command": "ls ~",
+                    "description": "List home directory"
+                },
+                "hook_event_name": "PermissionRequest",
+                "permission_mode": "default"
+            }
+        """.trimIndent()
+
+        val request = adapter.parse(rawJson)!!
+        assertEquals("Bash", request.hookInput.toolName)
+        assertEquals(JsonPrimitive("ls ~"), request.hookInput.toolInput["command"])
+
+        val result = ApprovalResult(
+            request = request,
+            decision = Decision.AUTO_APPROVED,
+            feedback = "Auto-approved: risk level 1",
+            riskAnalysis = null,
+            rawResponseJson = null,
+            decidedAt = kotlinx.datetime.Clock.System.now(),
+        )
+
+        storage.insert(result)
+
+        val loaded = storage.loadAll().single()
+        assertEquals("Bash", loaded.request.hookInput.toolName)
+        val loadedCommand = loaded.request.hookInput.toolInput["command"]
+        assertNotNull(loadedCommand, "tool_input_json should contain 'command' key after DB round-trip")
+        assertEquals("ls ~", loadedCommand.jsonPrimitive.content)
+        assertEquals("List home directory", loaded.request.hookInput.toolInput["description"]?.jsonPrimitive?.content)
+    }
+
+    @Test
+    fun backfillPopulatesToolInputFromRawRequestJson() {
+        // Simulate a row that was inserted before tool_input_json existed:
+        // tool_input_json is '{}' but raw_request_json has the full payload.
+        val rawJson = """{"session_id":"s1","tool_name":"Bash","tool_input":{"command":"npm test","description":"Run tests"},"cwd":"/tmp"}"""
+        val insertSql = """
+            INSERT INTO history (
+                id, type, source, tool_name, tool_type, session_id, cwd,
+                decision, feedback,
+                raw_request_json, raw_response_json,
+                requested_at, decided_at, tool_input_json
+            ) VALUES (?, 'approval', 'CLAUDE_CODE', 'Bash', 'DEFAULT', 's1', '/tmp',
+                      'APPROVED', null, ?, null, ?, ?, '{}')
+        """.trimIndent()
+
+        // Insert directly via SQL to simulate a pre-migration row
+        val conn = java.sql.DriverManager.getConnection(
+            "jdbc:sqlite:${java.io.File(tempDir, "agent-approver.db").absolutePath}"
+        )
+        conn.prepareStatement(insertSql).use { ps ->
+            ps.setString(1, "backfill-1")
+            ps.setString(2, rawJson)
+            ps.setString(3, kotlinx.datetime.Clock.System.now().toString())
+            ps.setString(4, kotlinx.datetime.Clock.System.now().toString())
+            ps.executeUpdate()
+        }
+        conn.close()
+
+        // Re-open storage — triggers backfill in createSchema()
+        storage.close()
+        storage = DatabaseStorage(tempDir.absolutePath)
+
+        val loaded = storage.loadAll().single()
+        assertEquals("Bash", loaded.request.hookInput.toolName)
+        val cmd = loaded.request.hookInput.toolInput["command"]
+        assertNotNull(cmd, "backfill should have populated tool_input_json from raw_request_json")
+        assertEquals("npm test", cmd.jsonPrimitive.content)
     }
 }

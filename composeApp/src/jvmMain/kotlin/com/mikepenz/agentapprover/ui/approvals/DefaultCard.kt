@@ -52,7 +52,11 @@ import com.mikepenz.agentapprover.model.Source
 import com.mikepenz.agentapprover.model.ToolType
 import com.mikepenz.agentapprover.ui.icons.FontAwesomeCaretDown
 import com.mikepenz.agentapprover.ui.theme.AgentApproverTheme
+import com.mikepenz.markdown.compose.components.markdownComponents
+import com.mikepenz.markdown.compose.elements.highlightedCodeBlock
+import com.mikepenz.markdown.compose.elements.highlightedCodeFence
 import com.mikepenz.markdown.m3.Markdown
+import com.mikepenz.markdown.m3.markdownColor
 import kotlinx.datetime.Clock
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
@@ -247,8 +251,15 @@ fun FallbackContent(toolInput: Map<String, JsonElement>) {
         color = Color(0xFF1E1E1E),
         shape = MaterialTheme.shapes.small,
     ) {
-        Box(modifier = Modifier.padding(8.dp)) {
-            Markdown(content = text)
+        Box(modifier = Modifier.padding(horizontal = 8.dp)) {
+            Markdown(
+                content = text,
+                colors = markdownColor(codeBackground = Color.Transparent),
+                components = markdownComponents(
+                    codeFence = highlightedCodeFence,
+                    codeBlock = highlightedCodeBlock,
+                ),
+            )
         }
     }
 }

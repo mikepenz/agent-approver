@@ -9,6 +9,10 @@ import kotlinx.serialization.builtins.MapSerializer
 import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.jsonObject
 import java.io.File
 import java.sql.Connection
 import java.sql.DriverManager
@@ -84,6 +88,7 @@ open class DatabaseStorage(
                 stmt.executeUpdate("ALTER TABLE history ADD COLUMN tool_input_json TEXT NOT NULL DEFAULT '{}'")
             }
         }
+        backfillToolInputJson()
     }
 
     private fun hasColumn(table: String, column: String): Boolean {
@@ -95,6 +100,73 @@ open class DatabaseStorage(
             }
         }
         return false
+    }
+
+    /**
+     * Backfills `tool_input_json` for rows that still have the migration
+     * default `'{}'`. Extracts `tool_input` / `toolInput` from the stored
+     * `raw_request_json` payload so that history entries created before the
+     * column existed display their tool content correctly.
+     */
+    private fun backfillToolInputJson() {
+        val rows = mutableListOf<Pair<String, String>>()
+        connection.prepareStatement(
+            "SELECT id, raw_request_json FROM history WHERE tool_input_json = '{}'"
+        ).use { ps ->
+            ps.executeQuery().use { rs ->
+                while (rs.next()) {
+                    rows.add(rs.getString("id") to rs.getString("raw_request_json"))
+                }
+            }
+        }
+        if (rows.isEmpty()) return
+
+        var backfilled = 0
+        connection.prepareStatement(
+            "UPDATE history SET tool_input_json = ? WHERE id = ?"
+        ).use { ps ->
+            for ((id, rawJson) in rows) {
+                val extracted = extractToolInputFromRawJson(rawJson) ?: continue
+                if (extracted == "{}") continue
+                ps.setString(1, extracted)
+                ps.setString(2, id)
+                ps.addBatch()
+                backfilled++
+            }
+            if (backfilled > 0) ps.executeBatch()
+        }
+        if (backfilled > 0) {
+            logger.i { "Backfilled tool_input_json for $backfilled history rows" }
+        }
+    }
+
+    /**
+     * Extracts the tool-input JSON object from a raw request payload. Handles
+     * both Claude Code (`tool_input`) and Copilot (`toolInput` / `toolArgs`)
+     * payload shapes.
+     */
+    private fun extractToolInputFromRawJson(rawJson: String): String? {
+        return try {
+            val obj = json.parseToJsonElement(rawJson).jsonObject
+            // snake_case (Claude Code / Copilot v1.0.21+)
+            (obj["tool_input"] as? JsonObject)?.let {
+                return json.encodeToString(JsonElement.serializer(), it)
+            }
+            // camelCase (Copilot permissionRequest v1.0.16+)
+            (obj["toolInput"] as? JsonObject)?.let {
+                return json.encodeToString(JsonElement.serializer(), it)
+            }
+            // Legacy Copilot preToolUse (toolArgs is a JSON string)
+            val argsString = (obj["toolArgs"] as? JsonPrimitive)?.contentOrNull
+            if (!argsString.isNullOrBlank()) {
+                // Validate it's actually JSON
+                json.parseToJsonElement(argsString)
+                return argsString
+            }
+            null
+        } catch (_: Exception) {
+            null
+        }
     }
 
     open fun insert(result: ApprovalResult): Unit = synchronized(connectionLock) {
