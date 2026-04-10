@@ -80,7 +80,8 @@ jobs:
         env:
           MACOS_SIGNING_IDENTITY: ${{ secrets.MACOS_SIGNING_IDENTITY }}
         run: |
-          APP_DIR="composeApp/build/compose/binaries/main/app/AgentApprover.app"
+          set -euo pipefail
+          APP_DIR="$(pwd)/composeApp/build/compose/binaries/main/app/AgentApprover.app"
           IDENTITY="$MACOS_SIGNING_IDENTITY"
 
           echo "Signing native libraries inside JARs..."
@@ -90,16 +91,16 @@ jobs:
               echo "  Processing: $(basename "$jar")"
               WORK=$(mktemp -d)
               pushd "$WORK" > /dev/null
-              printf '%s\n' "$JAR_LIBS" | while read -r lib; do
+              while IFS= read -r lib; do
                 [ -n "$lib" ] || continue
                 jar xf "$jar" "$lib"
                 echo "    Signing: $lib"
                 codesign --force --options runtime --timestamp --sign "$IDENTITY" "$lib"
-              done
-              printf '%s\n' "$JAR_LIBS" | while read -r lib; do
+              done <<< "$JAR_LIBS"
+              while IFS= read -r lib; do
                 [ -n "$lib" ] || continue
                 jar uf "$jar" "$lib"
-              done
+              done <<< "$JAR_LIBS"
               popd > /dev/null
               rm -rf "$WORK"
             fi
@@ -111,8 +112,17 @@ jobs:
             codesign --force --options runtime --timestamp --sign "$IDENTITY" "$lib"
           done
 
-          echo "Re-signing app bundle..."
-          codesign --force --deep --options runtime --timestamp --sign "$IDENTITY" "$APP_DIR"
+          echo "Re-signing app bundle with entitlements..."
+          ENTITLEMENTS=$(find "$(pwd)/composeApp/build/compose" -name "default-entitlements.plist" -type f | head -1)
+          if [ -n "$ENTITLEMENTS" ]; then
+            echo "  Using entitlements: $ENTITLEMENTS"
+            codesign --force --options runtime --timestamp \
+              --entitlements "$ENTITLEMENTS" \
+              --sign "$IDENTITY" "$APP_DIR"
+          else
+            echo "  WARNING: No entitlements file found, signing without entitlements"
+            codesign --force --options runtime --timestamp --sign "$IDENTITY" "$APP_DIR"
+          fi
 
           echo "Verifying app bundle signature..."
           codesign --verify --deep --strict --verbose=2 "$APP_DIR"
