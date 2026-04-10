@@ -48,6 +48,22 @@ cd agent-approver
 5. Commit your changes with a descriptive message
 6. Push to your fork and open a Pull Request
 
+## Dependency Verification
+
+This project uses [Gradle dependency verification](https://docs.gradle.org/current/userguide/dependency_verification.html) (`gradle/verification-metadata.xml`) to ensure all dependencies match known SHA-256 checksums. This protects against supply-chain attacks.
+
+**When adding or updating dependencies**, regenerate the verification metadata:
+
+```bash
+./gradlew --write-verification-metadata sha256 help
+```
+
+This updates `gradle/verification-metadata.xml` with checksums for any new or changed artifacts. **Commit the updated file** alongside your dependency changes.
+
+If the build fails with a verification error, it means a dependency's checksum doesn't match what's recorded. This could indicate:
+- A dependency was updated without regenerating the metadata (run the command above)
+- A dependency artifact was tampered with (investigate before proceeding)
+
 ## Code Guidelines
 
 - Follow Kotlin coding conventions

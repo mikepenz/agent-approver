@@ -57,6 +57,16 @@ Single module project: `:composeApp` with `commonMain` (shared models) and `jvmM
 
 See `AGENTS.md` — models serialized to `history.json` and `settings.json` must maintain backward/forward compatibility. New fields need defaults, fields cannot be removed or renamed, enum values cannot be removed.
 
+## Dependency Verification
+
+Gradle dependency verification is enabled via `gradle/verification-metadata.xml`. When adding or updating dependencies, regenerate it:
+
+```bash
+./gradlew --write-verification-metadata sha256 help
+```
+
+Commit the updated `gradle/verification-metadata.xml` alongside dependency changes.
+
 ## Key Technical Details
 
 - **Kotlin 2.3.20**, **Compose Multiplatform 1.10.0**, **Ktor 3.1.3**
