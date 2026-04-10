@@ -62,10 +62,10 @@ See `AGENTS.md` — models serialized to `history.json` and `settings.json` must
 Gradle dependency verification is enabled via `gradle/verification-metadata.xml`. When adding or updating dependencies, regenerate it:
 
 ```bash
-./gradlew --write-verification-metadata sha256 help
+./gradlew --write-verification-metadata sha256 :composeApp:jvmJar :composeApp:jvmTest
 ```
 
-Commit the updated `gradle/verification-metadata.xml` alongside dependency changes.
+Commit the updated `gradle/verification-metadata.xml` alongside dependency changes. Platform-specific artifacts (Compose Desktop, Skiko) and CI-injected dependencies are covered by `<trusted-artifacts>` rules.
 
 ## Key Technical Details
 

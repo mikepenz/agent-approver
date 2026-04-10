@@ -55,10 +55,12 @@ This project uses [Gradle dependency verification](https://docs.gradle.org/curre
 **When adding or updating dependencies**, regenerate the verification metadata:
 
 ```bash
-./gradlew --write-verification-metadata sha256 help
+./gradlew --write-verification-metadata sha256 :composeApp:jvmJar :composeApp:jvmTest
 ```
 
 This updates `gradle/verification-metadata.xml` with checksums for any new or changed artifacts. **Commit the updated file** alongside your dependency changes.
+
+> **Note:** Platform-specific artifacts (Compose Desktop runtimes, Skiko) and CI-injected dependencies are covered by `<trusted-artifacts>` rules in the config since they vary by OS/arch and can't be captured from a single machine.
 
 If the build fails with a verification error, it means a dependency's checksum doesn't match what's recorded. This could indicate:
 - A dependency was updated without regenerating the metadata (run the command above)
