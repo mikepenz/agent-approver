@@ -89,8 +89,8 @@ jobs:
             JAR_LIBS=$(jar tf "$jar" | grep -E '\.(dylib|jnilib)$' || true)
             if [ -n "$JAR_LIBS" ]; then
               echo "  Processing: $(basename "$jar")"
-              WORK=$(mktemp -d)
-              pushd "$WORK" > /dev/null
+              JAR_WORK=$(mktemp -d)
+              pushd "$JAR_WORK" > /dev/null
               while IFS= read -r lib; do
                 [ -n "$lib" ] || continue
                 jar xf "$jar" "$lib"
@@ -102,7 +102,7 @@ jobs:
                 jar uf "$jar" "$lib"
               done <<< "$JAR_LIBS"
               popd > /dev/null
-              rm -rf "$WORK"
+              rm -rf "$JAR_WORK"
             fi
           done
 
@@ -126,18 +126,44 @@ jobs:
           echo "Verifying app bundle signature..."
           codesign --verify --deep --strict --verbose=2 "$APP_DIR"
 
-      - name: Package DMG
+      - name: Package and sign DMG
         env:
-          MACOS_SIGN: 'true'
           MACOS_SIGNING_IDENTITY: ${{ secrets.MACOS_SIGNING_IDENTITY }}
-        run: ./gradlew :composeApp:packageDmg --stacktrace
+        run: |
+          set -euo pipefail
+          IDENTITY="$MACOS_SIGNING_IDENTITY"
+          APP_DIR="$(pwd)/composeApp/build/compose/binaries/main/app"
+          DMG_DIR="$(pwd)/composeApp/build/compose/binaries/main/dmg"
+          mkdir -p "$DMG_DIR"
+          DMG_FILE="$DMG_DIR/AgentApprover-${{ matrix.arch }}.dmg"
+
+          hdiutil create -volname "AgentApprover" -srcfolder "$APP_DIR" \
+            -ov -format UDZO "$DMG_FILE"
+          codesign --force --timestamp --sign "$IDENTITY" "$DMG_FILE"
+          echo "Created: $DMG_FILE"
 
       - name: Notarize DMG
         env:
           NOTARIZATION_APPLE_ID: ${{ secrets.NOTARIZATION_APPLE_ID }}
           NOTARIZATION_PASSWORD: ${{ secrets.NOTARIZATION_PASSWORD }}
           NOTARIZATION_TEAM_ID: ${{ secrets.NOTARIZATION_TEAM_ID }}
-        run: ./gradlew :composeApp:notarizeDmg --stacktrace
+        run: |
+          set -euo pipefail
+          DMG_FILE="$(pwd)/composeApp/build/compose/binaries/main/dmg/AgentApprover-${{ matrix.arch }}.dmg"
+          if [ ! -f "$DMG_FILE" ]; then
+            echo "ERROR: DMG not found at $DMG_FILE"
+            exit 1
+          fi
+          echo "Submitting for notarization: $DMG_FILE"
+
+          xcrun notarytool submit "$DMG_FILE" \
+            --apple-id "$NOTARIZATION_APPLE_ID" \
+            --password "$NOTARIZATION_PASSWORD" \
+            --team-id "$NOTARIZATION_TEAM_ID" \
+            --wait
+
+          echo "Stapling notarization ticket..."
+          xcrun stapler staple "$DMG_FILE"
 
       - name: Collect artifact
         run: |

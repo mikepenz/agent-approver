@@ -173,6 +173,7 @@ nucleus.application {
         }
         linux {
             iconFile.set(project.file("../icons/app.png"))
+            debMaintainer = "Mike Penz <opensource@mikepenz.dev>"
         }
     }
 }
