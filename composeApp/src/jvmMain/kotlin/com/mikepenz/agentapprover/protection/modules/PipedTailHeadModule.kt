@@ -37,7 +37,23 @@ object PipedTailHeadModule : ProtectionModule {
     /** Matches command chain separators: `;`, `&&`, `||`. */
     private val chainSeparator = Regex(""";|&&|\|\|""")
 
-    /** Returns true if every command in the pipeline (before tail/head) is a fast command. */
+    /** Grep-family commands that allow the pipeline only when they appear immediately before head/tail. */
+    private val grepCommands = setOf("grep", "egrep", "fgrep", "rg", "ag")
+
+    /** Extracts the command name from a pipeline segment, skipping env assignments. */
+    private fun segmentCommand(segment: String): String? {
+        val trimmed = segment.trim()
+        if (trimmed.isEmpty()) return null
+        val tokens = trimmed.split(Regex("""\s+"""))
+        val cmdToken = tokens.firstOrNull { !it.contains('=') } ?: return null
+        return cmdToken.substringAfterLast('/')
+    }
+
+    /**
+     * Returns true if every command before the final tail/head is fast, OR if the segment
+     * immediately before the tail/head is a grep-family command (grep limits its own output,
+     * so tail/head directly after grep is fine regardless of upstream cost).
+     */
     private fun allPipeSegmentsFast(fullCmd: String, pipeMatch: MatchResult): Boolean {
         val beforeFinalPipe = fullCmd.substring(0, pipeMatch.range.first)
         // Isolate the command chain segment containing this pipe by finding the last chain separator
@@ -48,14 +64,10 @@ object PipedTailHeadModule : ProtectionModule {
             beforeFinalPipe
         }
         val segments = singlePipePattern.split(pipelineStr)
-        return segments.all { segment ->
-            val trimmed = segment.trim()
-            if (trimmed.isEmpty()) return@all false
-            val tokens = trimmed.split(Regex("""\s+"""))
-            val cmdToken = tokens.firstOrNull { !it.contains('=') } ?: return@all false
-            val cmd = cmdToken.substringAfterLast('/')
-            cmd in fastCommands
-        }
+        val commands = segments.map { segmentCommand(it) }
+        if (commands.any { it == null }) return false
+        if (commands.lastOrNull() in grepCommands) return true
+        return commands.all { it in fastCommands }
     }
 
     private fun hit(ruleId: String, message: String) = ProtectionHit(

@@ -11,6 +11,7 @@ import com.mikepenz.agentapprover.protection.modules.InlineScriptsModule
 import com.mikepenz.agentapprover.protection.modules.PipeAbuseModule
 import com.mikepenz.agentapprover.protection.modules.PipedTailHeadModule
 import com.mikepenz.agentapprover.protection.modules.PythonVenvModule
+import com.mikepenz.agentapprover.protection.modules.SoftwareInstallModule
 import com.mikepenz.agentapprover.protection.modules.SensitiveFilesModule
 import com.mikepenz.agentapprover.protection.modules.SupplyChainRceModule
 import com.mikepenz.agentapprover.protection.modules.ToolBypassModule
@@ -76,6 +77,7 @@ interface AppProviders {
                 PythonVenvModule,
                 AbsolutePathsModule,
                 PipedTailHeadModule,
+                SoftwareInstallModule,
             ),
             settingsProvider = { stateManager.state.value.settings.protectionSettings },
         )
