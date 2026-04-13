@@ -6,7 +6,6 @@ import com.mikepenz.agentapprover.model.ProtectionMode
 import com.mikepenz.agentapprover.protection.CommandParser
 import com.mikepenz.agentapprover.protection.ProtectionModule
 import com.mikepenz.agentapprover.protection.ProtectionRule
-import com.mikepenz.agentapprover.protection.parser.ParsedCommand
 import com.mikepenz.agentapprover.protection.parser.SimpleCommand
 import com.mikepenz.agentapprover.protection.parser.allSimpleCommands
 
@@ -35,17 +34,14 @@ object PythonVenvModule : ProtectionModule {
 
     /**
      * Returns true if a `source <...>/bin/activate` (or `. <...>/bin/activate`) simple command
-     * appears in the chain strictly before [target] (compared by reference).
+     * appears strictly before [target] in the materialized command list. Uses list index rather
+     * than `===` against `parsed.pipelines` so unwrapped/virtual targets (e.g. from `sudo python`)
+     * are compared in the same traversal that produced them.
      */
-    private fun venvActivatedBefore(parsed: ParsedCommand, target: SimpleCommand): Boolean {
-        // Walk pipelines in order; as soon as we encounter [target] by reference, stop.
-        for (entry in parsed.pipelines) {
-            for (cmd in entry.pipeline.commands) {
-                if (cmd === target) return false
-                if (isActivateCommand(cmd)) return true
-            }
-        }
-        return false
+    private fun venvActivatedBefore(commands: List<SimpleCommand>, target: SimpleCommand): Boolean {
+        val targetIndex = commands.indexOfFirst { it === target }
+        if (targetIndex < 0) return false
+        return commands.subList(0, targetIndex).any(::isActivateCommand)
     }
 
     private fun isActivateCommand(sc: SimpleCommand): Boolean {
@@ -83,10 +79,11 @@ object PythonVenvModule : ProtectionModule {
             // Note: `uv run python ...` never surfaces a python simple command (python is just
             // an arg of `uv`), so we don't need an explicit uv allow-check here. Any python-named
             // simple command is by definition a bare invocation of python.
-            val offending = parsed.allSimpleCommands().firstOrNull { sc ->
+            val commands = parsed.allSimpleCommands().toList()
+            val offending = commands.firstOrNull { sc ->
                 if (sc.commandName !in pythonNames) return@firstOrNull false
                 if (isSafePython(sc)) return@firstOrNull false
-                if (venvActivatedBefore(parsed, sc)) return@firstOrNull false
+                if (venvActivatedBefore(commands, sc)) return@firstOrNull false
                 true
             } ?: return null
             val raw = offending.rawName ?: offending.commandName ?: "python"
@@ -105,13 +102,14 @@ object PythonVenvModule : ProtectionModule {
             val parsed = CommandParser.parsedBash(hookInput) ?: return null
             // `uv pip install` surfaces as a `uv` simple command with pip/install as args — it has
             // no standalone pip simple command, so the filter below naturally excludes it.
-            val offending = parsed.allSimpleCommands().firstOrNull { sc ->
+            val commands = parsed.allSimpleCommands().toList()
+            val offending = commands.firstOrNull { sc ->
                 val name = sc.commandName ?: return@firstOrNull false
                 val isBarePip = (name == "pip" || name == "pip3") && sc.hasLiteralArg("install")
                 val isPythonMPipInstall = name in pythonNames && sc.hasLiteralArg("-m") &&
                     sc.hasLiteralArg("pip") && sc.hasLiteralArg("install")
                 if (!isBarePip && !isPythonMPipInstall) return@firstOrNull false
-                if (venvActivatedBefore(parsed, sc)) return@firstOrNull false
+                if (venvActivatedBefore(commands, sc)) return@firstOrNull false
                 true
             } ?: return null
             val raw = offending.rawName ?: "pip"

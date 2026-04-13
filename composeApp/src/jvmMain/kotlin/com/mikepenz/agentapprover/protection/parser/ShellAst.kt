@@ -334,7 +334,7 @@ internal fun ParsedCommand.allSimpleCommands(): Sequence<SimpleCommand> = sequen
  * wrapped inner command so that rules can match on the real target. Returns null when the
  * wrapper is opaque or has no inner command.
  */
-private fun unwrapSudo(sc: SimpleCommand): SimpleCommand? {
+internal fun unwrapSudo(sc: SimpleCommand): SimpleCommand? {
     val name = sc.commandName
     if (name != "sudo" && name != "doas") return null
     val args = sc.args
@@ -403,6 +403,61 @@ private fun SimpleCommand.extractEmbeddedScripts(): List<ParsedCommand> {
         if (body.isNotEmpty()) result.add(parseShellCommand(body))
     }
     return result
+}
+
+/**
+ * Yields every [Pipeline] reachable from this parsed command, recursing into:
+ *  - subshells `( ... )` / brace groups `{ ...; }`
+ *  - command substitutions `$(...)` / backticks
+ *  - process substitutions `<(...)` / `>(...)`
+ *  - literal shell-interpreter bodies (`bash -c "..."`, `sh -c "..."`, `eval "..."`)
+ *
+ * Pipelines are yielded **as-written**. Rules that want to see through `sudo`/`doas` wrappers
+ * (e.g. to detect `curl ... | sudo bash`) should call [Pipeline.effectiveCommands] on each
+ * yielded pipeline. Rules that deliberately target the wrapper itself (e.g. `| sudo`) should
+ * inspect `Pipeline.commands` directly.
+ */
+internal fun ParsedCommand.allPipelines(): Sequence<Pipeline> = sequence {
+    for (entry in pipelines) {
+        yield(entry.pipeline)
+        for (cmd in entry.pipeline.commands) {
+            cmd.subshell?.let { yieldAll(it.allPipelines()) }
+            val words = (listOfNotNull(cmd.name) + cmd.args + cmd.redirects.map { it.target })
+            for (w in words) {
+                for (sub in w.substitutions) yieldAll(parseShellCommand(sub).allPipelines())
+            }
+            for (asg in cmd.assignments) {
+                for (sub in asg.value.substitutions) yieldAll(parseShellCommand(sub).allPipelines())
+            }
+            for (body in cmd.embeddedShellBodies()) {
+                yieldAll(parseShellCommand(body).allPipelines())
+            }
+        }
+    }
+}
+
+/**
+ * Returns the pipeline's commands with each `sudo`/`doas` wrapper replaced by the inner command
+ * it invokes. Useful for structural pipeline checks that shouldn't be fooled by a privilege
+ * wrapper (e.g. `curl ... | sudo bash`). Commands that are not wrappers pass through unchanged.
+ */
+internal fun Pipeline.effectiveCommands(): List<SimpleCommand> =
+    commands.map { unwrapSudo(it) ?: it }
+
+/** Returns literal shell script bodies for `bash -c`, `sh -c`, `zsh -c`, `dash -c`, and `eval`. */
+internal fun SimpleCommand.embeddedShellBodies(): List<String> {
+    val name = commandName ?: return emptyList()
+    return when (name) {
+        "bash", "sh", "zsh", "dash" -> {
+            val idx = args.indexOfFirst { it.literal == "-c" }
+            if (idx >= 0 && idx + 1 < args.size) listOfNotNull(args[idx + 1].literal) else emptyList()
+        }
+        "eval" -> {
+            val body = args.mapNotNull { it.literal }.joinToString(" ")
+            if (body.isEmpty()) emptyList() else listOf(body)
+        }
+        else -> emptyList()
+    }
 }
 
 /** Convenience: tokenize + parse a source string into a [ParsedCommand]. */

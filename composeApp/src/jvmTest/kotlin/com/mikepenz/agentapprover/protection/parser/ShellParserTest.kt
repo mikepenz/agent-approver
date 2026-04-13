@@ -32,7 +32,6 @@ class ShellParserTest {
         val c = firstCmd("rm -rf /tmp/x")
         assertTrue(c.hasFlag(short = 'r'))
         assertTrue(c.hasFlag(short = 'f'))
-        assertTrue(c.hasFlag(short = 'f'))
     }
 
     @Test

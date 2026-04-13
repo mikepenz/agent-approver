@@ -6,9 +6,9 @@ import com.mikepenz.agentapprover.model.ProtectionMode
 import com.mikepenz.agentapprover.protection.CommandParser
 import com.mikepenz.agentapprover.protection.ProtectionModule
 import com.mikepenz.agentapprover.protection.ProtectionRule
-import com.mikepenz.agentapprover.protection.parser.ParsedCommand
 import com.mikepenz.agentapprover.protection.parser.Pipeline
-import com.mikepenz.agentapprover.protection.parser.parseShellCommand
+import com.mikepenz.agentapprover.protection.parser.allPipelines
+import com.mikepenz.agentapprover.protection.parser.effectiveCommands
 
 object PipedTailHeadModule : ProtectionModule {
     override val id = "piped_tail_head"
@@ -44,27 +44,14 @@ object PipedTailHeadModule : ProtectionModule {
         mode = defaultMode,
     )
 
-    /** Every pipeline reachable from the parsed command, recursing into subshells and substitutions. */
-    private fun allPipelines(parsed: ParsedCommand): Sequence<Pipeline> = sequence {
-        for (entry in parsed.pipelines) {
-            yield(entry.pipeline)
-            for (cmd in entry.pipeline.commands) {
-                cmd.subshell?.let { yieldAll(allPipelines(it)) }
-                val words = (listOfNotNull(cmd.name) + cmd.args + cmd.redirects.map { it.target })
-                for (w in words) {
-                    for (sub in w.substitutions) yieldAll(allPipelines(parseShellCommand(sub)))
-                }
-            }
-        }
-    }
-
     /**
-     * True iff the pipeline is allowed: every upstream command is in the fast-list, OR the command
-     * immediately before the target is a grep-family command (which limits output regardless of
-     * upstream cost). Opaque command names (variables, substitutions) are treated as non-fast.
+     * True iff the pipeline is allowed: every upstream command is in the fast-list, OR the
+     * command immediately before the target is a grep-family command (which limits output
+     * regardless of upstream cost). Opaque command names (variables, substitutions) are treated
+     * as non-fast — fail closed. Commands are unwrapped through `sudo`/`doas`.
      */
     private fun isAllowedPipeline(p: Pipeline, target: String): Boolean {
-        val commands = p.commands
+        val commands = p.effectiveCommands()
         val tailIdx = commands.indexOfLast { it.commandName == target }
         if (tailIdx <= 0) return true
         val upstream = commands.subList(0, tailIdx)
@@ -74,8 +61,9 @@ object PipedTailHeadModule : ProtectionModule {
 
     private fun offendingPipeline(hookInput: HookInput, target: String): Boolean {
         val parsed = CommandParser.parsedBash(hookInput) ?: return false
-        return allPipelines(parsed).any { p ->
-            val tailIdx = p.commands.indexOfLast { it.commandName == target }
+        return parsed.allPipelines().any { p ->
+            val cmds = p.effectiveCommands()
+            val tailIdx = cmds.indexOfLast { it.commandName == target }
             if (tailIdx <= 0) false else !isAllowedPipeline(p, target)
         }
     }

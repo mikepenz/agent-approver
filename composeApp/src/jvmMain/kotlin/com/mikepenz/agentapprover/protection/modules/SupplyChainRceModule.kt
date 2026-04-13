@@ -8,9 +8,9 @@ import com.mikepenz.agentapprover.protection.ProtectionModule
 import com.mikepenz.agentapprover.protection.ProtectionRule
 import com.mikepenz.agentapprover.protection.parser.OpKind
 import com.mikepenz.agentapprover.protection.parser.ParsedCommand
-import com.mikepenz.agentapprover.protection.parser.Pipeline
-import com.mikepenz.agentapprover.protection.parser.SimpleCommand
+import com.mikepenz.agentapprover.protection.parser.allPipelines
 import com.mikepenz.agentapprover.protection.parser.allSimpleCommands
+import com.mikepenz.agentapprover.protection.parser.effectiveCommands
 import com.mikepenz.agentapprover.protection.parser.parseShellCommand
 
 object SupplyChainRceModule : ProtectionModule {
@@ -41,31 +41,6 @@ object SupplyChainRceModule : ProtectionModule {
         mode = defaultMode,
     )
 
-    /** Yields every [Pipeline] reachable from the parsed command, including nested subshells and substitutions. */
-    private fun allPipelines(parsed: ParsedCommand): Sequence<Pipeline> = sequence {
-        for (entry in parsed.pipelines) {
-            yield(entry.pipeline)
-            for (cmd in entry.pipeline.commands) {
-                cmd.subshell?.let { yieldAll(allPipelines(it)) }
-                val words = (listOfNotNull(cmd.name) + cmd.args + cmd.redirects.map { it.target })
-                for (w in words) {
-                    for (sub in w.substitutions) yieldAll(allPipelines(parseShellCommand(sub)))
-                }
-                // bash -c bodies
-                if (cmd.commandName in setOf("bash", "sh", "zsh", "dash")) {
-                    val idx = cmd.args.indexOfFirst { it.literal == "-c" }
-                    if (idx >= 0 && idx + 1 < cmd.args.size) {
-                        cmd.args[idx + 1].literal?.let { yieldAll(allPipelines(parseShellCommand(it))) }
-                    }
-                }
-                if (cmd.commandName == "eval") {
-                    val body = cmd.args.mapNotNull { it.literal }.joinToString(" ")
-                    if (body.isNotEmpty()) yieldAll(allPipelines(parseShellCommand(body)))
-                }
-            }
-        }
-    }
-
     private fun parsedOrNull(hookInput: HookInput): ParsedCommand? = CommandParser.parsedBash(hookInput)
 
     private object CurlPipeExec : ProtectionRule {
@@ -76,11 +51,11 @@ object SupplyChainRceModule : ProtectionModule {
         override fun evaluate(hookInput: HookInput): ProtectionHit? {
             val cmd = CommandParser.bashCommand(hookInput) ?: return null
             val parsed = parsedOrNull(hookInput) ?: return null
-            val match = allPipelines(parsed).any { p ->
-                val cmds = p.commands
+            val match = parsed.allPipelines().any { p ->
+                // Unwrap sudo/doas so `curl ... | sudo bash` exposes `bash` as the interpreter.
+                val cmds = p.effectiveCommands()
                 val fetchIdx = cmds.indexOfFirst { it.commandName in fetchCommands }
                 if (fetchIdx < 0) return@any false
-                // Any interpreter after the fetch in the same pipeline.
                 cmds.subList(fetchIdx + 1, cmds.size).any { it.commandName in interpreters }
             }
             return if (match) hit(id, "Remote code execution via pipe: $cmd") else null
@@ -95,8 +70,8 @@ object SupplyChainRceModule : ProtectionModule {
         override fun evaluate(hookInput: HookInput): ProtectionHit? {
             val cmd = CommandParser.bashCommand(hookInput) ?: return null
             val parsed = parsedOrNull(hookInput) ?: return null
-            val match = allPipelines(parsed).any { p ->
-                val cmds = p.commands
+            val match = parsed.allPipelines().any { p ->
+                val cmds = p.effectiveCommands()
                 val decodeIdx = cmds.indexOfFirst { sc ->
                     when (sc.commandName) {
                         "base64" -> sc.hasFlag(short = 'd') || sc.hasLongFlag("--decode")
@@ -119,10 +94,9 @@ object SupplyChainRceModule : ProtectionModule {
         override fun evaluate(hookInput: HookInput): ProtectionHit? {
             val cmd = CommandParser.bashCommand(hookInput) ?: return null
             val parsed = parsedOrNull(hookInput) ?: return null
-            val match = allPipelines(parsed).any { p ->
-                val cmds = p.commands
+            val match = parsed.allPipelines().any { p ->
+                val cmds = p.effectiveCommands()
                 if (cmds.size < 2) return@any false
-                // eval must appear as a non-first command in the pipeline.
                 cmds.drop(1).any { it.commandName == "eval" }
             }
             return if (match) hit(id, "Pipe to eval: $cmd") else null
@@ -163,10 +137,10 @@ object SupplyChainRceModule : ProtectionModule {
         override fun evaluate(hookInput: HookInput): ProtectionHit? {
             val cmd = CommandParser.bashCommand(hookInput) ?: return null
             val parsed = parsedOrNull(hookInput) ?: return null
-            val match = allPipelines(parsed).any { p ->
+            val match = parsed.allPipelines().any { p ->
                 val cmds = p.commands
                 if (cmds.size < 2) return@any false
-                cmds.drop(1).any { it.commandName == "sudo" || it.commandName == "su" }
+                cmds.drop(1).any { it.commandName == "sudo" || it.commandName == "su" || it.commandName == "doas" }
             }
             return if (match) hit(id, "Privilege escalation via pipe: $cmd") else null
         }

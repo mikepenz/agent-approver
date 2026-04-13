@@ -390,14 +390,8 @@ internal class ShellTokenizer(private val source: String) {
                             if (dc == '\\' && pos + 1 < source.length) {
                                 val next = source[pos + 1]
                                 raw.append(dc).append(next)
-                                val decoded = decodeAnsiCEscape(next, extraAdvance = { lit.append(it) })
-                                if (decoded != null) {
-                                    lit.append(decoded)
-                                    pos += 2
-                                } else {
-                                    // Extended escape (\xHH, \NNN, \uHHHH) — handled inside helper via advance.
-                                    pos += 2
-                                }
+                                decodeAnsiCEscape(next)?.let { lit.append(it) }
+                                pos += 2
                             } else {
                                 raw.append(dc); lit.append(dc); pos++
                             }
@@ -553,7 +547,7 @@ internal class ShellTokenizer(private val source: String) {
         return body.toString()
     }
 
-    private fun decodeAnsiCEscape(next: Char, extraAdvance: (String) -> Unit): String? {
+    private fun decodeAnsiCEscape(next: Char): String? {
         return when (next) {
             'n' -> "\n"
             't' -> "\t"

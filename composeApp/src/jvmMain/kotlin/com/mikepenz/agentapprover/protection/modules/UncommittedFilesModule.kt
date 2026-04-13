@@ -55,7 +55,19 @@ object UncommittedFilesModule : ProtectionModule {
                 }
                 if (name == "sed" && (sc.hasFlag(short = 'i') || sc.hasLongFlag("--in-place"))) {
                     destructive = true
-                    sc.args.forEach { a -> a.literal?.let { if (!it.startsWith("-") && !it.contains("s/")) candidates.add(it) } }
+                    // `-e <script>` / `-f <script-file>` take an operand that is NOT the target
+                    // file sed writes to. Skip that operand so we don't flag the script file.
+                    var skipNext = false
+                    for (a in sc.args) {
+                        val lit = a.literal ?: continue
+                        if (skipNext) { skipNext = false; continue }
+                        when {
+                            lit == "-e" || lit == "-f" || lit == "--expression" || lit == "--file" -> skipNext = true
+                            lit.startsWith("-e") || lit.startsWith("-f") ||
+                                lit.startsWith("--expression=") || lit.startsWith("--file=") -> { /* inline option */ }
+                            !lit.startsWith("-") -> candidates.add(lit)
+                        }
+                    }
                 }
                 if (name == "perl" && sc.hasFlag(short = 'i')) {
                     destructive = true

@@ -63,39 +63,39 @@ object PipeAbuseModule : ProtectionModule {
             val cmd = CommandParser.bashCommand(hookInput) ?: return null
             val parsed = CommandParser.parsedBash(hookInput) ?: return null
 
-            // Collect (filename, position in pipelines list) of any script file written via cat > / tee.
-            val written = mutableListOf<String>()
-            for (cmdSc in parsed.allSimpleCommands()) {
-                when (cmdSc.commandName) {
-                    "cat" -> {
-                        val target = cmdSc.redirects.firstOrNull {
-                            it.op == OpKind.REDIR_OUT || it.op == OpKind.REDIR_APPEND
-                        }?.target?.literal
-                        if (isScript(target)) written.add(target!!)
-                    }
-                    "tee" -> {
-                        for (a in cmdSc.args) {
-                            val lit = a.literal ?: continue
-                            if (lit.startsWith("-")) continue
-                            if (isScript(lit)) { written.add(lit); break }
-                        }
+            // Materialize the command stream once so we can check temporal order by index.
+            val commands = parsed.allSimpleCommands().toList()
+            for ((writerIdx, writer) in commands.withIndex()) {
+                val writtenFile = writerScriptTarget(writer) ?: continue
+                val writtenBase = writtenFile.substringAfterLast('/')
+                // Only commands *after* the writer count as execution.
+                val executed = commands.subList(writerIdx + 1, commands.size).any { sc ->
+                    val nameBase = sc.commandName
+                    if (nameBase != null && nameBase == writtenBase) return@any true
+                    sc.args.any { a ->
+                        val lit = a.literal ?: return@any false
+                        lit == writtenFile || lit.substringAfterLast('/') == writtenBase
                     }
                 }
+                if (executed) return hit(id, "Write then execute in same chain: $cmd")
             }
-            if (written.isEmpty()) return null
+            return null
+        }
 
-            // Any subsequent simple command whose name basename == written-file basename OR whose
-            // args contain the written filename is considered an execution of the written file.
-            val writtenBases = written.map { it.substringAfterLast('/') }.toSet()
-            val executes = parsed.allSimpleCommands().any { sc ->
-                val nameBase = sc.commandName
-                if (nameBase != null && nameBase in writtenBases) return@any true
-                sc.args.any { a ->
-                    val lit = a.literal ?: return@any false
-                    lit in written || lit.substringAfterLast('/') in writtenBases
+        /** Returns the script filename written by [sc] via `cat > script.sh` / `tee script.sh`, or null. */
+        private fun writerScriptTarget(sc: SimpleCommand): String? {
+            return when (sc.commandName) {
+                "cat" -> {
+                    val target = sc.redirects.firstOrNull {
+                        it.op == OpKind.REDIR_OUT || it.op == OpKind.REDIR_APPEND
+                    }?.target?.literal
+                    target?.takeIf { isScript(it) }
                 }
+                "tee" -> sc.args
+                    .mapNotNull { it.literal }
+                    .firstOrNull { !it.startsWith("-") && isScript(it) }
+                else -> null
             }
-            return if (executes) hit(id, "Write then execute in same chain: $cmd") else null
         }
 
         private fun isScript(lit: String?): Boolean {
