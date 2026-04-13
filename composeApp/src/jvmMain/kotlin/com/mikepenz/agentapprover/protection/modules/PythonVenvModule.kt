@@ -21,6 +21,13 @@ object PythonVenvModule : ProtectionModule {
         PythonMVenv,
     )
 
+    private val venvActivatePattern =
+        Regex("""(?:^|\s|;|&&|\|\|)(?:source|\.)\s+\S*(?:\.venv|venv|env)/bin/activate\b""")
+
+    /** True if a `source .venv/bin/activate` occurs strictly before `targetStart` in the command. */
+    private fun activatedBefore(cmd: String, targetStart: Int): Boolean =
+        venvActivatePattern.findAll(cmd).any { it.range.last < targetStart }
+
     private fun hit(ruleId: String, message: String) = ProtectionHit(
         moduleId = id,
         ruleId = ruleId,
@@ -35,15 +42,16 @@ object PythonVenvModule : ProtectionModule {
         override val correctiveHint = "Use .venv/bin/python or uv run python instead. Create a venv with: uv venv"
         private val pattern = Regex("""\bpython[23]?\s""")
         private val allowPatterns = listOf(
-            Regex("""\bpython3\s+--version\b"""),
+            Regex("""\bpython[23]?\s+--version\b"""),
             Regex("""\.venv/bin/python"""),
             Regex("""\buv\s+run\s+python"""),
         )
 
         override fun evaluate(hookInput: HookInput): ProtectionHit? {
             val cmd = CommandParser.bashCommand(hookInput) ?: return null
-            if (!pattern.containsMatchIn(cmd)) return null
+            val match = pattern.find(cmd) ?: return null
             if (allowPatterns.any { it.containsMatchIn(cmd) }) return null
+            if (activatedBefore(cmd, match.range.first)) return null
             return hit(id, "Use .venv/bin/python or uv run python instead. Create a venv with: uv venv")
         }
     }
@@ -60,7 +68,8 @@ object PythonVenvModule : ProtectionModule {
         override fun evaluate(hookInput: HookInput): ProtectionHit? {
             val cmd = CommandParser.bashCommand(hookInput) ?: return null
             if (allowPattern.containsMatchIn(cmd)) return null
-            if (!pipPattern.containsMatchIn(cmd) && !pythonMPipPattern.containsMatchIn(cmd)) return null
+            val match = pipPattern.find(cmd) ?: pythonMPipPattern.find(cmd) ?: return null
+            if (activatedBefore(cmd, match.range.first)) return null
             return hit(id, "Use uv pip install or activate a venv first.")
         }
     }

@@ -71,6 +71,24 @@ class PipedTailHeadModuleTest {
         assertNull(evaluateRule("piped_tail", "cat data.json | jq '.items[]' | tail -10"))
     }
 
+    @Test
+    fun pipedTailAfterGrepFollowingSlowCommandAllowed() {
+        assertNull(evaluateRule("piped_tail", "./gradlew build 2>&1 | grep ERROR | tail -20"))
+    }
+
+    @Test
+    fun pipedHeadAfterGrepFollowingSlowCommandAllowed() {
+        assertNull(evaluateRule("piped_head", "curl -s https://example.com | grep foo | head -5"))
+    }
+
+    @Test
+    fun pipedTailWithGrepEarlierButSlowLastSegmentBlocked() {
+        // grep appears earlier, but the segment directly feeding tail is a slow command.
+        assertNotNull(
+            evaluateRule("piped_tail", "grep foo big.log | curl https://example.com | tail -5")
+        )
+    }
+
     // --- piped_tail: blocked (expensive commands) ---
 
     @Test

@@ -61,6 +61,30 @@ class PythonVenvModuleTest {
         assertNull(evaluateRule("bare_python", "uv run python main.py"))
     }
 
+    @Test
+    fun sourceVenvActivateThenPythonAllowed() {
+        assertNull(evaluateRule("bare_python", "source .venv/bin/activate && python3 main.py"))
+    }
+
+    @Test
+    fun dotVenvActivateThenPythonAllowed() {
+        assertNull(evaluateRule("bare_python", ". .venv/bin/activate && python main.py"))
+    }
+
+    @Test
+    fun pythonBeforeActivateBlocked() {
+        assertNotNull(
+            evaluateRule("bare_python", "python main.py && source .venv/bin/activate")
+        )
+    }
+
+    @Test
+    fun pipBeforeActivateBlocked() {
+        assertNotNull(
+            evaluateRule("bare_pip", "pip install requests && source .venv/bin/activate")
+        )
+    }
+
     // --- bare_pip ---
 
     @Test
@@ -86,6 +110,11 @@ class PythonVenvModuleTest {
     @Test
     fun uvPipInstallAllowed() {
         assertNull(evaluateRule("bare_pip", "uv pip install requests"))
+    }
+
+    @Test
+    fun sourceVenvActivateThenPipAllowed() {
+        assertNull(evaluateRule("bare_pip", "source .venv/bin/activate && pip install requests"))
     }
 
     // --- python_m_venv ---
