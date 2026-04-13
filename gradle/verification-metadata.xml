@@ -4,17 +4,15 @@
       <verify-metadata>true</verify-metadata>
       <verify-signatures>false</verify-signatures>
       <trusted-artifacts>
-         <!-- Platform-specific and packaging artifacts resolved via compose.desktop.currentOs (vary by OS/arch) -->
-         <trust group="org.jetbrains.compose" regex="true"/>
-         <trust group="org.jetbrains.compose.desktop" regex="true"/>
-         <trust group="org.jetbrains.skiko" regex="true"/>
-         <!-- Artifacts injected by gradle/actions/setup-gradle (Develocity init script) -->
-         <trust group="org.junit" name="junit-bom" regex="true"/>
-         <trust group="org.jetbrains.kotlinx" name="kotlinx-coroutines-bom" regex="true"/>
-         <trust group="org.jetbrains.kotlinx" name="kotlinx-serialization-bom" regex="true"/>
-         <trust group="org.bouncycastle" regex="true"/>
          <trust group="com.fasterxml.jackson" regex="true"/>
          <trust group="com.fasterxml.jackson.module" regex="true"/>
+         <trust group="org.bouncycastle" regex="true"/>
+         <trust group="org.jetbrains.compose" regex="true"/>
+         <trust group="org.jetbrains.compose.desktop" regex="true"/>
+         <trust group="org.jetbrains.kotlinx" name="kotlinx-coroutines-bom" regex="true"/>
+         <trust group="org.jetbrains.kotlinx" name="kotlinx-serialization-bom" regex="true"/>
+         <trust group="org.jetbrains.skiko" regex="true"/>
+         <trust group="org.junit" name="junit-bom" regex="true"/>
       </trusted-artifacts>
    </configuration>
    <components>
