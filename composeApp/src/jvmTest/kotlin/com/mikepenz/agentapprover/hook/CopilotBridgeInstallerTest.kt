@@ -181,6 +181,27 @@ class CopilotBridgeInstallerTest {
     }
 
     @Test
+    fun `bridge scripts start with the shebang at byte 0 in both modes`() {
+        // Regression: an earlier attempt interpolated a pre-trimIndent()'d
+        // failure branch into a trimIndent()'d outer template, which made
+        // the min-indent detection collapse to 0 and left every line —
+        // including `#!/usr/bin/env bash` — indented by 12 spaces. A leading
+        // space in front of the shebang defeats kernel shebang lookup when
+        // Copilot CLI execs the script directly.
+        listOf(false, true).forEach { failClosed ->
+            CopilotBridgeInstaller.register(port, failClosed = failClosed)
+            listOf(preToolUseScript(), permissionRequestScript()).forEach { script ->
+                val body = script.readText()
+                assertTrue(
+                    body.startsWith("#!/usr/bin/env bash"),
+                    "script ${script.name} (failClosed=$failClosed) must start with shebang at byte 0, " +
+                        "got: ${body.take(40)}",
+                )
+            }
+        }
+    }
+
+    @Test
     fun `re-registering with a different failClosed flag overwrites the scripts`() {
         CopilotBridgeInstaller.register(port, failClosed = false)
         assertTrue("exit 0" in preToolUseScript().readText())

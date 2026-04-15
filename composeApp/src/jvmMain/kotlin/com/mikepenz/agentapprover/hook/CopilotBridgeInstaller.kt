@@ -127,21 +127,30 @@ object CopilotBridgeInstaller {
         // preToolUse; for permissionRequest an error exit is treated as a
         // blocked action. We also emit a short stderr message so the user
         // sees *why* their command was blocked rather than a silent failure.
+        //
+        // NOTE: this function uses `trimMargin("|")` rather than `trimIndent()`
+        // because the failure branch used to be interpolated as a
+        // pre-`trimIndent()`'d string, which left lines at column 0 inside
+        // the outer template — that made `trimIndent()`'s min-indent
+        // detection collapse to 0 and silently leave the shebang indented.
+        // A leading space in front of `#!/usr/bin/env bash` defeats kernel
+        // shebang lookup when Copilot CLI execs the script directly, so we
+        // keep explicit `|` margins and drop the whole min-indent dance.
         val failureBranch = if (failClosed) {
             """
-            if [ "${'$'}CURL_EXIT" -ne 0 ] || [ -z "${'$'}RESPONSE" ]; then
-                # Server unreachable — fail closed (Agent Approver setting)
-                echo "Agent Approver unreachable — blocking (fail-closed)" >&2
-                exit 1
-            fi
-            """.trimIndent()
+            |if [ "${'$'}CURL_EXIT" -ne 0 ] || [ -z "${'$'}RESPONSE" ]; then
+            |    # Server unreachable — fail closed (Agent Approver setting)
+            |    echo "Agent Approver unreachable — blocking (fail-closed)" >&2
+            |    exit 1
+            |fi
+            """.trimMargin()
         } else {
             """
-            if [ "${'$'}CURL_EXIT" -ne 0 ] || [ -z "${'$'}RESPONSE" ]; then
-                # Server unreachable — fail open
-                exit 0
-            fi
-            """.trimIndent()
+            |if [ "${'$'}CURL_EXIT" -ne 0 ] || [ -z "${'$'}RESPONSE" ]; then
+            |    # Server unreachable — fail open
+            |    exit 0
+            |fi
+            """.trimMargin()
         }
 
         val headerComment = if (failClosed) {
@@ -151,27 +160,27 @@ object CopilotBridgeInstaller {
         }
 
         return """
-            #!/usr/bin/env bash
-            # Agent Approver bridge script for GitHub Copilot CLI
-            # Reads hook JSON from stdin, POSTs to Agent Approver, returns response.
-            $headerComment
-
-            set -uo pipefail
-
-            URL="http://localhost:$port/$endpoint"
-            INPUT=${'$'}(cat)
-
-            RESPONSE=${'$'}(printf '%s' "${'$'}INPUT" | curl -sS --max-time 300 \
-                -X POST \
-                -H "Content-Type: application/json" \
-                --data-binary @- \
-                "${'$'}URL" 2>/dev/null)
-            CURL_EXIT=${'$'}?
-
-            $failureBranch
-
-            printf '%s' "${'$'}RESPONSE"
-        """.trimIndent()
+            |#!/usr/bin/env bash
+            |# Agent Approver bridge script for GitHub Copilot CLI
+            |# Reads hook JSON from stdin, POSTs to Agent Approver, returns response.
+            |$headerComment
+            |
+            |set -uo pipefail
+            |
+            |URL="http://localhost:$port/$endpoint"
+            |INPUT=${'$'}(cat)
+            |
+            |RESPONSE=${'$'}(printf '%s' "${'$'}INPUT" | curl -sS --max-time 300 \
+            |    -X POST \
+            |    -H "Content-Type: application/json" \
+            |    --data-binary @- \
+            |    "${'$'}URL" 2>/dev/null)
+            |CURL_EXIT=${'$'}?
+            |
+            |$failureBranch
+            |
+            |printf '%s' "${'$'}RESPONSE"
+        """.trimMargin()
     }
 
     /**
