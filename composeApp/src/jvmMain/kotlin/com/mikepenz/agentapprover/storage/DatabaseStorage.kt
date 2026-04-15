@@ -266,7 +266,7 @@ open class DatabaseStorage(
         connection.createStatement().use { stmt ->
             stmt.executeQuery("SELECT * FROM history ORDER BY decided_at DESC").use { rs ->
                 while (rs.next()) {
-                    results.add(rowToApprovalResult(rs))
+                    tryRowToApprovalResult(rs)?.let(results::add)
                 }
             }
         }
@@ -279,11 +279,27 @@ open class DatabaseStorage(
             ps.setString(1, type)
             ps.executeQuery().use { rs ->
                 while (rs.next()) {
-                    results.add(rowToApprovalResult(rs))
+                    tryRowToApprovalResult(rs)?.let(results::add)
                 }
             }
         }
         results
+    }
+
+    /**
+     * Wraps [rowToApprovalResult] so a single corrupt / tampered / undecryptable
+     * row cannot abort an entire history load. The row's id (plaintext) is
+     * captured first so the warning can identify the bad entry without
+     * exposing ciphertext.
+     */
+    private fun tryRowToApprovalResult(rs: ResultSet): ApprovalResult? {
+        val rowId = try { rs.getString("id") } catch (_: Exception) { "<unknown>" }
+        return try {
+            rowToApprovalResult(rs)
+        } catch (e: Exception) {
+            logger.w { "Skipping history row $rowId: failed to deserialize (${e.javaClass.simpleName}: ${e.message})" }
+            null
+        }
     }
 
     fun updateRawResponse(requestId: String, rawResponseJson: String): Unit = synchronized(connectionLock) {
