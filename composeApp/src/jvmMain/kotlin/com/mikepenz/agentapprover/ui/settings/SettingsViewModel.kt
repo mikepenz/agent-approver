@@ -156,11 +156,17 @@ class SettingsViewModel(
         }
 
         // Re-bake the Copilot bridge scripts whenever the fail-closed flag
-        // changes, but only if the bridge is already installed. `drop(1)`
-        // skips the initial emission so startup doesn't trigger an
-        // unsolicited install. If the user hasn't registered Copilot yet,
-        // the flag is latched into the settings and will be applied the
-        // first time they click Register.
+        // changes, but only for whichever of the two hook surfaces is
+        // currently installed. `drop(1)` skips the initial emission so
+        // startup doesn't trigger an unsolicited install.
+        //
+        // Two branches because capability hooks can be installed
+        // independently of the main approval hooks (see
+        // `reconcileCapabilityHooks`). The `else if` is safe — and required
+        // to avoid double-writing — because `copilotBridge.register()`
+        // already refreshes the capability script in place when it exists
+        // on disk, so when the main hook is registered a single call
+        // re-bakes all three scripts.
         viewModelScope.launch(writeDispatcher) {
             stateManager.state
                 .map { it.settings.copilotFailClosed }
@@ -171,6 +177,8 @@ class SettingsViewModel(
                     if (copilotBridge.isRegistered(port)) {
                         copilotBridge.register(port, failClosed)
                         isCopilotRegistered.value = copilotBridge.isRegistered(port)
+                    } else if (copilotBridge.isCapabilityHookRegistered(port)) {
+                        copilotBridge.registerCapabilityHook(port, failClosed)
                     }
                 }
         }

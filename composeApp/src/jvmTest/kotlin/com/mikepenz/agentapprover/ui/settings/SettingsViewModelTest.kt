@@ -186,6 +186,30 @@ class SettingsViewModelTest {
     }
 
     @Test
+    fun `toggling copilotFailClosed re-registers capability hook when only capability is installed`() = runTest {
+        // Capability hooks can be installed independently of the main
+        // approval hooks (via reconcileCapabilityHooks). In that state the
+        // main register() path is not exercised, so the watcher must fall
+        // back to registerCapabilityHook() to re-bake the capability script.
+        val bridge = FakeCopilotBridge()
+        val (_, state, _) = newVm(bridge = bridge)
+        runCurrent() // drain startup reconciles
+
+        // Simulate the user having enabled a capability previously so the
+        // capability hook is live on disk, but main approval is not.
+        bridge.capabilityHookPorts.add(state.state.value.settings.serverPort)
+        bridge.lastCapabilityFailClosed = null
+
+        state.updateSettings(state.state.value.settings.copy(copilotFailClosed = true))
+        runCurrent()
+
+        // Main register() is NOT called because main isn't registered.
+        assertEquals(0, bridge.registerCalls)
+        // Capability hook IS re-registered with the new flag.
+        assertEquals(true, bridge.lastCapabilityFailClosed)
+    }
+
+    @Test
     fun `isCopilotRegistered is initially false then populated from bridge on IO`() = runTest {
         val bridge = FakeCopilotBridge(registeredPorts = mutableSetOf(19532))
         val (vm, _, _) = newVm(bridge = bridge)
