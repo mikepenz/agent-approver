@@ -137,13 +137,20 @@ class SettingsViewModel(
                 }
         }
 
-        // Reconcile capability hooks on startup so a capability that was
-        // enabled in a previous session re-registers its UserPromptSubmit
-        // entry — otherwise the entry would only be (re)written the next
-        // time the user toggles a capability switch.
+        // Reconcile capability hooks whenever `serverPort` changes, in
+        // addition to the startup emission. Capability hooks have no
+        // manual re-register button in the UI (unlike the main approval
+        // hooks), so without this they would orphan their old-port entries
+        // silently when the user changes `serverPort`. Runs on the
+        // serialized `writeDispatcher` so it drains FIFO with
+        // `updateCapabilitySettings` and `register*Hook()` calls.
         viewModelScope.launch(writeDispatcher) {
-            val settings = stateManager.state.value.settings
-            reconcileCapabilityHooks(settings.serverPort, settings.capabilitySettings)
+            stateManager.state
+                .map { it.settings.serverPort }
+                .distinctUntilChanged()
+                .collect { port ->
+                    reconcileCapabilityHooks(port, stateManager.state.value.settings.capabilitySettings)
+                }
         }
     }
 

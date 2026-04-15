@@ -4,6 +4,7 @@ import co.touchlab.kermit.Logger
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
@@ -251,29 +252,7 @@ object HookRegistrar {
 
         val existingHooks = root["hooks"]?.jsonObject ?: return
         val upsUrl = userPromptSubmitUrl(port)
-
-        val entries = existingHooks["UserPromptSubmit"]?.jsonArray ?: return
-        val filtered = entries.mapNotNull { entry ->
-            val entryObject = entry.jsonObject
-            val innerHooks = entryObject["hooks"]?.jsonArray ?: return@mapNotNull entry
-            val remainingHooks = innerHooks.filterNot { h ->
-                val hObj = h.jsonObject
-                hObj["type"].toString().trim('"') == "http" &&
-                    hObj["url"].toString().trim('"') == upsUrl
-            }
-            if (remainingHooks.isEmpty()) {
-                null
-            } else if (remainingHooks.size == innerHooks.size) {
-                entry
-            } else {
-                buildJsonObject {
-                    entryObject.forEach { (key, value) ->
-                        if (key != "hooks") put(key, value)
-                    }
-                    put("hooks", Json.encodeToJsonElement(remainingHooks))
-                }
-            }
-        }
+        val filtered = stripMatchingHookDefs(existingHooks["UserPromptSubmit"]?.jsonArray, upsUrl) ?: return
 
         val updatedHooks = buildJsonObject {
             existingHooks.forEach { (key, value) ->
@@ -310,19 +289,8 @@ object HookRegistrar {
 
         val existingHooks = root["hooks"]?.jsonObject ?: return
 
-        fun filterHooks(event: String, url: String): List<JsonElement> {
-            val entries = existingHooks[event]?.jsonArray ?: return emptyList()
-            return entries.filter { entry ->
-                val obj = entry.jsonObject
-                val innerHooks = obj["hooks"]?.jsonArray ?: return@filter true
-                val hasOurHook = innerHooks.any { h ->
-                    val hObj = h.jsonObject
-                    hObj["type"].toString().trim('"') == "http" &&
-                        hObj["url"].toString().trim('"') == url
-                }
-                !hasOurHook
-            }
-        }
+        fun filterHooks(event: String, url: String): List<JsonElement> =
+            stripMatchingHookDefs(existingHooks[event]?.jsonArray, url) ?: emptyList()
 
         val filteredPerm = filterHooks("PermissionRequest", hookUrl(port))
         val filteredPtu = filterHooks("PreToolUse", preToolUseUrl(port))
@@ -358,5 +326,35 @@ object HookRegistrar {
 
         file.writeText(json.encodeToString(JsonElement.serializer(), updatedRoot))
         logger.i { "Unregistered hooks for port $port" }
+    }
+
+    /**
+     * For each entry in [entries], drops any inner hook def whose `type` is
+     * `http` and `url` equals [url], preserving unrelated hook defs inside
+     * the same entry. Entries that end up empty after the filter are
+     * dropped entirely. Returns `null` when the caller's event key is
+     * absent from the settings file (so the caller can short-circuit).
+     */
+    private fun stripMatchingHookDefs(entries: JsonArray?, url: String): List<JsonElement>? {
+        if (entries == null) return null
+        return entries.mapNotNull { entry ->
+            val entryObject = entry.jsonObject
+            val innerHooks = entryObject["hooks"]?.jsonArray ?: return@mapNotNull entry
+            val remainingHooks = innerHooks.filterNot { h ->
+                val hObj = h.jsonObject
+                hObj["type"].toString().trim('"') == "http" &&
+                    hObj["url"].toString().trim('"') == url
+            }
+            when {
+                remainingHooks.isEmpty() -> null
+                remainingHooks.size == innerHooks.size -> entry
+                else -> buildJsonObject {
+                    entryObject.forEach { (key, value) ->
+                        if (key != "hooks") put(key, value)
+                    }
+                    put("hooks", Json.encodeToJsonElement(remainingHooks))
+                }
+            }
+        }
     }
 }

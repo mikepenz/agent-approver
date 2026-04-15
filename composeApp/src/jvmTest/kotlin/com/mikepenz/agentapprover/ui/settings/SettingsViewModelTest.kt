@@ -3,6 +3,7 @@ package com.mikepenz.agentapprover.ui.settings
 import com.mikepenz.agentapprover.capability.CapabilityEngine
 import com.mikepenz.agentapprover.hook.CopilotBridge
 import com.mikepenz.agentapprover.hook.HookRegistry
+import com.mikepenz.agentapprover.model.CapabilityModuleSettings
 import com.mikepenz.agentapprover.model.CapabilitySettings
 import com.mikepenz.agentapprover.model.ModuleSettings
 import com.mikepenz.agentapprover.model.ProtectionMode
@@ -280,5 +281,81 @@ class SettingsViewModelTest {
 
         assertTrue(vm.uiState.value.isHookRegistered)
         assertTrue(registry.isRegisteredCalls > initialIsRegisteredCalls)
+    }
+
+    @Test
+    fun `enabling a capability registers capability hooks on both agents`() = runTest {
+        val registry = FakeHookRegistry()
+        val bridge = FakeCopilotBridge()
+        val (vm, state, _) = newVm(bridge = bridge, registry = registry)
+        runCurrent()
+
+        // Startup reconcile with no enabled capabilities must unregister.
+        assertFalse(registry.capabilityHookPorts.contains(state.state.value.settings.serverPort))
+        assertFalse(bridge.capabilityHookPorts.contains(state.state.value.settings.serverPort))
+
+        vm.updateCapabilitySettings(
+            CapabilitySettings(
+                modules = mapOf("response-compression" to CapabilityModuleSettings(enabled = true)),
+            ),
+        )
+        runCurrent()
+
+        val port = state.state.value.settings.serverPort
+        assertTrue(registry.capabilityHookPorts.contains(port))
+        assertTrue(bridge.capabilityHookPorts.contains(port))
+    }
+
+    @Test
+    fun `disabling the last capability unregisters capability hooks on both agents`() = runTest {
+        val registry = FakeHookRegistry()
+        val bridge = FakeCopilotBridge()
+        val (vm, state, _) = newVm(bridge = bridge, registry = registry)
+        runCurrent()
+
+        vm.updateCapabilitySettings(
+            CapabilitySettings(
+                modules = mapOf("response-compression" to CapabilityModuleSettings(enabled = true)),
+            ),
+        )
+        runCurrent()
+        val port = state.state.value.settings.serverPort
+        assertTrue(registry.capabilityHookPorts.contains(port))
+
+        vm.updateCapabilitySettings(
+            CapabilitySettings(
+                modules = mapOf("response-compression" to CapabilityModuleSettings(enabled = false)),
+            ),
+        )
+        runCurrent()
+
+        assertFalse(registry.capabilityHookPorts.contains(port))
+        assertFalse(bridge.capabilityHookPorts.contains(port))
+    }
+
+    @Test
+    fun `port change re-registers capability hooks at the new port`() = runTest {
+        val registry = FakeHookRegistry()
+        val bridge = FakeCopilotBridge()
+        val (vm, state, _) = newVm(bridge = bridge, registry = registry)
+        runCurrent()
+
+        vm.updateCapabilitySettings(
+            CapabilitySettings(
+                modules = mapOf("response-compression" to CapabilityModuleSettings(enabled = true)),
+            ),
+        )
+        runCurrent()
+        val oldPort = state.state.value.settings.serverPort
+        assertTrue(registry.capabilityHookPorts.contains(oldPort))
+
+        state.updateSettings(state.state.value.settings.copy(serverPort = 20000))
+        runCurrent()
+
+        // Capability hook should now be wired to the new port. Our fake
+        // set-add semantics mean the old port lingers, but the new port must
+        // be present — that's the bit the reconcile flow guarantees.
+        assertTrue(registry.capabilityHookPorts.contains(20000))
+        assertTrue(bridge.capabilityHookPorts.contains(20000))
     }
 }

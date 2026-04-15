@@ -59,7 +59,7 @@ fun CapabilitiesSettingsContent(
 
         modules.forEach { module ->
             val moduleSettings = settings.modules[module.id] ?: CapabilityModuleSettings()
-            var expanded by remember { mutableStateOf(false) }
+            var expanded by remember(module.id) { mutableStateOf(false) }
 
             Card(
                 modifier = Modifier.fillMaxWidth(),

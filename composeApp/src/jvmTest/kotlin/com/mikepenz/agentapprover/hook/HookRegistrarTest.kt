@@ -192,6 +192,79 @@ class HookRegistrarTest {
     }
 
     @Test
+    fun unregisterCapabilityHookPreservesCoTenantHookDefsInMergedEntry() {
+        // A user has manually merged our capability hook into a single
+        // UserPromptSubmit entry that also holds another tool's hook def.
+        HookRegistrar.registerCapabilityHook(port)
+        val root0 = Json.parseToJsonElement(settingsFile.readText()).jsonObject
+        val ourHookDef = root0["hooks"]!!.jsonObject["UserPromptSubmit"]!!
+            .jsonArray[0].jsonObject["hooks"]!!.jsonArray[0]
+
+        settingsFile.writeText(
+            """
+            {
+                "hooks": {
+                    "UserPromptSubmit": [{
+                        "matcher": "",
+                        "hooks": [
+                            $ourHookDef,
+                            {"type": "command", "command": "echo preserved"}
+                        ]
+                    }]
+                }
+            }
+            """.trimIndent()
+        )
+
+        HookRegistrar.unregisterCapabilityHook(port)
+        assertFalse(HookRegistrar.isCapabilityHookRegistered(port))
+
+        // The co-tenant's hook def must still be there.
+        val root = Json.parseToJsonElement(settingsFile.readText()).jsonObject
+        val upsEntries = root["hooks"]!!.jsonObject["UserPromptSubmit"]!!.jsonArray
+        assertTrue(upsEntries.size == 1)
+        val remaining = upsEntries[0].jsonObject["hooks"]!!.jsonArray
+        assertTrue(remaining.size == 1)
+        assertTrue(remaining[0].jsonObject["command"].toString().contains("echo preserved"))
+    }
+
+    @Test
+    fun fullUnregisterPreservesCoTenantHookDefsInMergedEntry() {
+        // Same scenario as above but on the full-teardown path — our approval
+        // hook shares a PreToolUse entry with another tool's hook def.
+        HookRegistrar.register(port)
+        val root0 = Json.parseToJsonElement(settingsFile.readText()).jsonObject
+        val ourPtu = root0["hooks"]!!.jsonObject["PreToolUse"]!!
+            .jsonArray[0].jsonObject["hooks"]!!.jsonArray[0]
+
+        settingsFile.writeText(
+            """
+            {
+                "hooks": {
+                    "PreToolUse": [{
+                        "matcher": "",
+                        "hooks": [
+                            $ourPtu,
+                            {"type": "command", "command": "echo ptu-preserved"}
+                        ]
+                    }]
+                }
+            }
+            """.trimIndent()
+        )
+
+        HookRegistrar.unregister(port)
+        assertFalse(HookRegistrar.isRegistered(port))
+
+        val root = Json.parseToJsonElement(settingsFile.readText()).jsonObject
+        val ptuEntries = root["hooks"]!!.jsonObject["PreToolUse"]!!.jsonArray
+        assertTrue(ptuEntries.size == 1)
+        val remaining = ptuEntries[0].jsonObject["hooks"]!!.jsonArray
+        assertTrue(remaining.size == 1)
+        assertTrue(remaining[0].jsonObject["command"].toString().contains("echo ptu-preserved"))
+    }
+
+    @Test
     fun unregisterPreservesOtherHookEvents() {
         // Register, then add another hook event, then unregister
         settingsFile.parentFile.mkdirs()
