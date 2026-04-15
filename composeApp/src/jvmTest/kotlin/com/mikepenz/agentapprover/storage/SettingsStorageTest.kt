@@ -64,7 +64,10 @@ class SettingsStorageTest {
 
     @Test
     fun `load defaults verboseLogging when missing from legacy file`() {
-        val dir = "/tmp/test-settings-${java.util.UUID.randomUUID()}"
+        val dir = java.io.File(
+            System.getProperty("java.io.tmpdir"),
+            "test-settings-${java.util.UUID.randomUUID()}"
+        ).absolutePath
         java.io.File(dir).mkdirs()
         // Legacy settings file without verboseLogging — must still deserialize.
         java.io.File(dir, "settings.json").writeText(
@@ -78,7 +81,10 @@ class SettingsStorageTest {
 
     @Test
     fun `save and reload preserves verboseLogging`() {
-        val dir = "/tmp/test-settings-${java.util.UUID.randomUUID()}"
+        val dir = java.io.File(
+            System.getProperty("java.io.tmpdir"),
+            "test-settings-${java.util.UUID.randomUUID()}"
+        ).absolutePath
         val storage = SettingsStorage(dir)
         storage.save(AppSettings(verboseLogging = true))
         assertEquals(true, storage.load().verboseLogging)
