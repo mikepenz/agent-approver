@@ -8,6 +8,7 @@ import com.mikepenz.agentapprover.protection.CommandParser
 import com.mikepenz.agentapprover.protection.ProtectionModule
 import com.mikepenz.agentapprover.protection.ProtectionRule
 import java.io.File
+import java.nio.file.Paths
 import java.util.concurrent.TimeUnit
 
 /**
@@ -79,8 +80,12 @@ object GitAwareGuardModule : ProtectionModule {
         return try {
             val process = ProcessBuilder("git", "status", "--porcelain")
                 .directory(gitRoot)
-                .redirectErrorStream(false)
+                // Merge stderr into stdout so a chatty stderr can't fill its pipe and
+                // block the child before waitFor returns. We drain the combined stream
+                // below regardless of exit code.
+                .redirectErrorStream(true)
                 .start()
+            val output = process.inputStream.bufferedReader().use { it.readText() }
             val finished = process.waitFor(3, TimeUnit.SECONDS)
             if (!finished) {
                 process.destroyForcibly()
@@ -88,7 +93,9 @@ object GitAwareGuardModule : ProtectionModule {
                 return false
             }
             if (process.exitValue() != 0) return false
-            process.inputStream.bufferedReader().use { it.readText() }.isNotBlank()
+            // With redirectErrorStream(true) stderr ends up in `output` too; porcelain
+            // output is line-oriented, so checking for any non-blank line is sufficient.
+            output.isNotBlank()
         } catch (e: Exception) {
             Logger.w("GitAwareGuardModule", e) { "Failed to run git status in ${gitRoot.path}" }
             false
@@ -160,10 +167,13 @@ object GitAwareGuardModule : ProtectionModule {
             // Only warn when the target lives under (or is) the cwd — don't double-warn for
             // arbitrary absolute paths handled elsewhere.
             val targetUnderCwd = try {
-                val target = if (filePath.startsWith("/")) File(filePath) else File(cwd, filePath)
-                val targetCanon = target.absoluteFile.normalize().path
-                val cwdCanon = File(cwd).absoluteFile.normalize().path
-                targetCanon == cwdCanon || targetCanon.startsWith("$cwdCanon/")
+                // Use NIO Path so this is correct on Windows (C:\...) as well as POSIX.
+                val rawTarget = Paths.get(filePath)
+                val cwdPath = Paths.get(cwd).toAbsolutePath().normalize()
+                val targetPath = (if (rawTarget.isAbsolute) rawTarget else cwdPath.resolve(rawTarget))
+                    .toAbsolutePath()
+                    .normalize()
+                targetPath == cwdPath || targetPath.startsWith(cwdPath)
             } catch (_: Exception) {
                 false
             }

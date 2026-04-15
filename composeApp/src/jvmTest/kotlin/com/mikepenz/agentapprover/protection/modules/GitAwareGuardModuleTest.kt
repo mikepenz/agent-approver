@@ -14,6 +14,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import org.junit.Assume.assumeTrue
 
 class GitAwareGuardModuleTest {
 
@@ -50,7 +51,12 @@ class GitAwareGuardModuleTest {
     private fun evaluateAll(input: HookInput): List<ProtectionHit> =
         module.rules.mapNotNull { it.evaluate(input) }
 
-    private fun rule(id: String) = module.rules.first { it.id == id }
+    private fun gitAvailable(): Boolean = try {
+        val p = ProcessBuilder("git", "--version").redirectErrorStream(true).start()
+        p.waitFor(5, TimeUnit.SECONDS) && p.exitValue() == 0
+    } catch (_: Exception) {
+        false
+    }
 
     private fun gitInit(dir: File) {
         val process = ProcessBuilder("git", "init", "-q")
@@ -64,15 +70,6 @@ class GitAwareGuardModuleTest {
         ProcessBuilder("git", "config", "user.email", "test@example.com").directory(dir).start().waitFor()
         ProcessBuilder("git", "config", "user.name", "Test").directory(dir).start().waitFor()
         ProcessBuilder("git", "config", "commit.gpgsign", "false").directory(dir).start().waitFor()
-    }
-
-    private fun gitCommitAll(dir: File, message: String = "init") {
-        ProcessBuilder("git", "add", "-A").directory(dir).start().waitFor()
-        val proc = ProcessBuilder("git", "commit", "-q", "-m", message)
-            .directory(dir)
-            .redirectErrorStream(true)
-            .start()
-        proc.waitFor(10, TimeUnit.SECONDS)
     }
 
     // --- Module metadata -------------------------------------------------------
@@ -104,6 +101,7 @@ class GitAwareGuardModuleTest {
 
     @Test
     fun rmRfInCleanGitRepo_noHit() {
+        assumeTrue("git not available on PATH", gitAvailable())
         val dir = newTempDir()
         gitInit(dir)
         // No working tree changes -> `git status --porcelain` is empty -> clean.
@@ -120,6 +118,7 @@ class GitAwareGuardModuleTest {
 
     @Test
     fun rmRfInDirtyGitRepo_dirtyHit() {
+        assumeTrue("git not available on PATH", gitAvailable())
         val dir = newTempDir()
         gitInit(dir)
         File(dir, "untracked.txt").writeText("hello")
@@ -171,6 +170,7 @@ class GitAwareGuardModuleTest {
 
     @Test
     fun writeInGitRepo_noWriteOutsideHit() {
+        assumeTrue("git not available on PATH", gitAvailable())
         val dir = newTempDir()
         gitInit(dir)
         val cwd = dir.absolutePath
@@ -190,11 +190,27 @@ class GitAwareGuardModuleTest {
 
     @Test
     fun findGitRoot_walksUp() {
+        assumeTrue("git not available on PATH", gitAvailable())
         val root = newTempDir()
         gitInit(root)
         val nested = File(root, "a/b/c").apply { mkdirs() }
         val found = module.findGitRoot(nested.absolutePath)
         assertNotNull(found)
+        assertEquals(root.canonicalFile, found.canonicalFile)
+    }
+
+    /**
+     * Linked worktrees and git submodules use a `.git` *file* (containing e.g.
+     * `gitdir: /path/to/real/gitdir`) instead of a `.git` directory. `findGitRoot`
+     * documents support for this — verify it without requiring the git binary.
+     */
+    @Test
+    fun findGitRoot_supportsDotGitAsFile() {
+        val root = newTempDir()
+        File(root, ".git").writeText("gitdir: /tmp/fake/.git/worktrees/wt\n")
+        val nested = File(root, "sub/dir").apply { mkdirs() }
+        val found = module.findGitRoot(nested.absolutePath)
+        assertNotNull(found, "expected findGitRoot to treat .git file as repo root")
         assertEquals(root.canonicalFile, found.canonicalFile)
     }
 
