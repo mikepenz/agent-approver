@@ -11,6 +11,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.datetime.Clock
 import kotlinx.serialization.json.JsonElement
+import java.util.concurrent.ConcurrentHashMap
 
 data class AppState(
     val pendingApprovals: List<ApprovalRequest> = emptyList(),
@@ -30,8 +31,8 @@ class AppStateManager(
     private val _state = MutableStateFlow(AppState())
     val state: StateFlow<AppState> = _state.asStateFlow()
 
-    private val pendingDeferreds = mutableMapOf<String, CompletableDeferred<ApprovalResult>>()
-    private val pendingUpdatedInputs = mutableMapOf<String, Map<String, JsonElement>>()
+    private val pendingDeferreds = ConcurrentHashMap<String, CompletableDeferred<ApprovalResult>>()
+    private val pendingUpdatedInputs = ConcurrentHashMap<String, Map<String, JsonElement>>()
 
     /**
      * Lock guarding disk writes (settings + database). The in-memory state
@@ -170,7 +171,9 @@ class AppStateManager(
     }
 
     fun updateRiskResult(requestId: String, analysis: RiskAnalysis) {
-        _state.update { it.copy(riskResults = it.riskResults + (requestId to analysis)) }
+        synchronized(persistLock) {
+            _state.update { it.copy(riskResults = it.riskResults + (requestId to analysis)) }
+        }
     }
 
     fun updateSettings(settings: AppSettings) {

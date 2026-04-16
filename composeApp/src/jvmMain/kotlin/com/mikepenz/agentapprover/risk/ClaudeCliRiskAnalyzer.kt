@@ -4,11 +4,13 @@ import co.touchlab.kermit.Logger
 import com.mikepenz.agentapprover.model.HookInput
 import com.mikepenz.agentapprover.model.RiskAnalysis
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import kotlinx.coroutines.coroutineScope
 import java.util.concurrent.TimeUnit
 
 class ClaudeCliRiskAnalyzer(
@@ -34,7 +36,7 @@ class ClaudeCliRiskAnalyzer(
         }
     }
 
-    private fun runClaude(userMessage: String): String {
+    private suspend fun runClaude(userMessage: String): String = coroutineScope {
         val command = listOf(
             "claude",
             "-p",
@@ -49,7 +51,7 @@ class ClaudeCliRiskAnalyzer(
 
         log.d { "Spawning claude -p --model $model --effort low" }
 
-        val process = ProcessBuilder(listOf("/bin/sh", "-c", command.joinToString(" ") { shellEscape(it) })).apply {
+        val process = ProcessBuilder(command).apply {
             environment().remove("CLAUDECODE")
             val path = environment()["PATH"] ?: ""
             val extraPaths = listOf("/usr/local/bin", "/opt/homebrew/bin", "${System.getProperty("user.home")}/.local/bin")
@@ -62,27 +64,21 @@ class ClaudeCliRiskAnalyzer(
 
         log.d { "Process pid=${process.pid()}" }
 
-        // Read both streams in background threads to prevent deadlock
-        var stdoutOutput = ""
-        var stderrOutput = ""
-        val stdoutThread = Thread {
-            stdoutOutput = process.inputStream.bufferedReader().readText()
-        }.apply { isDaemon = true; start() }
-        val stderrThread = Thread {
-            stderrOutput = process.errorStream.bufferedReader().readText()
-        }.apply { isDaemon = true; start() }
+        // Read both streams concurrently via coroutines to prevent deadlock
+        val stdoutDeferred = async { process.inputStream.bufferedReader().readText() }
+        val stderrDeferred = async { process.errorStream.bufferedReader().readText() }
 
         val finished = process.waitFor(PROCESS_TIMEOUT_SECONDS, TimeUnit.SECONDS)
         if (!finished) {
             log.w { "Process timed out after ${PROCESS_TIMEOUT_SECONDS}s" }
             process.destroyForcibly()
-            stdoutThread.join(2000)
-            stderrThread.join(2000)
+            stdoutDeferred.cancel()
+            stderrDeferred.cancel()
             throw RuntimeException("claude process timed out after ${PROCESS_TIMEOUT_SECONDS}s")
         }
 
-        stdoutThread.join(3000)
-        stderrThread.join(3000)
+        val stdoutOutput = stdoutDeferred.await()
+        val stderrOutput = stderrDeferred.await()
 
         val exitCode = process.exitValue()
         log.d { "Exited=$exitCode" }
@@ -92,7 +88,7 @@ class ClaudeCliRiskAnalyzer(
             throw RuntimeException("claude exited with code $exitCode: ${stderrOutput.take(200)}")
         }
 
-        return stdoutOutput.trim()
+        stdoutOutput.trim()
     }
 
     private fun parseResult(rawOutput: String): RiskAnalysis {
@@ -140,11 +136,5 @@ class ClaudeCliRiskAnalyzer(
         private const val PROCESS_TIMEOUT_SECONDS = 25L
 
         private const val JSON_SCHEMA = """{"type":"object","properties":{"level":{"type":"integer"},"label":{"type":"string"},"explanation":{"type":"string"}},"required":["level","label","explanation"]}"""
-
-        private fun shellEscape(arg: String): String {
-            if (arg.isEmpty()) return "''"
-            if (arg.all { it.isLetterOrDigit() || it in "-_./:=" }) return arg
-            return "'" + arg.replace("'", "'\\''") + "'"
-        }
     }
 }

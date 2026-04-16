@@ -100,17 +100,18 @@ fun Route.approvalRoute(
             // exited. Swallow the cancellation here: rethrowing would
             // propagate into Ktor's shared pipeline parent scope and cause
             // every subsequent call to be cancelled on arrival.
-            if (!deferred.isCompleted) {
-                logger.i { "Connection closed for request ${request.id} — resolved externally" }
-                stateManager.resolve(
-                    requestId = request.id,
-                    decision = Decision.RESOLVED_EXTERNALLY,
-                    feedback = "Resolved externally (decided in harness or harness exited)",
-                    riskAnalysis = null,
-                    rawResponseJson = null,
-                )
-                deferred.cancel()
-            }
+            //
+            // resolve() is idempotent: if a concurrent caller already
+            // completed the deferred, resolve() sees the request gone from
+            // pending and returns immediately.
+            logger.i { "Connection closed for request ${request.id} — resolving externally" }
+            stateManager.resolve(
+                requestId = request.id,
+                decision = Decision.RESOLVED_EXTERNALLY,
+                feedback = "Resolved externally (decided in harness or harness exited)",
+                riskAnalysis = null,
+                rawResponseJson = null,
+            )
         }
     }
 }
