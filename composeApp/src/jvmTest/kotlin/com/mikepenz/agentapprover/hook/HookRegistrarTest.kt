@@ -265,6 +265,62 @@ class HookRegistrarTest {
     }
 
     @Test
+    fun registerSessionStartHookAddsCommandEntry() {
+        HookRegistrar.registerSessionStartHook(port)
+        assertTrue(HookRegistrar.isSessionStartHookRegistered(port))
+
+        val root = Json.parseToJsonElement(settingsFile.readText()).jsonObject
+        val hooks = root["hooks"]!!.jsonObject
+        val ssEntries = hooks["SessionStart"]!!.jsonArray
+        assertTrue(ssEntries.isNotEmpty())
+        val ssHook = ssEntries[0].jsonObject["hooks"]!!.jsonArray[0].jsonObject
+        // SessionStart hooks must be type: "command" (not "http").
+        assertTrue(ssHook["type"].toString().trim('"') == "command")
+        assertTrue(ssHook["command"].toString().contains("claude-session-start.sh"))
+    }
+
+    @Test
+    fun registerSessionStartHookInstallsBridgeScript() {
+        HookRegistrar.registerSessionStartHook(port)
+        val script = java.io.File(tempDir, ".agent-approver/claude-session-start.sh")
+        assertTrue(script.exists())
+        assertTrue(script.canExecute())
+        val content = script.readText()
+        assertTrue(content.contains("localhost:$port/capability/session-start"))
+    }
+
+    @Test
+    fun registerSessionStartHookIsIdempotent() {
+        HookRegistrar.registerSessionStartHook(port)
+        HookRegistrar.registerSessionStartHook(port)
+        val root = Json.parseToJsonElement(settingsFile.readText()).jsonObject
+        val hooks = root["hooks"]!!.jsonObject
+        val ssEntries = hooks["SessionStart"]!!.jsonArray
+        assertTrue(ssEntries.size == 1)
+    }
+
+    @Test
+    fun unregisterSessionStartHookRemovesEntryAndScript() {
+        HookRegistrar.registerSessionStartHook(port)
+        assertTrue(HookRegistrar.isSessionStartHookRegistered(port))
+
+        HookRegistrar.unregisterSessionStartHook(port)
+        assertFalse(HookRegistrar.isSessionStartHookRegistered(port))
+        // Bridge script should be removed.
+        val script = java.io.File(tempDir, ".agent-approver/claude-session-start.sh")
+        assertFalse(script.exists())
+    }
+
+    @Test
+    fun fullUnregisterRemovesSessionStartHookToo() {
+        HookRegistrar.register(port)
+        HookRegistrar.registerSessionStartHook(port)
+        HookRegistrar.unregister(port)
+        assertFalse(HookRegistrar.isRegistered(port))
+        assertFalse(HookRegistrar.isSessionStartHookRegistered(port))
+    }
+
+    @Test
     fun unregisterPreservesOtherHookEvents() {
         // Register, then add another hook event, then unregister
         settingsFile.parentFile.mkdirs()

@@ -51,10 +51,31 @@ fun Route.capabilityRoute(engine: CapabilityEngine) {
         call.respondText(body, contentType = ContentType.Application.Json)
     }
 
+    post("/capability/session-start") {
+        runCatching { call.receiveText() }
+
+        val text = engine.injectionFor(HookEvent.SESSION_START, AgentTarget.CLAUDE_CODE)
+        if (text.isBlank()) {
+            call.respondText("{}", contentType = ContentType.Application.Json)
+            return@post
+        }
+        val body = buildJsonObject {
+            put("hookSpecificOutput", buildJsonObject {
+                put("hookEventName", "SessionStart")
+                put("additionalContext", text)
+            })
+        }.toString()
+        call.respondText(body, contentType = ContentType.Application.Json)
+    }
+
     post("/capability/inject-copilot") {
         runCatching { call.receiveText() }
 
-        val text = engine.injectionFor(HookEvent.USER_PROMPT_SUBMIT, AgentTarget.COPILOT_CLI)
+        val parts = listOf(
+            engine.injectionFor(HookEvent.USER_PROMPT_SUBMIT, AgentTarget.COPILOT_CLI),
+            engine.injectionFor(HookEvent.SESSION_START, AgentTarget.COPILOT_CLI),
+        ).filter { it.isNotBlank() }
+        val text = parts.joinToString("\n\n")
         if (text.isBlank()) {
             call.respondText("{}", contentType = ContentType.Application.Json)
             return@post

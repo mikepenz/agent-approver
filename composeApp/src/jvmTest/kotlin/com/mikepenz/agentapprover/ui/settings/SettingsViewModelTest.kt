@@ -1,6 +1,8 @@
 package com.mikepenz.agentapprover.ui.settings
 
 import com.mikepenz.agentapprover.capability.CapabilityEngine
+import com.mikepenz.agentapprover.capability.modules.ResponseCompressionCapability
+import com.mikepenz.agentapprover.capability.modules.SocraticThinkingCapability
 import com.mikepenz.agentapprover.hook.CopilotBridge
 import com.mikepenz.agentapprover.hook.HookRegistry
 import com.mikepenz.agentapprover.model.CapabilityModuleSettings
@@ -98,6 +100,11 @@ class SettingsViewModelTest {
         override fun isCapabilityHookRegistered(port: Int): Boolean = port in capabilityHookPorts
         override fun registerCapabilityHook(port: Int) { capabilityHookPorts.add(port) }
         override fun unregisterCapabilityHook(port: Int) { capabilityHookPorts.remove(port) }
+
+        val sessionStartHookPorts: MutableSet<Int> = mutableSetOf()
+        override fun isSessionStartHookRegistered(port: Int): Boolean = port in sessionStartHookPorts
+        override fun registerSessionStartHook(port: Int) { sessionStartHookPorts.add(port) }
+        override fun unregisterSessionStartHook(port: Int) { sessionStartHookPorts.remove(port) }
     }
 
     private fun newVm(
@@ -108,7 +115,7 @@ class SettingsViewModelTest {
     ): Triple<SettingsViewModel, AppStateManager, FakeHookRegistry> {
         val state = AppStateManager()
         val engine = ProtectionEngine(modules = emptyList(), settingsProvider = { ProtectionSettings() })
-        val capEngine = CapabilityEngine(modules = emptyList(), settingsProvider = { state.state.value.settings.capabilitySettings })
+        val capEngine = CapabilityEngine(modules = listOf(ResponseCompressionCapability, SocraticThinkingCapability), settingsProvider = { state.state.value.settings.capabilitySettings })
         val vm = SettingsViewModel(
             stateManager = state,
             copilotBridge = bridge,

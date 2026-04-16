@@ -24,6 +24,15 @@ interface HookRegistry {
 
     /** Removes our `UserPromptSubmit` hook entry. */
     fun unregisterCapabilityHook(port: Int)
+
+    /** True iff the `SessionStart` hook is registered for this port. */
+    fun isSessionStartHookRegistered(port: Int): Boolean
+
+    /** Adds our `SessionStart` hook entry. Idempotent. */
+    fun registerSessionStartHook(port: Int)
+
+    /** Removes our `SessionStart` hook entry. */
+    fun unregisterSessionStartHook(port: Int)
 }
 
 /** Production-only delegate to the [HookRegistrar] object. */
@@ -35,4 +44,8 @@ object DefaultHookRegistry : HookRegistry {
         HookRegistrar.isCapabilityHookRegistered(port)
     override fun registerCapabilityHook(port: Int) = HookRegistrar.registerCapabilityHook(port)
     override fun unregisterCapabilityHook(port: Int) = HookRegistrar.unregisterCapabilityHook(port)
+    override fun isSessionStartHookRegistered(port: Int): Boolean =
+        HookRegistrar.isSessionStartHookRegistered(port)
+    override fun registerSessionStartHook(port: Int) = HookRegistrar.registerSessionStartHook(port)
+    override fun unregisterSessionStartHook(port: Int) = HookRegistrar.unregisterSessionStartHook(port)
 }

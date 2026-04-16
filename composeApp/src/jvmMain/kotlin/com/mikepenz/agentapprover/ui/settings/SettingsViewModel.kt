@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.mikepenz.agentapprover.capability.CapabilityEngine
 import com.mikepenz.agentapprover.capability.CapabilityModule
+import com.mikepenz.agentapprover.capability.HookEvent
 import com.mikepenz.agentapprover.di.AppScope
 import com.mikepenz.agentapprover.hook.CopilotBridge
 import com.mikepenz.agentapprover.hook.HookRegistry
@@ -223,9 +224,25 @@ class SettingsViewModel(
      * without the other.
      */
     private fun reconcileCapabilityHooks(port: Int, capSettings: CapabilitySettings, copilotFailClosed: Boolean) {
-        val anyEnabled = capSettings.modules.values.any { it.enabled }
-        if (anyEnabled) {
+        val enabledModules = capabilityModules.filter { capSettings.modules[it.id]?.enabled == true }
+        val requiredEvents = enabledModules.flatMap { it.requiredHookEvents }.toSet()
+
+        // UserPromptSubmit hook — only if an enabled module requires it.
+        if (HookEvent.USER_PROMPT_SUBMIT in requiredEvents) {
             hookRegistry.registerCapabilityHook(port)
+        } else {
+            hookRegistry.unregisterCapabilityHook(port)
+        }
+
+        // SessionStart hook — only if an enabled module requires it.
+        if (HookEvent.SESSION_START in requiredEvents) {
+            hookRegistry.registerSessionStartHook(port)
+        } else {
+            hookRegistry.unregisterSessionStartHook(port)
+        }
+
+        // Copilot: sessionStart covers both events, register if anything is enabled.
+        if (requiredEvents.isNotEmpty()) {
             copilotBridge.registerCapabilityHook(port, copilotFailClosed)
         } else {
             hookRegistry.unregisterCapabilityHook(port)

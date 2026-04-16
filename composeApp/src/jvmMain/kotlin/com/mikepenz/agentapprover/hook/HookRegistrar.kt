@@ -35,7 +35,8 @@ private data class HookEntry(
 @Serializable
 private data class HookDef(
     val type: String,
-    val url: String,
+    val url: String? = null,
+    val command: String? = null,
     val timeout: Int? = null,
 )
 
@@ -54,7 +55,8 @@ object HookRegistrar {
 
     private fun userPromptSubmitUrl(port: Int): String = "http://localhost:$port/capability/inject"
 
-    private fun hasHook(hooks: JsonObject, event: String, url: String): Boolean {
+
+    private fun hasHttpHook(hooks: JsonObject, event: String, url: String): Boolean {
         val entries = hooks[event]?.jsonArray ?: return false
         return entries.any { entry ->
             val obj = entry.jsonObject
@@ -67,15 +69,28 @@ object HookRegistrar {
         }
     }
 
+    private fun hasCommandHook(hooks: JsonObject, event: String, command: String): Boolean {
+        val entries = hooks[event]?.jsonArray ?: return false
+        return entries.any { entry ->
+            val obj = entry.jsonObject
+            val innerHooks = obj["hooks"]?.jsonArray ?: return@any false
+            innerHooks.any { h ->
+                val hObj = h.jsonObject
+                hObj["type"].toString().trim('"') == "command" &&
+                    hObj["command"].toString().trim('"') == command
+            }
+        }
+    }
+
     fun isRegistered(port: Int): Boolean {
         val file = settingsFile()
         if (!file.exists()) return false
         return try {
             val root = json.parseToJsonElement(file.readText()).jsonObject
             val hooks = root["hooks"]?.jsonObject ?: return false
-            hasHook(hooks, "PermissionRequest", hookUrl(port)) &&
-                hasHook(hooks, "PreToolUse", preToolUseUrl(port)) &&
-                hasHook(hooks, "PostToolUse", postToolUseUrl(port))
+            hasHttpHook(hooks, "PermissionRequest", hookUrl(port)) &&
+                hasHttpHook(hooks, "PreToolUse", preToolUseUrl(port)) &&
+                hasHttpHook(hooks, "PostToolUse", postToolUseUrl(port))
         } catch (e: Exception) {
             logger.w(e) { "Failed to read settings.json" }
             false
@@ -105,9 +120,9 @@ object HookRegistrar {
             val ptuUrl = preToolUseUrl(port)
             val postUrl = postToolUseUrl(port)
 
-            val hasPermHook = hasHook(existingHooks, "PermissionRequest", permUrl)
-            val hasPtuHook = hasHook(existingHooks, "PreToolUse", ptuUrl)
-            val hasPostHook = hasHook(existingHooks, "PostToolUse", postUrl)
+            val hasPermHook = hasHttpHook(existingHooks, "PermissionRequest", permUrl)
+            val hasPtuHook = hasHttpHook(existingHooks, "PreToolUse", ptuUrl)
+            val hasPostHook = hasHttpHook(existingHooks, "PostToolUse", postUrl)
 
             if (hasPermHook && hasPtuHook && hasPostHook) {
                 logger.i { "Hooks already registered for port $port" }
@@ -178,7 +193,7 @@ object HookRegistrar {
         return try {
             val root = json.parseToJsonElement(file.readText()).jsonObject
             val hooks = root["hooks"]?.jsonObject ?: return false
-            hasHook(hooks, "UserPromptSubmit", userPromptSubmitUrl(port))
+            hasHttpHook(hooks, "UserPromptSubmit", userPromptSubmitUrl(port))
         } catch (e: Exception) {
             logger.w(e) { "Failed to read settings.json" }
             false
@@ -210,7 +225,7 @@ object HookRegistrar {
 
             val existingHooks = root["hooks"]?.jsonObject ?: JsonObject(emptyMap())
             val upsUrl = userPromptSubmitUrl(port)
-            if (hasHook(existingHooks, "UserPromptSubmit", upsUrl)) {
+            if (hasHttpHook(existingHooks, "UserPromptSubmit", upsUrl)) {
                 logger.i { "Capability hook already registered for port $port" }
                 return@withFileLock
             }
@@ -288,6 +303,196 @@ object HookRegistrar {
         }
     }
 
+    // ---- SessionStart hook (command-type, not HTTP) ----
+    //
+    // Claude Code's `SessionStart` event only supports `type: "command"` hooks.
+    // We install a bridge script under `~/.agent-approver/` that curls our HTTP
+    // endpoint and prints the response to stdout — the same pattern used by the
+    // Copilot bridge scripts.
+
+    private const val SESSION_START_SCRIPT_NAME = "claude-session-start.sh"
+
+    private fun sessionStartScriptDir(): File {
+        val home = System.getProperty("user.home")
+        return File(home, ".agent-approver")
+    }
+
+    private fun sessionStartScriptFile(): File = File(sessionStartScriptDir(), SESSION_START_SCRIPT_NAME)
+
+    private fun sessionStartScriptPath(): String = sessionStartScriptFile().absolutePath
+
+    private fun buildSessionStartScript(port: Int): String = """
+        |#!/usr/bin/env bash
+        |# Agent Approver bridge script for Claude Code SessionStart hook.
+        |# POSTs to the Agent Approver capability endpoint and echoes the response
+        |# so Claude Code picks it up as additionalContext.
+        |
+        |set -uo pipefail
+        |
+        |URL="http://localhost:$port/capability/session-start"
+        |INPUT=${'$'}(cat)
+        |
+        |RESPONSE=${'$'}(printf '%s' "${'$'}INPUT" | curl -sS --max-time 10 \
+        |    -X POST \
+        |    -H "Content-Type: application/json" \
+        |    --data-binary @- \
+        |    "${'$'}URL" 2>/dev/null)
+        |CURL_EXIT=${'$'}?
+        |
+        |if [ "${'$'}CURL_EXIT" -ne 0 ] || [ -z "${'$'}RESPONSE" ]; then
+        |    # Server unreachable — fail open, no context injected
+        |    exit 0
+        |fi
+        |
+        |printf '%s' "${'$'}RESPONSE"
+    """.trimMargin()
+
+    /**
+     * Returns true iff the `SessionStart` command hook referencing our bridge
+     * script is present in `~/.claude/settings.json` AND the bridge script
+     * itself exists on disk.
+     */
+    fun isSessionStartHookRegistered(port: Int): Boolean {
+        if (!sessionStartScriptFile().exists()) return false
+        val file = settingsFile()
+        if (!file.exists()) return false
+        return try {
+            val root = json.parseToJsonElement(file.readText()).jsonObject
+            val hooks = root["hooks"]?.jsonObject ?: return false
+            hasCommandHook(hooks, "SessionStart", sessionStartScriptPath())
+        } catch (e: Exception) {
+            logger.w(e) { "Failed to read settings.json" }
+            false
+        }
+    }
+
+    /**
+     * Installs the bridge script and registers a `SessionStart` command hook
+     * in `~/.claude/settings.json`. Idempotent.
+     */
+    fun registerSessionStartHook(port: Int) {
+        // 1. Write the bridge script.
+        val scriptDir = sessionStartScriptDir()
+        scriptDir.mkdirs()
+        atomicWriteExecutable(sessionStartScriptFile(), buildSessionStartScript(port))
+        logger.i { "Installed SessionStart bridge script at ${sessionStartScriptFile().absolutePath}" }
+
+        // 2. Register the command hook in settings.json.
+        val file = settingsFile()
+        file.parentFile.mkdirs()
+
+        withFileLock(file) {
+            val root: JsonObject = if (file.exists()) {
+                try {
+                    json.parseToJsonElement(file.readText()).jsonObject
+                } catch (e: Exception) {
+                    backupCorruptFile(file)
+                    logger.e(e) { "settings.json is corrupt — backed up and aborting registration" }
+                    return@withFileLock
+                }
+            } else {
+                JsonObject(emptyMap())
+            }
+
+            val existingHooks = root["hooks"]?.jsonObject ?: JsonObject(emptyMap())
+            val scriptPath = sessionStartScriptPath()
+            if (hasCommandHook(existingHooks, "SessionStart", scriptPath)) {
+                logger.i { "SessionStart hook already registered for port $port" }
+                return@withFileLock
+            }
+
+            val ssList = existingHooks["SessionStart"]?.jsonArray?.toMutableList() ?: mutableListOf()
+            ssList.add(
+                json.encodeToJsonElement(
+                    HookEntry(matcher = "", hooks = listOf(HookDef(type = "command", command = scriptPath)))
+                )
+            )
+
+            val updatedHooks = buildJsonObject {
+                existingHooks.forEach { (key, value) ->
+                    if (key != "SessionStart") put(key, value)
+                }
+                put("SessionStart", Json.encodeToJsonElement(ssList))
+            }
+
+            val updatedRoot = buildJsonObject {
+                root.forEach { (key, value) ->
+                    if (key != "hooks") put(key, value)
+                }
+                put("hooks", updatedHooks)
+            }
+
+            atomicWrite(file, json.encodeToString(JsonElement.serializer(), updatedRoot))
+            logger.i { "Registered SessionStart hook for port $port" }
+        }
+    }
+
+    /**
+     * Removes our SessionStart command hook entry and bridge script.
+     * The settings file is updated first — the script is only deleted once
+     * the hook entry is gone, avoiding a dangling reference that would make
+     * Claude Code log an error on every session start.
+     */
+    fun unregisterSessionStartHook(port: Int) {
+        val script = sessionStartScriptFile()
+        val file = settingsFile()
+        // Track whether the settings entry was successfully removed (or was
+        // never present). The script is only deleted when this is true to
+        // avoid leaving a dangling hook that errors on every session start.
+        var hookEntryCleared = !file.exists()
+
+        // 1. Remove the hook entry from settings.json.
+        if (file.exists()) {
+            withFileLock(file) {
+                val root: JsonObject = try {
+                    json.parseToJsonElement(file.readText()).jsonObject
+                } catch (e: Exception) {
+                    logger.w(e) { "Failed to parse settings.json — keeping bridge script to avoid dangling hook" }
+                    return@withFileLock
+                }
+
+                val existingHooks = root["hooks"]?.jsonObject
+                if (existingHooks == null) {
+                    hookEntryCleared = true
+                    return@withFileLock
+                }
+                val filtered = stripMatchingCommandHookDefs(existingHooks["SessionStart"]?.jsonArray, sessionStartScriptPath())
+                if (filtered == null) {
+                    hookEntryCleared = true
+                    return@withFileLock
+                }
+
+                val updatedHooks = buildJsonObject {
+                    existingHooks.forEach { (key, value) ->
+                        if (key != "SessionStart") put(key, value)
+                    }
+                    if (filtered.isNotEmpty()) {
+                        put("SessionStart", Json.encodeToJsonElement(filtered))
+                    }
+                }
+
+                val updatedRoot = buildJsonObject {
+                    root.forEach { (key, value) ->
+                        if (key != "hooks") put(key, value)
+                    }
+                    if (updatedHooks.isNotEmpty()) {
+                        put("hooks", updatedHooks)
+                    }
+                }
+
+                atomicWrite(file, json.encodeToString(JsonElement.serializer(), updatedRoot))
+                hookEntryCleared = true
+                logger.i { "Unregistered SessionStart hook for port $port" }
+            }
+        }
+
+        // 2. Delete the bridge script only after the hook entry is gone.
+        if (hookEntryCleared && script.exists()) {
+            script.delete()
+            logger.i { "Removed SessionStart bridge script ${script.absolutePath}" }
+        }
+    }
+
     fun unregister(port: Int) {
         val file = settingsFile()
         if (!file.exists()) return
@@ -302,17 +507,22 @@ object HookRegistrar {
 
             val existingHooks = root["hooks"]?.jsonObject ?: return@withFileLock
 
-            fun filterHooks(event: String, url: String): List<JsonElement> =
+            fun filterHttpHooks(event: String, url: String): List<JsonElement> =
                 stripMatchingHookDefs(existingHooks[event]?.jsonArray, url) ?: emptyList()
 
-            val filteredPerm = filterHooks("PermissionRequest", hookUrl(port))
-            val filteredPtu = filterHooks("PreToolUse", preToolUseUrl(port))
-            val filteredPost = filterHooks("PostToolUse", postToolUseUrl(port))
-            val filteredUps = filterHooks("UserPromptSubmit", userPromptSubmitUrl(port))
+            val filteredPerm = filterHttpHooks("PermissionRequest", hookUrl(port))
+            val filteredPtu = filterHttpHooks("PreToolUse", preToolUseUrl(port))
+            val filteredPost = filterHttpHooks("PostToolUse", postToolUseUrl(port))
+            val filteredUps = filterHttpHooks("UserPromptSubmit", userPromptSubmitUrl(port))
+            val filteredSs = stripMatchingCommandHookDefs(existingHooks["SessionStart"]?.jsonArray, sessionStartScriptPath()) ?: emptyList()
+
+            // Also clean up the bridge script.
+            val script = sessionStartScriptFile()
+            if (script.exists()) script.delete()
 
             val updatedHooks = buildJsonObject {
                 existingHooks.forEach { (key, value) ->
-                    if (key != "PermissionRequest" && key != "PreToolUse" && key != "PostToolUse" && key != "UserPromptSubmit") put(key, value)
+                    if (key != "PermissionRequest" && key != "PreToolUse" && key != "PostToolUse" && key != "UserPromptSubmit" && key != "SessionStart") put(key, value)
                 }
                 if (filteredPerm.isNotEmpty()) {
                     put("PermissionRequest", Json.encodeToJsonElement(filteredPerm))
@@ -325,6 +535,9 @@ object HookRegistrar {
                 }
                 if (filteredUps.isNotEmpty()) {
                     put("UserPromptSubmit", Json.encodeToJsonElement(filteredUps))
+                }
+                if (filteredSs.isNotEmpty()) {
+                    put("SessionStart", Json.encodeToJsonElement(filteredSs))
                 }
             }
 
@@ -398,6 +611,19 @@ object HookRegistrar {
     }
 
     /**
+     * Writes [content] to [target] atomically and makes it executable.
+     * Used for bridge scripts.
+     */
+    private fun atomicWriteExecutable(target: File, content: String) {
+        val tmp = File(target.parentFile, "${target.name}.tmp")
+        tmp.writeText(content)
+        if (!tmp.setExecutable(true)) {
+            logger.w { "Failed to set executable bit on ${tmp.absolutePath}" }
+        }
+        Files.move(tmp.toPath(), target.toPath(), StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE)
+    }
+
+    /**
      * For each entry in [entries], drops any inner hook def whose `type` is
      * `http` and `url` equals [url], preserving unrelated hook defs inside
      * the same entry. Entries that end up empty after the filter are
@@ -413,6 +639,33 @@ object HookRegistrar {
                 val hObj = h.jsonObject
                 hObj["type"].toString().trim('"') == "http" &&
                     hObj["url"].toString().trim('"') == url
+            }
+            when {
+                remainingHooks.isEmpty() -> null
+                remainingHooks.size == innerHooks.size -> entry
+                else -> buildJsonObject {
+                    entryObject.forEach { (key, value) ->
+                        if (key != "hooks") put(key, value)
+                    }
+                    put("hooks", Json.encodeToJsonElement(remainingHooks))
+                }
+            }
+        }
+    }
+
+    /**
+     * Like [stripMatchingHookDefs] but matches `type: "command"` hooks by
+     * their `command` field instead of `type: "http"` + `url`.
+     */
+    private fun stripMatchingCommandHookDefs(entries: JsonArray?, command: String): List<JsonElement>? {
+        if (entries == null) return null
+        return entries.mapNotNull { entry ->
+            val entryObject = entry.jsonObject
+            val innerHooks = entryObject["hooks"]?.jsonArray ?: return@mapNotNull entry
+            val remainingHooks = innerHooks.filterNot { h ->
+                val hObj = h.jsonObject
+                hObj["type"].toString().trim('"') == "command" &&
+                    hObj["command"].toString().trim('"') == command
             }
             when {
                 remainingHooks.isEmpty() -> null

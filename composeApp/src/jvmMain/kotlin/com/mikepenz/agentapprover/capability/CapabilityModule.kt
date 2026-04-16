@@ -11,6 +11,9 @@ import com.mikepenz.agentapprover.model.CapabilityModuleSettings
 enum class HookEvent {
     /** Fires on every user prompt. Lets the capability inject per-turn context. */
     USER_PROMPT_SUBMIT,
+
+    /** Fires once at session start. Injects session-level context / instructions. */
+    SESSION_START,
 }
 
 /** Agent targets a capability can be installed into. */
