@@ -89,21 +89,28 @@ jobs:
           # [1/7] Sign native libraries inside JARs
           echo "[1/7] Signing native libraries inside JARs..."
           find "$APP_DIR/Contents/app" -name "*.jar" | while read -r jar; do
-            JAR_LIBS=$(jar tf "$jar" | grep -E '\.(dylib|jnilib)$' || true)
+            JAR_LIBS=$(jar tf "$jar" | grep -E '\.(dylib|jnilib|so)$' || true)
             if [ -n "$JAR_LIBS" ]; then
               echo "  Processing: $(basename "$jar")"
               JAR_WORK=$(mktemp -d)
               pushd "$JAR_WORK" > /dev/null
+              SIGNED_LIBS=()
               while IFS= read -r lib; do
                 [ -n "$lib" ] || continue
                 jar xf "$jar" "$lib"
+                if ! file "$lib" | grep -q "Mach-O"; then
+                  echo "    Skipping (not Mach-O): $lib"
+                  continue
+                fi
                 echo "    Signing: $lib"
                 codesign --force --options runtime --timestamp --sign "$IDENTITY" "$lib"
+                SIGNED_LIBS+=("$lib")
               done <<< "$JAR_LIBS"
-              while IFS= read -r lib; do
-                [ -n "$lib" ] || continue
-                jar uf "$jar" "$lib"
-              done <<< "$JAR_LIBS"
+              if [ ${#SIGNED_LIBS[@]} -gt 0 ]; then
+                for lib in "${SIGNED_LIBS[@]}"; do
+                  jar uf "$jar" "$lib"
+                done
+              fi
               popd > /dev/null
               rm -rf "$JAR_WORK"
             fi
