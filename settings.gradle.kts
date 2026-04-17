@@ -1,4 +1,4 @@
-rootProject.name = "AgentApprover"
+rootProject.name = "AgentBuddy"
 enableFeaturePreview("TYPESAFE_PROJECT_ACCESSORS")
 
 pluginManagement {

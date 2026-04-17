@@ -1,21 +1,21 @@
 <p align="center">
-  <img src="icons/app.png" alt="Agent Approver" width="128">
+  <img src="icons/app.png" alt="Agent Buddy" width="128">
 </p>
 
-<h1 align="center">Agent Approver</h1>
+<h1 align="center">Agent Buddy</h1>
 
 <p align="center">
   A desktop application that gives you full control over what AI coding agents can do on your machine.
 </p>
 
 <p align="center">
-  <a href="https://github.com/mikepenz/agent-approver/actions/workflows/ci.yml"><img src="https://github.com/mikepenz/agent-approver/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
-  <a href="https://github.com/mikepenz/agent-approver/blob/main/LICENSE"><img src="https://img.shields.io/badge/License-Apache%202.0-blue.svg" alt="License"></a>
+  <a href="https://github.com/mikepenz/agent-buddy/actions/workflows/ci.yml"><img src="https://github.com/mikepenz/agent-buddy/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="https://github.com/mikepenz/agent-buddy/blob/main/LICENSE"><img src="https://img.shields.io/badge/License-Apache%202.0-blue.svg" alt="License"></a>
 </p>
 
 ---
 
-Agent Approver is a **human-in-the-loop gateway** for AI coding agents like [Claude Code](https://docs.anthropic.com/en/docs/claude-code) and [GitHub Copilot](https://github.com/features/copilot). It intercepts tool requests (file edits, shell commands, web fetches, etc.) via hook events, displays them in a review UI, and lets you approve or deny each action before it executes.
+Agent Buddy is a **human-in-the-loop gateway** for AI coding agents like [Claude Code](https://docs.anthropic.com/en/docs/claude-code) and [GitHub Copilot](https://github.com/features/copilot). It intercepts tool requests (file edits, shell commands, web fetches, etc.) via hook events, displays them in a review UI, and lets you approve or deny each action before it executes.
 
 <p align="center">
   <img src="screenshots/approval_risk.png" alt="Approval UI with risk analysis" width="280">
@@ -40,11 +40,11 @@ Agent Approver is a **human-in-the-loop gateway** for AI coding agents like [Cla
 
 ### 1. Install
 
-Download the latest macOS DMG from [Releases](https://github.com/mikepenz/agent-approver/releases), or build from source for any platform:
+Download the latest macOS DMG from [Releases](https://github.com/mikepenz/agent-buddy/releases), or build from source for any platform:
 
 ```bash
-git clone https://github.com/mikepenz/agent-approver.git
-cd agent-approver
+git clone https://github.com/mikepenz/agent-buddy.git
+cd agent-buddy
 ./gradlew :composeApp:run    # requires JDK 17+
 ```
 
@@ -52,7 +52,7 @@ cd agent-approver
 
 ### 2. Connect Your Agent
 
-Agent Approver integrates via [hooks](https://docs.anthropic.com/en/docs/claude-code/hooks) — lightweight HTTP callbacks that AI agents fire before executing tools. The app registers two types of hooks:
+Agent Buddy integrates via [hooks](https://docs.anthropic.com/en/docs/claude-code/hooks) — lightweight HTTP callbacks that AI agents fire before executing tools. The app registers two types of hooks:
 
 | Hook | Purpose | Claude Code | GitHub Copilot |
 |------|---------|:-----------:|:--------------:|
@@ -65,13 +65,13 @@ Both Claude Code and GitHub Copilot now support the full interactive approval fl
 
 **Claude Code** — In Settings > Integrations, click **Register Hooks** to add both hook entries to `~/.claude/settings.json`.
 
-**GitHub Copilot** — In Settings > Integrations, click **Register** under GitHub Copilot. This installs the bridge scripts under `~/.agent-approver/` and writes both hook entries (`permissionRequest` + `preToolUse`) into a single user-scoped `~/.copilot/hooks/agent-approver.json` — no per-project setup needed.
+**GitHub Copilot** — In Settings > Integrations, click **Register** under GitHub Copilot. This installs the bridge scripts under `~/.agent-buddy/` and writes both hook entries (`permissionRequest` + `preToolUse`) into a single user-scoped `~/.copilot/hooks/agent-buddy.json` — no per-project setup needed.
 
 ### 3. Review & Approve
 
 When Claude Code requests permission to use a tool:
 
-1. The request hits Agent Approver's local HTTP server
+1. The request hits Agent Buddy's local HTTP server
 2. The **Protection Engine** evaluates it against built-in safety rules — dangerous requests are blocked or modified automatically
 3. If the request passes, it appears in the **Approvals** tab for your review
 4. You approve or deny — the response is sent back to the agent
@@ -92,7 +92,7 @@ Each module can be configured to: **Auto Block**, **Ask** (prompt user), **Auto-
 
 ## Risk Analysis
 
-Agent Approver can optionally score each request's risk level (1–5) using AI, allowing safe operations (risk 1) to be auto-approved and critical ones (risk 5) to be auto-denied.
+Agent Buddy can optionally score each request's risk level (1–5) using AI, allowing safe operations (risk 1) to be auto-approved and critical ones (risk 5) to be auto-denied.
 
 Two backends are supported:
 - **Claude** — Spawns a `claude` CLI process to analyze the request.

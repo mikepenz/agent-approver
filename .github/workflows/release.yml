@@ -78,7 +78,7 @@ jobs:
           MACOS_SIGNING_IDENTITY: ${{ secrets.MACOS_SIGNING_IDENTITY }}
         run: |
           set -euo pipefail
-          APP_DIR="$(pwd)/composeApp/build/compose/binaries/main/app/AgentApprover.app"
+          APP_DIR="$(pwd)/composeApp/build/compose/binaries/main/app/AgentBuddy.app"
           IDENTITY="$MACOS_SIGNING_IDENTITY"
           ENTITLEMENTS=$(find "$(pwd)/composeApp/build/compose" -type f -name "default-entitlements.plist" -print -quit)
           if [ -z "$ENTITLEMENTS" ]; then
@@ -173,9 +173,9 @@ jobs:
           APP_DIR="$(pwd)/composeApp/build/compose/binaries/main/app"
           DMG_DIR="$(pwd)/composeApp/build/compose/binaries/main/dmg"
           mkdir -p "$DMG_DIR"
-          DMG_FILE="$DMG_DIR/AgentApprover-${{ matrix.arch }}.dmg"
+          DMG_FILE="$DMG_DIR/AgentBuddy-${{ matrix.arch }}.dmg"
 
-          hdiutil create -volname "AgentApprover" -srcfolder "$APP_DIR" \
+          hdiutil create -volname "AgentBuddy" -srcfolder "$APP_DIR" \
             -ov -format UDZO "$DMG_FILE"
           codesign --force --timestamp --sign "$IDENTITY" "$DMG_FILE"
           echo "Created: $DMG_FILE"
@@ -187,7 +187,7 @@ jobs:
           NOTARIZATION_TEAM_ID: ${{ secrets.NOTARIZATION_TEAM_ID }}
         run: |
           set -euo pipefail
-          DMG_FILE="$(pwd)/composeApp/build/compose/binaries/main/dmg/AgentApprover-${{ matrix.arch }}.dmg"
+          DMG_FILE="$(pwd)/composeApp/build/compose/binaries/main/dmg/AgentBuddy-${{ matrix.arch }}.dmg"
           if [ ! -f "$DMG_FILE" ]; then
             echo "ERROR: DMG not found at $DMG_FILE"
             exit 1
@@ -227,7 +227,7 @@ jobs:
           VERSION="${GITHUB_REF_NAME#v}"
           mkdir -p artifacts
           cp composeApp/build/compose/binaries/main/dmg/*.dmg \
-            "artifacts/AgentApprover-${VERSION}-macos-${{ matrix.arch }}.dmg"
+            "artifacts/AgentBuddy-${VERSION}-macos-${{ matrix.arch }}.dmg"
 
       - name: Upload artifact
         uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
@@ -304,7 +304,7 @@ jobs:
           VERSION="${GITHUB_REF_NAME#v}"
           mkdir -p artifacts
           cp composeApp/build/compose/binaries/main/msi/*.msi \
-            "artifacts/AgentApprover-${VERSION}-windows-x64.msi"
+            "artifacts/AgentBuddy-${VERSION}-windows-x64.msi"
 
       - name: Upload artifact
         uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
@@ -355,9 +355,9 @@ jobs:
           VERSION="${GITHUB_REF_NAME#v}"
           mkdir -p artifacts
           cp composeApp/build/compose/binaries/main/deb/*.deb \
-            "artifacts/AgentApprover-${VERSION}-linux-amd64.deb"
+            "artifacts/AgentBuddy-${VERSION}-linux-amd64.deb"
           cp composeApp/build/libs/composeApp-jvm.jar \
-            "artifacts/AgentApprover-${VERSION}.jar"
+            "artifacts/AgentBuddy-${VERSION}.jar"
 
       - name: Upload artifacts
         uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0

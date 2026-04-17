@@ -47,7 +47,7 @@ require(appPackageVersion.matches(Regex("\\d+\\.\\d+\\.\\d+"))) {
 }
 
 val generateVersion = project.tasks.register<VersionTask>("generateVersion") {
-    packageString.set("com.mikepenz.agentapprover")
+    packageString.set("com.mikepenz.agentbuddy")
     version.set(appVersion)
     store(resources)
     into(layout.buildDirectory.dir("generated-version/kotlin/"))
@@ -122,7 +122,7 @@ aboutLibraries {
 }
 
 nucleus.application {
-    mainClass = "com.mikepenz.agentapprover.MainKt"
+    mainClass = "com.mikepenz.agentbuddy.MainKt"
 
     jvmArgs += listOf(
         "--add-opens", "java.desktop/java.awt=ALL-UNNAMED",
@@ -135,11 +135,11 @@ nucleus.application {
 
     nativeDistributions {
         targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb)
-        packageName = "AgentApprover"
+        packageName = "AgentBuddy"
         packageVersion = appPackageVersion
         description = "Centralized approval UI for AI agent tool requests"
         vendor = "mikepenz"
-        homepage = "https://github.com/mikepenz/agent-approver"
+        homepage = "https://github.com/mikepenz/agent-buddy"
 
         cleanupNativeLibs = true
 
@@ -147,9 +147,9 @@ nucleus.application {
 
         macOS {
             iconFile.set(project.file("../icons/app.icns"))
-            layeredIconDir.set(project.file("../icons/AgentApprover.icon"))
-            bundleID = "com.mikepenz.agentapprover"
-            dockName = "Agent Approver"
+            layeredIconDir.set(project.file("../icons/AgentBuddy.icon"))
+            bundleID = "com.mikepenz.agentbuddy"
+            dockName = "Agent Buddy"
             appCategory = "public.app-category.developer-tools"
             infoPlist {
                 extraKeysRawXml = """

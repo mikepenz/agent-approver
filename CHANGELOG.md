@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unreleased]
+
+### Changed
+- Renamed project from **Agent Approver** to **Agent Buddy** (repo `mikepenz/agent-buddy`).
+  Package, bundle ID, and data-directory names updated accordingly. Existing installs
+  auto-migrate on first launch: data dir (`AgentApprover/` → `AgentBuddy/`), DB file,
+  hook bridge dir (`~/.agent-approver/` → `~/.agent-buddy/`), Claude `SessionStart`
+  command paths, Copilot hook file (`agent-approver.json` → `agent-buddy.json`), and
+  keyring service entry are all moved in place.
+
 ## [1.7.0] - 2026-04-04
 
 ### Added
