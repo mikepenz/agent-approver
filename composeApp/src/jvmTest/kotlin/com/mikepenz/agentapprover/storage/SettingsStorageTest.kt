@@ -24,8 +24,8 @@ class SettingsStorageTest {
             defaultTimeoutSeconds = 60,
             startOnBoot = true,
             riskAnalysisEnabled = false,
-            autoApproveRisk1 = true,
-            autoDenyRisk5 = true,
+            autoApproveLevel = 2,
+            autoDenyLevel = 4,
         )
         storage.save(custom)
         val loaded = storage.load()
@@ -88,6 +88,51 @@ class SettingsStorageTest {
         val storage = SettingsStorage(dir)
         storage.save(AppSettings(verboseLogging = true))
         assertEquals(true, storage.load().verboseLogging)
+    }
+
+    @Test
+    fun `legacy autoApproveRisk1 true migrates to autoApproveLevel 1`() {
+        val dir = java.io.File(
+            System.getProperty("java.io.tmpdir"),
+            "test-settings-${java.util.UUID.randomUUID()}"
+        ).absolutePath
+        java.io.File(dir).mkdirs()
+        java.io.File(dir, "settings.json").writeText(
+            """{"autoApproveRisk1":true,"autoDenyRisk5":true}"""
+        )
+        val loaded = SettingsStorage(dir).load()
+        assertEquals(1, loaded.autoApproveLevel)
+        assertEquals(5, loaded.autoDenyLevel)
+    }
+
+    @Test
+    fun `legacy auto risk booleans false migrate to level 0`() {
+        val dir = java.io.File(
+            System.getProperty("java.io.tmpdir"),
+            "test-settings-${java.util.UUID.randomUUID()}"
+        ).absolutePath
+        java.io.File(dir).mkdirs()
+        java.io.File(dir, "settings.json").writeText(
+            """{"autoApproveRisk1":false,"autoDenyRisk5":false}"""
+        )
+        val loaded = SettingsStorage(dir).load()
+        assertEquals(0, loaded.autoApproveLevel)
+        assertEquals(0, loaded.autoDenyLevel)
+    }
+
+    @Test
+    fun `new autoApproveLevel takes precedence over legacy boolean`() {
+        val dir = java.io.File(
+            System.getProperty("java.io.tmpdir"),
+            "test-settings-${java.util.UUID.randomUUID()}"
+        ).absolutePath
+        java.io.File(dir).mkdirs()
+        java.io.File(dir, "settings.json").writeText(
+            """{"autoApproveRisk1":true,"autoApproveLevel":3,"autoDenyRisk5":true,"autoDenyLevel":4}"""
+        )
+        val loaded = SettingsStorage(dir).load()
+        assertEquals(3, loaded.autoApproveLevel)
+        assertEquals(4, loaded.autoDenyLevel)
     }
 
     @Test

@@ -434,17 +434,21 @@ fun RiskAnalysisSettingsContent(
             )
         }
 
-        SettingsSwitch(
-            label = "Auto-approve risk 1",
-            checked = settings.autoApproveRisk1,
-            onCheckedChange = { onSettingsChange(settings.copy(autoApproveRisk1 = it)) },
+        SettingsDiscreteSlider(
+            label = "Auto-approve up to risk",
+            value = settings.autoApproveLevel,
+            stops = listOf(0, 1, 2, 3),
+            stopLabels = listOf("Off", "1", "2", "3"),
+            onValueChange = { onSettingsChange(settings.copy(autoApproveLevel = it)) },
             enabled = settings.riskAnalysisEnabled,
         )
 
-        SettingsSwitch(
-            label = "Auto-deny risk 5",
-            checked = settings.autoDenyRisk5,
-            onCheckedChange = { onSettingsChange(settings.copy(autoDenyRisk5 = it)) },
+        SettingsDiscreteSlider(
+            label = "Auto-deny at or above risk",
+            value = settings.autoDenyLevel,
+            stops = listOf(0, 5, 4),
+            stopLabels = listOf("Off", "5", "4"),
+            onValueChange = { onSettingsChange(settings.copy(autoDenyLevel = it)) },
             enabled = settings.riskAnalysisEnabled,
         )
     }

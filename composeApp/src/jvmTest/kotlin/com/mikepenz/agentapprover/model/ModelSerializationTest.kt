@@ -148,6 +148,17 @@ class ModelSerializationTest {
         val decoded = lenientJson.decodeFromString(AppSettings.serializer(), oldJson)
         assertEquals(RiskAnalysisBackend.CLAUDE, decoded.riskAnalysisBackend)
         assertEquals("gpt-4.1-mini", decoded.riskAnalysisCopilotModel)
+        assertEquals(0, decoded.autoApproveLevel)
+        assertEquals(0, decoded.autoDenyLevel)
+    }
+
+    @Test
+    fun appSettingsAutoLevelsRoundTrip() {
+        val settings = AppSettings(autoApproveLevel = 3, autoDenyLevel = 4)
+        val encoded = json.encodeToString(AppSettings.serializer(), settings)
+        val decoded = json.decodeFromString(AppSettings.serializer(), encoded)
+        assertEquals(3, decoded.autoApproveLevel)
+        assertEquals(4, decoded.autoDenyLevel)
     }
 
     @Test
