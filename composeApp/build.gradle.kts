@@ -96,6 +96,7 @@ kotlin {
             implementation(libs.markdown.renderer)
             implementation(libs.markdown.renderer.code)
             implementation(libs.jna)
+            implementation(libs.java.keyring)
             implementation(libs.nucleus.darkmode.detector)
             implementation(libs.nucleus.decorated.window.core)
             implementation(libs.nucleus.decorated.window.jni)

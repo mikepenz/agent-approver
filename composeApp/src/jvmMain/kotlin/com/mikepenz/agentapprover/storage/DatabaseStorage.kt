@@ -20,6 +20,15 @@ import java.sql.ResultSet
 open class DatabaseStorage(
     private val dataDir: String,
     private val maxEntries: Int = 2500,
+    /**
+     * Optional column-level cipher applied to sensitive columns
+     * (`raw_request_json`, `raw_response_json`, `tool_input_json`, `feedback`,
+     * `protection_detail`, `risk_message`). Pass `null` to disable encryption
+     * — this is the test default so existing tests continue to pass without
+     * key plumbing. Production wiring in `AppProviders` always supplies a
+     * real cipher backed by [DbKeyManager].
+     */
+    private val cipher: ColumnCipher? = null,
 ) {
     private val logger = Logger.withTag("DatabaseStorage")
     private val connection: Connection
@@ -39,6 +48,14 @@ open class DatabaseStorage(
     }
 
     private val toolInputSerializer = MapSerializer(String.serializer(), JsonElement.serializer())
+
+    // ---- Column encryption helpers ---------------------------------------
+    // Each helper is a no-op when [cipher] is null, so test code that omits
+    // the cipher continues to read/write plaintext unchanged.
+    private fun enc(value: String): String = cipher?.encrypt(value) ?: value
+    private fun encNullable(value: String?): String? = cipher?.encryptNullable(value) ?: value
+    private fun dec(value: String): String = cipher?.decrypt(value) ?: value
+    private fun decNullable(value: String?): String? = cipher?.decryptNullable(value) ?: value
 
     init {
         val dir = File(dataDir)
@@ -124,10 +141,22 @@ open class DatabaseStorage(
         connection.prepareStatement(
             "UPDATE history SET tool_input_json = ? WHERE id = ?"
         ).use { ps ->
-            for ((id, rawJson) in rows) {
+            for ((id, storedRawJson) in rows) {
+                // The raw_request_json column may be encrypted (if this row was
+                // written after column encryption was enabled) or plaintext (if
+                // this row predates encryption). `dec()` is a transparent
+                // pass-through for unprefixed legacy values.
+                val rawJson = try {
+                    dec(storedRawJson)
+                } catch (e: Exception) {
+                    logger.w { "Skipping backfill for row $id: cannot decrypt raw_request_json (${e.message})" }
+                    continue
+                }
                 val extracted = extractToolInputFromRawJson(rawJson) ?: continue
                 if (extracted == "{}") continue
-                ps.setString(1, extracted)
+                // Re-encrypt before persisting so the new tool_input_json column
+                // matches the at-rest encryption invariant.
+                ps.setString(1, enc(extracted))
                 ps.setString(2, id)
                 ps.addBatch()
                 backfilled++
@@ -190,11 +219,11 @@ open class DatabaseStorage(
             ps.setString(6, result.request.hookInput.sessionId)
             ps.setString(7, result.request.hookInput.cwd)
             ps.setString(8, result.decision.name)
-            ps.setString(9, result.feedback)
+            ps.setString(9, encNullable(result.feedback))
             result.riskAnalysis?.let {
                 ps.setInt(10, it.risk)
                 ps.setString(11, it.label)
-                ps.setString(12, it.message)
+                ps.setString(12, encNullable(it.message))
                 ps.setString(13, it.source)
             } ?: run {
                 ps.setNull(10, java.sql.Types.INTEGER)
@@ -204,12 +233,12 @@ open class DatabaseStorage(
             }
             ps.setString(14, result.protectionModule)
             ps.setString(15, result.protectionRule)
-            ps.setString(16, result.protectionDetail)
-            ps.setString(17, result.request.rawRequestJson)
-            ps.setString(18, result.rawResponseJson)
+            ps.setString(16, encNullable(result.protectionDetail))
+            ps.setString(17, enc(result.request.rawRequestJson))
+            ps.setString(18, encNullable(result.rawResponseJson))
             ps.setString(19, result.request.timestamp.toString())
             ps.setString(20, result.decidedAt.toString())
-            ps.setString(21, json.encodeToString(toolInputSerializer, result.request.hookInput.toolInput))
+            ps.setString(21, enc(json.encodeToString(toolInputSerializer, result.request.hookInput.toolInput)))
             ps.executeUpdate()
         }
 
@@ -237,7 +266,7 @@ open class DatabaseStorage(
         connection.createStatement().use { stmt ->
             stmt.executeQuery("SELECT * FROM history ORDER BY decided_at DESC").use { rs ->
                 while (rs.next()) {
-                    results.add(rowToApprovalResult(rs))
+                    tryRowToApprovalResult(rs)?.let(results::add)
                 }
             }
         }
@@ -250,16 +279,32 @@ open class DatabaseStorage(
             ps.setString(1, type)
             ps.executeQuery().use { rs ->
                 while (rs.next()) {
-                    results.add(rowToApprovalResult(rs))
+                    tryRowToApprovalResult(rs)?.let(results::add)
                 }
             }
         }
         results
     }
 
+    /**
+     * Wraps [rowToApprovalResult] so a single corrupt / tampered / undecryptable
+     * row cannot abort an entire history load. The row's id (plaintext) is
+     * captured first so the warning can identify the bad entry without
+     * exposing ciphertext.
+     */
+    private fun tryRowToApprovalResult(rs: ResultSet): ApprovalResult? {
+        val rowId = try { rs.getString("id") } catch (_: Exception) { "<unknown>" }
+        return try {
+            rowToApprovalResult(rs)
+        } catch (e: Exception) {
+            logger.w { "Skipping history row $rowId: failed to deserialize (${e.javaClass.simpleName}: ${e.message})" }
+            null
+        }
+    }
+
     fun updateRawResponse(requestId: String, rawResponseJson: String): Unit = synchronized(connectionLock) {
         connection.prepareStatement("UPDATE history SET raw_response_json = ? WHERE id = ?").use { ps ->
-            ps.setString(1, rawResponseJson)
+            ps.setString(1, enc(rawResponseJson))
             ps.setString(2, requestId)
             ps.executeUpdate()
         }
@@ -436,11 +481,11 @@ open class DatabaseStorage(
         val riskAnalysis = if (rs.wasNull()) null else RiskAnalysis(
             risk = riskLevel,
             label = rs.getString("risk_label") ?: "",
-            message = rs.getString("risk_message") ?: "",
+            message = decNullable(rs.getString("risk_message")) ?: "",
             source = rs.getString("risk_source") ?: "",
         )
 
-        val toolInput: Map<String, JsonElement> = rs.getString("tool_input_json")
+        val toolInput: Map<String, JsonElement> = decNullable(rs.getString("tool_input_json"))
             ?.takeIf { it.isNotBlank() }
             ?.let {
                 try {
@@ -465,19 +510,19 @@ open class DatabaseStorage(
             toolType = ToolType.valueOf(rs.getString("tool_type")),
             hookInput = hookInput,
             timestamp = Instant.parse(rs.getString("requested_at")),
-            rawRequestJson = rs.getString("raw_request_json"),
+            rawRequestJson = dec(rs.getString("raw_request_json")),
         )
 
         return ApprovalResult(
             request = request,
             decision = Decision.valueOf(rs.getString("decision")),
-            feedback = rs.getString("feedback"),
+            feedback = decNullable(rs.getString("feedback")),
             riskAnalysis = riskAnalysis,
-            rawResponseJson = rs.getString("raw_response_json"),
+            rawResponseJson = decNullable(rs.getString("raw_response_json")),
             decidedAt = Instant.parse(rs.getString("decided_at")),
             protectionModule = rs.getString("protection_module"),
             protectionRule = rs.getString("protection_rule"),
-            protectionDetail = rs.getString("protection_detail"),
+            protectionDetail = decNullable(rs.getString("protection_detail")),
         )
     }
 }

@@ -23,7 +23,9 @@ import com.mikepenz.agentapprover.protection.modules.ToolBypassModule
 import com.mikepenz.agentapprover.protection.modules.UncommittedFilesModule
 import com.mikepenz.agentapprover.risk.ClaudeCliRiskAnalyzer
 import com.mikepenz.agentapprover.state.AppStateManager
+import com.mikepenz.agentapprover.storage.ColumnCipher
 import com.mikepenz.agentapprover.storage.DatabaseStorage
+import com.mikepenz.agentapprover.storage.DbKeyManager
 import com.mikepenz.agentapprover.storage.SettingsStorage
 import dev.zacsweers.metro.ContributesTo
 import dev.zacsweers.metro.Provides
@@ -52,7 +54,8 @@ interface AppProviders {
         settingsStorage: SettingsStorage,
     ): DatabaseStorage {
         val maxEntries = settingsStorage.load().maxHistoryEntries
-        return DatabaseStorage(env.dataDir, maxEntries = maxEntries)
+        val cipher = ColumnCipher(DbKeyManager.loadOrCreate(env.dataDir))
+        return DatabaseStorage(env.dataDir, maxEntries = maxEntries, cipher = cipher)
     }
 
     @Provides

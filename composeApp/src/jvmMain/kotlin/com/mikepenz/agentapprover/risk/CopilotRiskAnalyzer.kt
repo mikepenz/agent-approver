@@ -10,6 +10,7 @@ import com.github.copilot.sdk.json.PermissionHandler
 import com.github.copilot.sdk.json.SessionConfig
 import com.github.copilot.sdk.json.SystemMessageConfig
 import java.io.File
+import com.mikepenz.agentapprover.logging.Logging
 import com.mikepenz.agentapprover.model.HookInput
 import com.mikepenz.agentapprover.model.RiskAnalysis
 import kotlin.coroutines.cancellation.CancellationException
@@ -120,7 +121,7 @@ class CopilotRiskAnalyzer(
                 val event = session.sendAndWait(messageOptions, SEND_TIMEOUT_MS).await()
                 val rawContent = event.data?.content
                     ?: throw RuntimeException("No content in Copilot response")
-                log.d { "Raw response: ${rawContent.take(200)}" }
+                if (Logging.verbose) log.d { "Raw response: ${rawContent.take(200)}" }
                 return Result.success(parseResult(rawContent))
             } finally {
                 session.close()
@@ -177,7 +178,10 @@ class CopilotRiskAnalyzer(
 
         val response = json.decodeFromString<RiskResponse>(cleaned)
         val level = response.level.coerceIn(1, 5)
-        log.i { "Risk: level=$level (${response.label}) - ${response.explanation}" }
+        log.i {
+            if (Logging.verbose) "Risk: level=$level (${response.label}) - ${response.explanation}"
+            else "Risk: level=$level (${response.label})"
+        }
         return RiskAnalysis(
             risk = level,
             label = response.label,

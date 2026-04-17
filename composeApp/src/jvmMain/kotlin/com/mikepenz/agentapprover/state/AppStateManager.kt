@@ -1,6 +1,7 @@
 package com.mikepenz.agentapprover.state
 
 import co.touchlab.kermit.Logger
+import com.mikepenz.agentapprover.logging.Logging
 import com.mikepenz.agentapprover.model.*
 import com.mikepenz.agentapprover.storage.DatabaseStorage
 import com.mikepenz.agentapprover.storage.SettingsStorage
@@ -46,6 +47,7 @@ class AppStateManager(
     fun initialize() {
         val settings = settingsStorage?.load() ?: AppSettings()
         val history = databaseStorage?.loadAll() ?: emptyList()
+        Logging.verbose = settings.verboseLogging
         _state.value = AppState(settings = settings, history = history)
     }
 
@@ -189,6 +191,7 @@ class AppStateManager(
         synchronized(persistLock) {
             _state.update { it.copy(settings = settings) }
             settingsStorage?.save(settings)
+            Logging.verbose = settings.verboseLogging
         }
     }
 

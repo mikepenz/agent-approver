@@ -280,6 +280,21 @@ fun GeneralSettingsContent(
             Text("Clear History")
         }
 
+        // -- Diagnostics --
+        SectionHeader("Diagnostics")
+
+        SettingsSwitch(
+            label = "Verbose logging",
+            checked = settings.verboseLogging,
+            onCheckedChange = { onSettingsChange(settings.copy(verboseLogging = it)) },
+        )
+        Text(
+            "Include commands, file paths, and request/response details in logs. " +
+                "Keep off unless diagnosing an issue — sensitive content may appear in log files.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+
         // -- About --
         SectionHeader("About")
 

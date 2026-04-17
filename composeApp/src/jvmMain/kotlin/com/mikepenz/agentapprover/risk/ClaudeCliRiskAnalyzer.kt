@@ -1,6 +1,7 @@
 package com.mikepenz.agentapprover.risk
 
 import co.touchlab.kermit.Logger
+import com.mikepenz.agentapprover.logging.Logging
 import com.mikepenz.agentapprover.model.HookInput
 import com.mikepenz.agentapprover.model.RiskAnalysis
 import kotlinx.coroutines.Dispatchers
@@ -118,7 +119,10 @@ class ClaudeCliRiskAnalyzer(
         val structuredOutput = wrapper.structuredOutput
         if (structuredOutput != null) {
             val level = structuredOutput.level.coerceIn(1, 5)
-            log.i { "Risk: level=$level (${structuredOutput.label}) - ${structuredOutput.explanation}" }
+            log.i {
+                if (Logging.verbose) "Risk: level=$level (${structuredOutput.label}) - ${structuredOutput.explanation}"
+                else "Risk: level=$level (${structuredOutput.label})"
+            }
             return RiskAnalysis(
                 risk = level,
                 label = structuredOutput.label,

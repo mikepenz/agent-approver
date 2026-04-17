@@ -10,6 +10,7 @@ markdown-renderer = "0.40.2"
 aboutlibraries = "14.0.0"
 nucleus = "1.9.0"
 jna = "5.18.1"
+java-keyring = "1.0.4"
 copilot-sdk = "0.2.1-java.1"
 sqlite = "3.51.3.0"
 metro = "0.13.2"
@@ -34,6 +35,7 @@ aboutlibraries-compose-m3 = { module = "com.mikepenz:aboutlibraries-compose-m3",
 markdown-renderer = { module = "com.mikepenz:multiplatform-markdown-renderer-m3", version.ref = "markdown-renderer" }
 markdown-renderer-code = { module = "com.mikepenz:multiplatform-markdown-renderer-code", version.ref = "markdown-renderer" }
 jna = { module = "net.java.dev.jna:jna", version.ref = "jna" }
+java-keyring = { module = "com.github.javakeyring:java-keyring", version.ref = "java-keyring" }
 nucleus-darkmode-detector = { module = "io.github.kdroidfilter:nucleus.darkmode-detector", version.ref = "nucleus" }
 nucleus-decorated-window-core = { module = "io.github.kdroidfilter:nucleus.decorated-window-core", version.ref = "nucleus" }
 nucleus-decorated-window-jni = { module = "io.github.kdroidfilter:nucleus.decorated-window-jni", version.ref = "nucleus" }

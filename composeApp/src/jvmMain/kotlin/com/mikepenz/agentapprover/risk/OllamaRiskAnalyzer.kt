@@ -1,6 +1,7 @@
 package com.mikepenz.agentapprover.risk
 
 import co.touchlab.kermit.Logger
+import com.mikepenz.agentapprover.logging.Logging
 import com.mikepenz.agentapprover.model.HookInput
 import com.mikepenz.agentapprover.model.RiskAnalysis
 import io.ktor.client.HttpClient
@@ -185,14 +186,17 @@ class OllamaRiskAnalyzer(
         }
 
         val rawBody = response.bodyAsText()
-        log.d { "Raw response: ${rawBody.take(200)}" }
+        if (Logging.verbose) log.d { "Raw response: ${rawBody.take(200)}" }
         val chatResponse = json.decodeFromString<ChatResponse>(rawBody)
         val content = chatResponse.message?.content
             ?: throw RuntimeException("No message.content in Ollama response")
 
         val parsed = json.decodeFromString<RiskResponse>(content)
         val level = parsed.level.coerceIn(1, 5)
-        log.i { "Risk: level=$level (${parsed.label}) - ${parsed.explanation}" }
+        log.i {
+            if (Logging.verbose) "Risk: level=$level (${parsed.label}) - ${parsed.explanation}"
+            else "Risk: level=$level (${parsed.label})"
+        }
         return RiskAnalysis(
             risk = level,
             label = parsed.label,

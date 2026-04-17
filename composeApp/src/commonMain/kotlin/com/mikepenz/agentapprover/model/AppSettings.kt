@@ -37,4 +37,11 @@ data class AppSettings(
     val protectionSettings: ProtectionSettings = ProtectionSettings(),
     val capabilitySettings: CapabilitySettings = CapabilitySettings(),
     val maxHistoryEntries: Int = 2500,
+    /**
+     * When true, sensitive content (commands, file paths, request/response
+     * JSON, AI explanations) is included in log output. Defaults to false so
+     * a stock install never writes raw tool input to disk-backed log streams.
+     * Toggleable at runtime via the Diagnostics section in Settings.
+     */
+    val verboseLogging: Boolean = false,
 )
