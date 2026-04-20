@@ -29,12 +29,17 @@ val PaleRose = Color(0xFFFFC2BA)
 val Carmine = Color(0xFFE63845)
 val WindowsBlue = Color(0xFF3082DB)
 
-// ── Surface scale (graphite, very slight cool tilt; oklch spec in tokens.css) ──
-val GraphiteBg = Color(0xFF1B1B1F)        // oklch(0.155 0.004 260) — app canvas
-val GraphiteSurface = Color(0xFF212126)   // oklch(0.185 0.004 260) — cards, sidebar
-val GraphiteSurface2 = Color(0xFF27272C)  // oklch(0.215 0.004 260) — inputs, hover
-val GraphiteSurface3 = Color(0xFF2F2F35)  // oklch(0.250 0.005 260) — pressed, selected
-val GraphiteChrome = Color(0xFF17171B)    // oklch(0.135 0.004 260) — titlebar
+// ── Surface scale (graphite, very slight cool tilt) ──
+// Calibrated against the rendered Agent Buddy design mockup (scratch/mid*.png
+// and uploads/Screenshot*.png) rather than the tokens.css oklch values, which
+// run ~0.07 lightness brighter than the hand-off renderings. The mockup uses
+// the body-level base (oklch(0.08 0.003 260) ≈ #0B0C0D) as the true app canvas,
+// with a compressed surface ramp sitting on top.
+val GraphiteBg = Color(0xFF0B0C0D)        // oklch(0.08 0.003 260)  — app canvas (matches mockup queue/detail panes)
+val GraphiteSurface = Color(0xFF131418)   // oklch(0.115 0.004 260) — cards, sidebar (matches mockup sidebar #121212)
+val GraphiteSurface2 = Color(0xFF1B1D22)  // oklch(0.145 0.004 260) — inputs, hover
+val GraphiteSurface3 = Color(0xFF24272D)  // oklch(0.180 0.005 260) — pressed, selected (matches uploads #22262C/#272C31)
+val GraphiteChrome = Color(0xFF08090A)    // oklch(0.065 0.004 260) — titlebar (matches mockup #080808)
 
 // ── Foreground ink scale (oklch spec) ──
 val InkPrimary = Color(0xFFF6F6F8)    // oklch(0.97 0.002 260)
@@ -67,25 +72,25 @@ val ToolAsk = Color(0xFF6FA0D6)     // oklch(0.76 0.12 238) — info blue
 val ToolWrite = Color(0xFF55B4B4)   // oklch(0.76 0.10 200) — teal
 val ToolRead = Color(0xFF4EB98B)    // oklch(0.76 0.11 162) — emerald
 
-// Risk colors
-val RiskSafe = Color(0xFF339470) // Sea Turtle
-val RiskLow = Color(0xFF5BB88E)
-val RiskMedium = Color(0xFFDEEF33) // Dandelion
-val RiskHigh = Color(0xFFE6A233)
-val RiskCritical = Color(0xFFE63845) // Carmine
+// Risk colors — aligned with design system semantic tokens
+val RiskSafe = AccentEmerald             // oklch(0.78 0.14 162) — level 1
+val RiskLow = ToolRead                   // oklch(0.76 0.11 162) — level 2
+val RiskMedium = WarnYellow              // oklch(0.82 0.13 82)  — level 3
+val RiskHigh = Color(0xFFD08030)         // oklch(0.78 0.15 40)  — level 4
+val RiskCritical = DangerRed             // oklch(0.72 0.17 22)  — level 5
 
-// Tool badge colors
-val ToolBashColor = Color(0xFFDEEF33) // Dandelion
-val ToolAskColor = Color(0xFF3082DB) // Windows Blue
-val ToolPlanColor = Color(0xFF339470) // Sea Turtle
-val ToolDefaultColor = Color(0xFF78909C)
-val ToolFileColor = Color(0xFFC792EA)   // Soft purple for file ops
-val ToolSearchColor = Color(0xFF82AAFF) // Soft blue for search
-val ToolWebColor = Color(0xFFFF9E64)    // Warm orange for web
+// Tool badge colors — aligned with design system tool tokens
+val ToolBashColor = ToolBash             // oklch(0.82 0.12 88)
+val ToolAskColor = ToolAsk               // oklch(0.76 0.12 238)
+val ToolPlanColor = AccentEmerald        // oklch(0.78 0.14 162)
+val ToolDefaultColor = Color(0xFF78909C) // fallback neutral
+val ToolFileColor = ToolWrite            // oklch(0.76 0.10 200)
+val ToolSearchColor = ToolRead           // oklch(0.76 0.11 162)
+val ToolWebColor = ToolWeb               // oklch(0.78 0.13 48)
 
 // Source badge colors
-val SourceClaudeColor = Color(0xFFD97757)   // Claude orange/terracotta
-val SourceCopilotColor = Color(0xFF6E40C9)  // GitHub Copilot purple
+val SourceClaudeColor = Color(0xFFD97757)  // oklch(0.78 0.14 30) — Claude orange
+val SourceCopilotColor = VioletPurple      // oklch(0.74 0.14 290) — design-system violet
 
 fun sourceColor(source: com.mikepenz.agentbuddy.model.Source): Color = when (source) {
     com.mikepenz.agentbuddy.model.Source.CLAUDE_CODE -> SourceClaudeColor
