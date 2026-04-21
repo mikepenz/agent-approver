@@ -8,11 +8,11 @@ buildscript {
 }
 
 plugins {
-    alias(libs.plugins.kotlinMultiplatform)
-    alias(libs.plugins.composeMultiplatform)
-    alias(libs.plugins.composeCompiler)
-    alias(libs.plugins.kotlinSerialization)
-    alias(libs.plugins.aboutlibraries)
+    alias(baseLibs.plugins.kotlinMultiplatform)
+    alias(baseLibs.plugins.composeMultiplatform)
+    alias(baseLibs.plugins.composeCompiler)
+    alias(baseLibs.plugins.kotlinSerialization)
+    alias(baseLibs.plugins.aboutLibraries)
     alias(libs.plugins.nucleus)
     alias(libs.plugins.metro)
     id("dev.mikepenz.composebuddy") version "0.2.0-a02"
@@ -51,23 +51,23 @@ kotlin {
             implementation(compose.material3)
             implementation(compose.ui)
             implementation(compose.components.resources)
-            implementation(libs.kotlinx.coroutines.core)
+            implementation(baseLibs.kotlinx.coroutines.core)
             implementation(libs.kotlinx.serialization.json)
             implementation(libs.kotlinx.datetime)
             implementation(libs.kermit)
-            implementation(libs.aboutlibraries.core)
-            implementation(libs.aboutlibraries.compose.m3)
+            implementation(baseLibs.aboutlibraries.core)
+            implementation(baseLibs.aboutlibraries.compose.m3)
         }
         commonTest.dependencies {
-            implementation(libs.kotlin.test)
+            implementation(kotlin("test"))
         }
         jvmTest.dependencies {
-            implementation(libs.kotlin.test)
+            implementation(kotlin("test"))
             implementation(libs.kotlinx.coroutines.test)
         }
         jvmMain.dependencies {
             implementation(compose.desktop.currentOs)
-            implementation(libs.kotlinx.coroutines.swing)
+            implementation(baseLibs.kotlinx.coroutines.swing)
             implementation(libs.jetbrains.lifecycle.viewmodel)
             implementation(libs.jetbrains.lifecycle.viewmodel.compose)
             implementation(libs.metrox.viewmodel.compose)

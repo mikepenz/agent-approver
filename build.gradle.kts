@@ -1,8 +1,8 @@
 plugins {
-    alias(libs.plugins.composeMultiplatform) apply false
-    alias(libs.plugins.composeCompiler) apply false
-    alias(libs.plugins.kotlinMultiplatform) apply false
-    alias(libs.plugins.kotlinSerialization) apply false
-    alias(libs.plugins.aboutlibraries) apply false
+    alias(baseLibs.plugins.composeMultiplatform) apply false
+    alias(baseLibs.plugins.composeCompiler) apply false
+    alias(baseLibs.plugins.kotlinMultiplatform) apply false
+    alias(baseLibs.plugins.kotlinSerialization) apply false
+    alias(baseLibs.plugins.aboutLibraries) apply false
     alias(libs.plugins.nucleus) apply false
 }

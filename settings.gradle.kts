@@ -16,6 +16,12 @@ dependencyResolutionManagement {
         google()
         mavenCentral()
     }
+
+    versionCatalogs {
+        create("baseLibs") {
+            from("com.mikepenz:version-catalog:0.14.4")
+        }
+    }
 }
 
 plugins {
