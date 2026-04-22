@@ -103,6 +103,7 @@ private fun summaryText(request: ApprovalRequest): String {
         name.equals("Edit", true) || name.equals("Write", true) || name.equals("Read", true) ->
             input["file_path"]?.jsonPrimitive?.content ?: name
         name.equals("WebFetch", true) -> input["url"]?.jsonPrimitive?.content ?: name
+        name.equals("WebSearch", true) -> input["query"]?.jsonPrimitive?.content ?: name
         name.equals("Grep", true) || name.equals("Glob", true) ->
             input["pattern"]?.jsonPrimitive?.content ?: name
         request.toolType == ToolType.ASK_USER_QUESTION ->

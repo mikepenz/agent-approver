@@ -19,6 +19,7 @@ fun ToolContentSummary(toolName: String, toolInput: Map<String, JsonElement>, cw
                 toolName.equals("Glob", ignoreCase = true) -> SearchContent(toolName, toolInput)
 
         toolName.equals("WebFetch", ignoreCase = true) -> WebFetchContent(toolInput)
+        toolName.equals("WebSearch", ignoreCase = true) -> WebSearchContent(toolInput)
         else -> FallbackContent(toolInput)
     }
     }
@@ -35,6 +36,8 @@ fun toolSummaryText(toolName: String, toolInput: Map<String, JsonElement>): Stri
         toolInput["file_path"]?.jsonPrimitive?.contentOrNull ?: toolName
     toolName.equals("WebFetch", ignoreCase = true) ->
         toolInput["url"]?.jsonPrimitive?.contentOrNull ?: toolName
+    toolName.equals("WebSearch", ignoreCase = true) ->
+        toolInput["query"]?.jsonPrimitive?.contentOrNull ?: toolName
     toolName.equals("Grep", ignoreCase = true) ->
         buildString {
             toolInput["pattern"]?.jsonPrimitive?.contentOrNull?.let { append(it) }
@@ -57,6 +60,7 @@ fun toolPopOutContent(toolName: String, toolInput: Map<String, JsonElement>): St
                 toolName.equals("Glob", ignoreCase = true) -> searchPopOutContent(toolName, toolInput)
 
         toolName.equals("WebFetch", ignoreCase = true) -> webFetchPopOutContent(toolInput)
+        toolName.equals("WebSearch", ignoreCase = true) -> webSearchPopOutContent(toolInput)
         else -> {
             val json = kotlinx.serialization.json.Json { prettyPrint = true }
             "```json\n${json.encodeToString(kotlinx.serialization.json.JsonObject.serializer(), kotlinx.serialization.json.JsonObject(toolInput))}\n```"

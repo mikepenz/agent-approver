@@ -78,6 +78,8 @@ private fun summaryText(event: PreToolUseEvent): String {
             input.toolInput["file_path"]?.jsonPrimitive?.content ?: input.toolName
         input.toolName.equals("WebFetch", ignoreCase = true) ->
             input.toolInput["url"]?.jsonPrimitive?.content ?: input.toolName
+        input.toolName.equals("WebSearch", ignoreCase = true) ->
+            input.toolInput["query"]?.jsonPrimitive?.content ?: input.toolName
         input.toolName.equals("Grep", ignoreCase = true) ||
                 input.toolName.equals("Glob", ignoreCase = true) ->
             input.toolInput["pattern"]?.jsonPrimitive?.content ?: input.toolName
