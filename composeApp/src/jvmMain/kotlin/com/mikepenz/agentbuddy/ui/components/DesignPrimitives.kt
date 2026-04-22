@@ -192,11 +192,19 @@ fun StatusPill(
 
 @Composable
 fun RiskPill(
-    level: Int,
+    level: Int?,
     via: String,
     modifier: Modifier = Modifier,
+    analyzing: Boolean = false,
+    error: Boolean = false,
+    enabled: Boolean = true,
 ) {
-    val color = riskColor(level)
+    val pendingTint = when {
+        error -> DangerRed
+        !enabled -> AgentBuddyColors.inkMuted
+        else -> AgentBuddyColors.inkTertiary
+    }
+    val color = if (level != null) riskColor(level) else pendingTint
     Row(
         modifier = modifier
             .height(20.dp)
@@ -206,7 +214,7 @@ fun RiskPill(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(6.dp),
     ) {
-        // Level circle
+        // Level circle (or pending indicator)
         Box(
             modifier = Modifier
                 .size(14.dp)
@@ -214,24 +222,40 @@ fun RiskPill(
                 .background(color.copy(alpha = 0.18f)),
             contentAlignment = Alignment.Center,
         ) {
-            Text(
-                text = "$level",
-                color = color,
-                fontSize = 10.sp,
-                lineHeight = 10.sp,
-                fontWeight = FontWeight.SemiBold,
-                fontFamily = FontFamily.Monospace,
-                maxLines = 1,
-                style = androidx.compose.ui.text.TextStyle(
-                    lineHeightStyle = androidx.compose.ui.text.style.LineHeightStyle(
-                        alignment = androidx.compose.ui.text.style.LineHeightStyle.Alignment.Center,
-                        trim = androidx.compose.ui.text.style.LineHeightStyle.Trim.Both,
+            if (level != null) {
+                Text(
+                    text = "$level",
+                    color = color,
+                    fontSize = 10.sp,
+                    lineHeight = 10.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    fontFamily = FontFamily.Monospace,
+                    maxLines = 1,
+                    style = androidx.compose.ui.text.TextStyle(
+                        lineHeightStyle = androidx.compose.ui.text.style.LineHeightStyle(
+                            alignment = androidx.compose.ui.text.style.LineHeightStyle.Alignment.Center,
+                            trim = androidx.compose.ui.text.style.LineHeightStyle.Trim.Both,
+                        ),
                     ),
-                ),
-            )
+                )
+            } else {
+                Icon(
+                    imageVector = LucideClock,
+                    contentDescription = null,
+                    tint = color,
+                    modifier = Modifier.size(9.dp),
+                )
+            }
+        }
+        val prefix = when {
+            level != null -> "via"
+            !enabled -> "risk analysis off"
+            error -> "analysis failed · via"
+            analyzing -> "analyzing · via"
+            else -> "pending · via"
         }
         Text(
-            text = "via",
+            text = prefix,
             color = AgentBuddyColors.inkMuted,
             fontSize = 10.sp,
             lineHeight = 10.sp,
@@ -244,21 +268,23 @@ fun RiskPill(
                 ),
             ),
         )
-        Text(
-            text = via,
-            color = AgentBuddyColors.inkSecondary,
-            fontSize = 10.sp,
-            lineHeight = 10.sp,
-            fontWeight = FontWeight.Medium,
-            letterSpacing = (-0.05).sp,
-            maxLines = 1,
-            style = androidx.compose.ui.text.TextStyle(
-                lineHeightStyle = androidx.compose.ui.text.style.LineHeightStyle(
-                    alignment = androidx.compose.ui.text.style.LineHeightStyle.Alignment.Center,
-                    trim = androidx.compose.ui.text.style.LineHeightStyle.Trim.Both,
+        if (enabled || level != null) {
+            Text(
+                text = via,
+                color = AgentBuddyColors.inkSecondary,
+                fontSize = 10.sp,
+                lineHeight = 10.sp,
+                fontWeight = FontWeight.Medium,
+                letterSpacing = (-0.05).sp,
+                maxLines = 1,
+                style = androidx.compose.ui.text.TextStyle(
+                    lineHeightStyle = androidx.compose.ui.text.style.LineHeightStyle(
+                        alignment = androidx.compose.ui.text.style.LineHeightStyle.Alignment.Center,
+                        trim = androidx.compose.ui.text.style.LineHeightStyle.Trim.Both,
+                    ),
                 ),
-            ),
-        )
+            )
+        }
     }
 }
 
