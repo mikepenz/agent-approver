@@ -76,7 +76,8 @@ data class ApprovalQueueItem(
     val toolType: ToolType = ToolType.DEFAULT,
     val source: Source,
     val summary: String,
-    val risk: Int,
+    /** `null` while no risk result is available (pending, analyzing, errored, or disabled). */
+    val risk: Int?,
     val via: String,
     val timestamp: String,
     val elapsedSeconds: Int,
@@ -85,6 +86,9 @@ data class ApprovalQueueItem(
     val prompt: String,
     val workingDir: String,
     val riskAssessment: String,
+    val riskAnalysisEnabled: Boolean = true,
+    val riskAnalyzing: Boolean = false,
+    val riskError: String? = null,
 )
 
 @Composable
@@ -343,7 +347,13 @@ private fun QueueRow(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 modifier = Modifier.fillMaxWidth(),
             ) {
-                RiskPill(level = item.risk, via = item.via)
+                RiskPill(
+                    level = item.risk,
+                    via = item.via,
+                    analyzing = item.riskAnalyzing,
+                    error = item.riskError != null,
+                    enabled = item.riskAnalysisEnabled,
+                )
                 Spacer(Modifier.weight(1f))
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
@@ -442,7 +452,13 @@ private fun MediumQueueRow(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             modifier = Modifier.fillMaxWidth(),
         ) {
-            RiskPill(level = item.risk, via = item.via)
+            RiskPill(
+                level = item.risk,
+                via = item.via,
+                analyzing = item.riskAnalyzing,
+                error = item.riskError != null,
+                enabled = item.riskAnalysisEnabled,
+            )
             Spacer(Modifier.weight(1f))
             Row(
                 verticalAlignment = Alignment.CenterVertically,
@@ -595,7 +611,13 @@ private fun ApprovalDetail(
             ) {
                 ToolTag(toolName = item.tool, toolType = item.toolType)
                 SourceTag(source = item.source)
-                RiskPill(level = item.risk, via = item.via)
+                RiskPill(
+                    level = item.risk,
+                    via = item.via,
+                    analyzing = item.riskAnalyzing,
+                    error = item.riskError != null,
+                    enabled = item.riskAnalysisEnabled,
+                )
                 StatusPill(status = DecisionStatus.PENDING)
                 Spacer(Modifier.weight(1f))
                 Text(
@@ -694,31 +716,69 @@ private fun ApprovalDetail(
                         .padding(16.dp),
                     horizontalArrangement = Arrangement.spacedBy(14.dp),
                 ) {
-                    val c = riskColor(item.risk)
-                    ColoredIconTile(tint = c, bgAlpha = 0.12f, borderAlpha = 0f) {
-                        Text(
-                            text = "${item.risk}",
-                            color = c,
-                            fontSize = 15.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            fontFamily = FontFamily.Monospace,
-                        )
-                    }
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = "LEVEL ${item.risk} · GRADED BY ${item.via.uppercase()}",
-                            color = AgentBuddyColors.inkMuted,
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            letterSpacing = 0.4.sp,
-                        )
-                        Spacer(Modifier.height(5.dp))
-                        Text(
-                            text = item.riskAssessment,
-                            color = AgentBuddyColors.inkPrimary,
-                            fontSize = 13.sp,
-                            lineHeight = 20.sp,
-                        )
+                    val risk = item.risk
+                    if (risk != null) {
+                        val c = riskColor(risk)
+                        ColoredIconTile(tint = c, bgAlpha = 0.12f, borderAlpha = 0f) {
+                            Text(
+                                text = "$risk",
+                                color = c,
+                                fontSize = 15.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                fontFamily = FontFamily.Monospace,
+                            )
+                        }
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "LEVEL $risk · GRADED BY ${item.via.uppercase()}",
+                                color = AgentBuddyColors.inkMuted,
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                letterSpacing = 0.4.sp,
+                            )
+                            Spacer(Modifier.height(5.dp))
+                            Text(
+                                text = item.riskAssessment,
+                                color = AgentBuddyColors.inkPrimary,
+                                fontSize = 13.sp,
+                                lineHeight = 20.sp,
+                            )
+                        }
+                    } else {
+                        ColoredIconTile(
+                            tint = AgentBuddyColors.inkTertiary,
+                            bgAlpha = 0.12f,
+                            borderAlpha = 0f,
+                        ) {
+                            Icon(
+                                imageVector = LucideClock,
+                                contentDescription = null,
+                                tint = AgentBuddyColors.inkTertiary,
+                                modifier = Modifier.size(14.dp),
+                            )
+                        }
+                        Column(modifier = Modifier.weight(1f)) {
+                            val header = when {
+                                !item.riskAnalysisEnabled -> "RISK ANALYSIS DISABLED"
+                                item.riskError != null -> "ANALYSIS FAILED · ${item.via.uppercase()}"
+                                item.riskAnalyzing -> "ANALYZING · ${item.via.uppercase()}"
+                                else -> "PENDING · ${item.via.uppercase()}"
+                            }
+                            Text(
+                                text = header,
+                                color = AgentBuddyColors.inkMuted,
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                letterSpacing = 0.4.sp,
+                            )
+                            Spacer(Modifier.height(5.dp))
+                            Text(
+                                text = item.riskAssessment,
+                                color = AgentBuddyColors.inkPrimary,
+                                fontSize = 13.sp,
+                                lineHeight = 20.sp,
+                            )
+                        }
                     }
                 }
             }

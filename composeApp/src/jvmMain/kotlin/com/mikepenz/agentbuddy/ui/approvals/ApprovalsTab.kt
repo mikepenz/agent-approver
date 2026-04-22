@@ -50,16 +50,20 @@ fun ApprovalsTab(
 
     val items = pendingApprovals.map { request ->
         val risk = riskResults[request.id]
+        val status = riskStatuses[request.id]
         val elapsedSeconds = (now - request.timestamp).inWholeSeconds.toInt().coerceAtLeast(0)
         val localTime = request.timestamp.toLocalDateTime(TimeZone.currentSystemDefault())
         val timeStr = "%02d:%02d:%02d".format(localTime.hour, localTime.minute, localTime.second)
+        val analysisError = if (status == RiskStatus.ERROR) {
+            riskErrors[request.id] ?: "Risk analysis failed."
+        } else null
         ApprovalQueueItem(
             id = request.id,
             tool = request.hookInput.toolName,
             toolType = request.toolType,
             source = request.source,
             summary = toolSummaryText(request.hookInput.toolName, request.hookInput.toolInput),
-            risk = risk?.risk ?: 3,
+            risk = risk?.risk,
             via = via,
             timestamp = timeStr,
             elapsedSeconds = elapsedSeconds,
@@ -68,11 +72,16 @@ fun ApprovalsTab(
             prompt = "Approval requested for ${request.hookInput.toolName} in ${request.hookInput.cwd}.",
             workingDir = request.hookInput.cwd,
             riskAssessment = risk?.message?.takeIf { it.isNotBlank() }
-                ?: when (riskStatuses[request.id]) {
-                    RiskStatus.ANALYZING -> "Risk analysis in progress…"
-                    RiskStatus.ERROR -> riskErrors[request.id] ?: "Risk analysis failed."
-                    else -> "No risk assessment available."
+                ?: when {
+                    !settings.riskAnalysisEnabled -> "Risk analysis is disabled."
+                    status == RiskStatus.ANALYZING -> "Risk analysis in progress…"
+                    status == RiskStatus.ERROR -> analysisError ?: "Risk analysis failed."
+                    else -> "Risk analysis pending…"
                 },
+            riskAnalysisEnabled = settings.riskAnalysisEnabled,
+            riskAnalyzing = settings.riskAnalysisEnabled && risk == null &&
+                (status == null || status == RiskStatus.ANALYZING || status == RiskStatus.IDLE),
+            riskError = analysisError,
         )
     }
 
