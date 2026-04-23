@@ -47,27 +47,38 @@ import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 
+class AskUserQuestionState internal constructor(
+    internal val selections: androidx.compose.runtime.snapshots.SnapshotStateMap<Int, Set<Int>>,
+    internal val customAnswers: androidx.compose.runtime.snapshots.SnapshotStateMap<Int, String>,
+) {
+    fun allAnswered(questionData: UserQuestionData): Boolean =
+        questionData.questions.indices.all { qIdx ->
+            val question = questionData.questions[qIdx]
+            val hasCustom = (customAnswers[qIdx] ?: "").isNotBlank()
+            if (question.options.isEmpty()) hasCustom
+            else hasCustom || (selections[qIdx]?.isNotEmpty() == true)
+        }
+}
+
 @Composable
-fun AskUserQuestionCard(
+fun rememberAskUserQuestionState(): AskUserQuestionState {
+    val selections = remember { mutableStateMapOf<Int, Set<Int>>() }
+    val customAnswers = remember { mutableStateMapOf<Int, String>() }
+    return remember(selections, customAnswers) {
+        AskUserQuestionState(selections, customAnswers)
+    }
+}
+
+@Composable
+fun AskUserQuestionForm(
     request: ApprovalRequest,
     questionData: UserQuestionData,
-    onApproveWithInput: (updatedInput: Map<String, JsonElement>) -> Unit,
-    onDismiss: () -> Unit,
-    slimButtons: Boolean = false,
+    state: AskUserQuestionState,
+    modifier: Modifier = Modifier,
 ) {
-    // question index -> selected option indices
-    val selections = remember { mutableStateMapOf<Int, Set<Int>>() }
-    // question index -> custom answer text
-    val customAnswers = remember { mutableStateMapOf<Int, String>() }
-
-    val allAnswered = questionData.questions.indices.all { qIdx ->
-        val question = questionData.questions[qIdx]
-        val hasCustom = (customAnswers[qIdx] ?: "").isNotBlank()
-        if (question.options.isEmpty()) hasCustom
-        else hasCustom || (selections[qIdx]?.isNotEmpty() == true)
-    }
-
-    Column(modifier = Modifier.fillMaxWidth()) {
+    val selections = state.selections
+    val customAnswers = state.customAnswers
+    Column(modifier = modifier.fillMaxWidth()) {
         Text("No timeout", fontSize = 10.sp, color = Color.Gray)
         Spacer(Modifier.height(8.dp))
 
@@ -166,58 +177,59 @@ fun AskUserQuestionCard(
                 Spacer(Modifier.height(8.dp))
             }
         }
-
-        Spacer(Modifier.height(8.dp))
-
-        // Buttons
-        val submitAction = {
-            val updatedInput = buildUpdatedInput(
-                request.hookInput.toolInput,
-                selections,
-                customAnswers,
-            )
-            onApproveWithInput(updatedInput)
-        }
-        if (slimButtons) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
-            ) {
-                SlimDenyButton(
-                    modifier = Modifier.weight(1f),
-                    label = "Dismiss",
-                    onClick = onDismiss,
-                )
-                SlimAllowButton(
-                    modifier = Modifier.weight(1f),
-                    label = "Submit",
-                    enabled = allAnswered,
-                    onClick = submitAction,
-                )
-            }
-        } else {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                OutlinedButton(
-                    onClick = onDismiss,
-                    modifier = Modifier.weight(1f),
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
-                ) {
-                    Text("Dismiss")
-                }
-                Button(
-                    onClick = submitAction,
-                    modifier = Modifier.weight(1f),
-                    enabled = allAnswered,
-                ) {
-                    Text("Submit")
-                }
-            }
-        }
     }
 }
+
+@Composable
+fun AskUserQuestionActionBar(
+    request: ApprovalRequest,
+    questionData: UserQuestionData,
+    state: AskUserQuestionState,
+    onApproveWithInput: (updatedInput: Map<String, JsonElement>) -> Unit,
+    onDismiss: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val canSubmit = state.allAnswered(questionData)
+    Row(
+        modifier = modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        SlimDenyButton(
+            modifier = Modifier.weight(1f),
+            label = "Dismiss",
+            onClick = onDismiss,
+        )
+        SlimAllowButton(
+            modifier = Modifier.weight(1f),
+            label = "Submit",
+            enabled = canSubmit,
+            onClick = {
+                val updated = buildUpdatedInput(
+                    request.hookInput.toolInput,
+                    state.selections,
+                    state.customAnswers,
+                )
+                onApproveWithInput(updated)
+            },
+        )
+    }
+}
+
+@Composable
+fun AskUserQuestionCard(
+    request: ApprovalRequest,
+    questionData: UserQuestionData,
+    onApproveWithInput: (updatedInput: Map<String, JsonElement>) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val state = rememberAskUserQuestionState()
+    Column(modifier = Modifier.fillMaxWidth()) {
+        AskUserQuestionForm(request, questionData, state)
+        Spacer(Modifier.height(8.dp))
+        AskUserQuestionActionBar(request, questionData, state, onApproveWithInput, onDismiss)
+    }
+}
+
 
 internal fun buildUpdatedInput(
     originalInput: Map<String, JsonElement>,
@@ -335,7 +347,7 @@ private fun PreviewAskUserQuestionSlimButtons() {
                 ),
                 onApproveWithInput = {},
                 onDismiss = {},
-                slimButtons = true,
+
             )
         }
     }

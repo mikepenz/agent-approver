@@ -2,6 +2,7 @@ package com.mikepenz.agentbuddy.ui.approvals
 
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.runtime.Composable
+import com.mikepenz.agentbuddy.model.SpecialToolParser
 import com.mikepenz.agentbuddy.util.asStringOrNull
 import kotlinx.serialization.json.JsonElement
 
@@ -44,6 +45,20 @@ fun toolSummaryText(toolName: String, toolInput: Map<String, JsonElement>): Stri
         }.ifBlank { toolName }
     toolName.equals("Glob", ignoreCase = true) ->
         toolInput["pattern"].asStringOrNull() ?: toolName
+    toolName.equals("AskUserQuestion", ignoreCase = true) ->
+        SpecialToolParser.parseUserQuestion(toolInput)?.questions
+            ?.joinToString("\n") { q ->
+                "• " + q.question.ifBlank { q.header }.ifBlank { "question" }
+            }
+            ?.ifBlank { toolName } ?: toolName
+    toolName.equals("ExitPlanMode", ignoreCase = true) ||
+    toolName.equals("Plan", ignoreCase = true) ->
+        SpecialToolParser.parsePlanReview(toolInput)?.plan
+            ?.lineSequence()?.map { it.trim() }
+            ?.filter { it.isNotBlank() }
+            ?.take(3)
+            ?.joinToString("\n")
+            ?.ifBlank { toolName } ?: toolName
     else ->
         toolInput.values.firstOrNull().asStringOrNull()?.take(120) ?: toolName
 }

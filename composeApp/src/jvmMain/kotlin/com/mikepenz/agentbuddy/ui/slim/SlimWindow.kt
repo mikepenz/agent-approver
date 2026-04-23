@@ -714,7 +714,7 @@ private fun SlimAskUserQuestion(
         questionData = questionData,
         onApproveWithInput = { updated -> onApproveWithInput(item.id, updated) },
         onDismiss = { onResolve(item.id, SlimAction.AskAnotherAgent) },
-        slimButtons = true,
+
     )
 }
 
@@ -741,7 +741,7 @@ private fun SlimPlanReview(
         planData = planData,
         onApprove = { onResolve(item.id, SlimAction.Allow) },
         onDeny = { onResolve(item.id, SlimAction.Deny) },
-        slimButtons = true,
+
     )
 }
 

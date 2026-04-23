@@ -10,6 +10,8 @@ import com.mikepenz.agentbuddy.model.AppSettings
 import com.mikepenz.agentbuddy.model.ApprovalRequest
 import com.mikepenz.agentbuddy.model.RiskAnalysis
 import com.mikepenz.agentbuddy.model.RiskAnalysisBackend
+import com.mikepenz.agentbuddy.model.SpecialToolParser
+import com.mikepenz.agentbuddy.model.ToolType
 import kotlinx.coroutines.delay
 import kotlinx.datetime.Clock
 import kotlinx.datetime.TimeZone
@@ -57,6 +59,12 @@ fun ApprovalsTab(
         val analysisError = if (status == RiskStatus.ERROR) {
             riskErrors[request.id] ?: "Risk analysis failed."
         } else null
+        val questionData = if (request.toolType == ToolType.ASK_USER_QUESTION) {
+            SpecialToolParser.parseUserQuestion(request.hookInput.toolInput)
+        } else null
+        val planData = if (request.toolType == ToolType.PLAN) {
+            SpecialToolParser.parsePlanReview(request.hookInput.toolInput)
+        } else null
         ApprovalQueueItem(
             id = request.id,
             tool = request.hookInput.toolName,
@@ -82,6 +90,9 @@ fun ApprovalsTab(
             riskAnalyzing = settings.riskAnalysisEnabled && risk == null &&
                 (status == null || status == RiskStatus.ANALYZING || status == RiskStatus.IDLE),
             riskError = analysisError,
+            questionData = questionData,
+            planData = planData,
+            request = request,
         )
     }
 
@@ -90,5 +101,8 @@ fun ApprovalsTab(
         onApprove = { id -> onApprove(id, null) },
         onAlwaysAllow = { id -> onAlwaysAllow(id) },
         onDeny = { id -> onDeny(id, "") },
+        onApproveWithInput = { id, updatedInput -> onApproveWithInput(id, updatedInput) },
+        onDenyWithFeedback = { id, feedback -> onDeny(id, feedback) },
+        onDismiss = { id -> onDismiss(id) },
     )
 }

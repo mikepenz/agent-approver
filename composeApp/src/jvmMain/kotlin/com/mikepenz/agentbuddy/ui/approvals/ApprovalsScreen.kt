@@ -43,8 +43,12 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.mikepenz.agentbuddy.model.ApprovalRequest
+import com.mikepenz.agentbuddy.model.PlanReviewData
 import com.mikepenz.agentbuddy.model.Source
 import com.mikepenz.agentbuddy.model.ToolType
+import com.mikepenz.agentbuddy.model.UserQuestionData
+import kotlinx.serialization.json.JsonElement
 import com.mikepenz.agentbuddy.ui.components.ColoredIconTile
 import com.mikepenz.agentbuddy.ui.components.DecisionStatus
 import com.mikepenz.agentbuddy.ui.components.HorizontalHairline
@@ -89,6 +93,9 @@ data class ApprovalQueueItem(
     val riskAnalysisEnabled: Boolean = true,
     val riskAnalyzing: Boolean = false,
     val riskError: String? = null,
+    val questionData: UserQuestionData? = null,
+    val planData: PlanReviewData? = null,
+    val request: ApprovalRequest? = null,
 )
 
 @Composable
@@ -98,6 +105,9 @@ fun ApprovalsScreen(
     onApprove: (id: String) -> Unit = {},
     onAlwaysAllow: (id: String) -> Unit = {},
     onDeny: (id: String) -> Unit = {},
+    onApproveWithInput: (id: String, updatedInput: Map<String, JsonElement>) -> Unit = { _, _ -> },
+    onDenyWithFeedback: (id: String, feedback: String) -> Unit = { _, _ -> },
+    onDismiss: (id: String) -> Unit = {},
     initialMediumDetailId: String? = null,
 ) {
     if (items.isEmpty()) {
@@ -143,6 +153,9 @@ fun ApprovalsScreen(
                     onApprove = onApprove,
                     onAlwaysAllow = onAlwaysAllow,
                     onDeny = onDeny,
+                    onApproveWithInput = onApproveWithInput,
+                    onDenyWithFeedback = onDenyWithFeedback,
+                    onDismiss = onDismiss,
                 )
             }
         } else {
@@ -157,6 +170,9 @@ fun ApprovalsScreen(
                         onApprove = onApprove,
                         onAlwaysAllow = onAlwaysAllow,
                         onDeny = onDeny,
+                        onApproveWithInput = onApproveWithInput,
+                        onDenyWithFeedback = onDenyWithFeedback,
+                        onDismiss = onDismiss,
                     )
                 } else {
                     QueueHeader(count = items.size)
@@ -331,6 +347,8 @@ private fun QueueRow(
                 )
             }
             Spacer(Modifier.height(8.dp))
+            val isSpecialQueue = item.toolType == ToolType.ASK_USER_QUESTION ||
+                item.toolType == ToolType.PLAN
             Text(
                 text = item.summary,
                 color = AgentBuddyColors.inkPrimary,
@@ -338,7 +356,7 @@ private fun QueueRow(
                 lineHeight = 18.sp,
                 fontFamily = FontFamily.Monospace,
                 letterSpacing = (-0.1).sp,
-                maxLines = 2,
+                maxLines = if (isSpecialQueue) 4 else 2,
                 overflow = TextOverflow.Ellipsis,
             )
             Spacer(Modifier.height(10.dp))
@@ -436,6 +454,8 @@ private fun MediumQueueRow(
             )
         }
         Spacer(Modifier.height(8.dp))
+        val isSpecialRow = item.toolType == ToolType.ASK_USER_QUESTION ||
+            item.toolType == ToolType.PLAN
         Text(
             text = item.summary,
             color = AgentBuddyColors.inkPrimary,
@@ -443,7 +463,7 @@ private fun MediumQueueRow(
             lineHeight = 18.sp,
             fontFamily = FontFamily.Monospace,
             letterSpacing = (-0.1).sp,
-            maxLines = 1,
+            maxLines = if (isSpecialRow) 4 else 1,
             overflow = TextOverflow.Ellipsis,
         )
         Spacer(Modifier.height(10.dp))
@@ -479,32 +499,34 @@ private fun MediumQueueRow(
                 )
             }
         }
-        Spacer(Modifier.height(10.dp))
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            MediumActionButton(
-                text = "Deny",
-                icon = LucideX,
-                primary = false,
-                modifier = Modifier.weight(1f),
-                onClick = { onDeny(item.id) },
-            )
-            MediumActionButton(
-                text = "Always allow",
-                icon = LucideCheck,
-                primary = false,
-                modifier = Modifier.weight(1f),
-                onClick = { onAlwaysAllow(item.id) },
-            )
-            MediumActionButton(
-                text = "Allow",
-                icon = LucideCheck,
-                primary = true,
-                modifier = Modifier.weight(1f),
-                onClick = { onApprove(item.id) },
-            )
+        if (item.toolType != ToolType.ASK_USER_QUESTION && item.toolType != ToolType.PLAN) {
+            Spacer(Modifier.height(10.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                MediumActionButton(
+                    text = "Deny",
+                    icon = LucideX,
+                    primary = false,
+                    modifier = Modifier.weight(1f),
+                    onClick = { onDeny(item.id) },
+                )
+                MediumActionButton(
+                    text = "Always allow",
+                    icon = LucideCheck,
+                    primary = false,
+                    modifier = Modifier.weight(1f),
+                    onClick = { onAlwaysAllow(item.id) },
+                )
+                MediumActionButton(
+                    text = "Allow",
+                    icon = LucideCheck,
+                    primary = true,
+                    modifier = Modifier.weight(1f),
+                    onClick = { onApprove(item.id) },
+                )
+            }
         }
     }
 }
@@ -551,6 +573,9 @@ private fun MediumDetailView(
     onApprove: (id: String) -> Unit = {},
     onAlwaysAllow: (id: String) -> Unit = {},
     onDeny: (id: String) -> Unit = {},
+    onApproveWithInput: (id: String, updatedInput: Map<String, JsonElement>) -> Unit = { _, _ -> },
+    onDenyWithFeedback: (id: String, feedback: String) -> Unit = { _, _ -> },
+    onDismiss: (id: String) -> Unit = {},
 ) {
     Column(modifier = modifier) {
         // Back bar
@@ -583,6 +608,9 @@ private fun MediumDetailView(
             onApprove = onApprove,
             onAlwaysAllow = onAlwaysAllow,
             onDeny = onDeny,
+            onApproveWithInput = onApproveWithInput,
+            onDenyWithFeedback = onDenyWithFeedback,
+            onDismiss = onDismiss,
         )
     }
 }
@@ -596,7 +624,19 @@ private fun ApprovalDetail(
     onApprove: (id: String) -> Unit = {},
     onAlwaysAllow: (id: String) -> Unit = {},
     onDeny: (id: String) -> Unit = {},
+    onApproveWithInput: (id: String, updatedInput: Map<String, JsonElement>) -> Unit = { _, _ -> },
+    onDenyWithFeedback: (id: String, feedback: String) -> Unit = { _, _ -> },
+    onDismiss: (id: String) -> Unit = {},
 ) {
+    val askRequest = item.request?.takeIf {
+        item.toolType == ToolType.ASK_USER_QUESTION && item.questionData != null
+    }
+    val planRequest = item.request?.takeIf {
+        item.toolType == ToolType.PLAN && item.planData != null
+    }
+    val isSpecial = askRequest != null || planRequest != null
+    val askState = if (askRequest != null) rememberAskUserQuestionState() else null
+    val planState = if (planRequest != null) rememberPlanReviewFormState() else null
     Column(modifier = modifier.background(AgentBuddyColors.background)) {
         // Header
         Column(
@@ -655,6 +695,40 @@ private fun ApprovalDetail(
                 .verticalScroll(rememberScrollState())
                 .padding(start = 32.dp, end = 32.dp, top = 22.dp, bottom = 28.dp),
         ) {
+            if (isSpecial) {
+                if (askRequest != null && item.questionData != null) {
+                    AskUserQuestionForm(
+                        request = askRequest,
+                        questionData = item.questionData,
+                        state = askState!!,
+                    )
+                } else if (planRequest != null && item.planData != null) {
+                    PlanReviewForm(
+                        request = planRequest,
+                        planData = item.planData,
+                        state = planState!!,
+                    )
+                }
+
+                Spacer(Modifier.height(22.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
+                    MetaRow(
+                        label = "Working directory",
+                        value = item.workingDir,
+                        icon = LucideFolder,
+                        modifier = Modifier.weight(1f),
+                    )
+                    MetaRow(
+                        label = "Timeout",
+                        value = "${item.ttlSeconds} seconds",
+                        icon = LucideClock,
+                        modifier = Modifier.weight(1f),
+                    )
+                }
+                Spacer(Modifier.height(22.dp))
+                RiskAssessmentBlock(item = item)
+                return@Column
+            }
             // Command
             DetailBlock(
                 label = "Command",
@@ -705,83 +779,7 @@ private fun ApprovalDetail(
 
             Spacer(Modifier.height(22.dp))
 
-            // Risk assessment
-            DetailBlock(label = "Risk assessment") {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(AgentBuddyColors.surface)
-                        .border(1.dp, AgentBuddyColors.line1, RoundedCornerShape(8.dp))
-                        .padding(16.dp),
-                    horizontalArrangement = Arrangement.spacedBy(14.dp),
-                ) {
-                    val risk = item.risk
-                    if (risk != null) {
-                        val c = riskColor(risk)
-                        ColoredIconTile(tint = c, bgAlpha = 0.12f, borderAlpha = 0f) {
-                            Text(
-                                text = "$risk",
-                                color = c,
-                                fontSize = 15.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                fontFamily = FontFamily.Monospace,
-                            )
-                        }
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = "LEVEL $risk · GRADED BY ${item.via.uppercase()}",
-                                color = AgentBuddyColors.inkMuted,
-                                fontSize = 10.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                letterSpacing = 0.4.sp,
-                            )
-                            Spacer(Modifier.height(5.dp))
-                            Text(
-                                text = item.riskAssessment,
-                                color = AgentBuddyColors.inkPrimary,
-                                fontSize = 13.sp,
-                                lineHeight = 20.sp,
-                            )
-                        }
-                    } else {
-                        ColoredIconTile(
-                            tint = AgentBuddyColors.inkTertiary,
-                            bgAlpha = 0.12f,
-                            borderAlpha = 0f,
-                        ) {
-                            Icon(
-                                imageVector = LucideClock,
-                                contentDescription = null,
-                                tint = AgentBuddyColors.inkTertiary,
-                                modifier = Modifier.size(14.dp),
-                            )
-                        }
-                        Column(modifier = Modifier.weight(1f)) {
-                            val header = when {
-                                !item.riskAnalysisEnabled -> "RISK ANALYSIS DISABLED"
-                                item.riskError != null -> "ANALYSIS FAILED · ${item.via.uppercase()}"
-                                item.riskAnalyzing -> "ANALYZING · ${item.via.uppercase()}"
-                                else -> "PENDING · ${item.via.uppercase()}"
-                            }
-                            Text(
-                                text = header,
-                                color = AgentBuddyColors.inkMuted,
-                                fontSize = 10.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                letterSpacing = 0.4.sp,
-                            )
-                            Spacer(Modifier.height(5.dp))
-                            Text(
-                                text = item.riskAssessment,
-                                color = AgentBuddyColors.inkPrimary,
-                                fontSize = 13.sp,
-                                lineHeight = 20.sp,
-                            )
-                        }
-                    }
-                }
-            }
+            RiskAssessmentBlock(item = item)
 
             Spacer(Modifier.height(22.dp))
 
@@ -791,7 +789,7 @@ private fun ApprovalDetail(
             }
         }
 
-        // Footer actions
+        // Pinned footer actions
         Column(modifier = Modifier.fillMaxWidth()) {
             HorizontalHairline()
             Row(
@@ -802,10 +800,110 @@ private fun ApprovalDetail(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                ActionButton(text = "Deny", variant = ButtonVariant.Outline, leadingIcon = LucideX, onClick = { onDeny(item.id) })
-                Spacer(Modifier.weight(1f))
-                ActionButton(text = "Always allow", variant = ButtonVariant.Secondary, onClick = { onAlwaysAllow(item.id) })
-                ActionButton(text = "Allow", variant = ButtonVariant.Primary, leadingIcon = LucideCheck, onClick = { onApprove(item.id) })
+                when {
+                    askRequest != null && item.questionData != null && askState != null -> {
+                        AskUserQuestionActionBar(
+                            request = askRequest,
+                            questionData = item.questionData,
+                            state = askState,
+                            onApproveWithInput = { updated -> onApproveWithInput(item.id, updated) },
+                            onDismiss = { onDismiss(item.id) },
+                        )
+                    }
+                    planRequest != null && planState != null -> {
+                        PlanReviewActionBar(
+                            state = planState,
+                            onApprove = { onApprove(item.id) },
+                            onDeny = { feedback -> onDenyWithFeedback(item.id, feedback) },
+                        )
+                    }
+                    else -> {
+                        ActionButton(text = "Deny", variant = ButtonVariant.Outline, leadingIcon = LucideX, onClick = { onDeny(item.id) })
+                        Spacer(Modifier.weight(1f))
+                        ActionButton(text = "Always allow", variant = ButtonVariant.Secondary, onClick = { onAlwaysAllow(item.id) })
+                        ActionButton(text = "Allow", variant = ButtonVariant.Primary, leadingIcon = LucideCheck, onClick = { onApprove(item.id) })
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun RiskAssessmentBlock(item: ApprovalQueueItem) {
+    DetailBlock(label = "Risk assessment") {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(8.dp))
+                .background(AgentBuddyColors.surface)
+                .border(1.dp, AgentBuddyColors.line1, RoundedCornerShape(8.dp))
+                .padding(16.dp),
+            horizontalArrangement = Arrangement.spacedBy(14.dp),
+        ) {
+            val risk = item.risk
+            if (risk != null) {
+                val c = riskColor(risk)
+                ColoredIconTile(tint = c, bgAlpha = 0.12f, borderAlpha = 0f) {
+                    Text(
+                        text = "$risk",
+                        color = c,
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        fontFamily = FontFamily.Monospace,
+                    )
+                }
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "LEVEL $risk · GRADED BY ${item.via.uppercase()}",
+                        color = AgentBuddyColors.inkMuted,
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        letterSpacing = 0.4.sp,
+                    )
+                    Spacer(Modifier.height(5.dp))
+                    Text(
+                        text = item.riskAssessment,
+                        color = AgentBuddyColors.inkPrimary,
+                        fontSize = 13.sp,
+                        lineHeight = 20.sp,
+                    )
+                }
+            } else {
+                ColoredIconTile(
+                    tint = AgentBuddyColors.inkTertiary,
+                    bgAlpha = 0.12f,
+                    borderAlpha = 0f,
+                ) {
+                    Icon(
+                        imageVector = LucideClock,
+                        contentDescription = null,
+                        tint = AgentBuddyColors.inkTertiary,
+                        modifier = Modifier.size(14.dp),
+                    )
+                }
+                Column(modifier = Modifier.weight(1f)) {
+                    val header = when {
+                        !item.riskAnalysisEnabled -> "RISK ANALYSIS DISABLED"
+                        item.riskError != null -> "ANALYSIS FAILED · ${item.via.uppercase()}"
+                        item.riskAnalyzing -> "ANALYZING · ${item.via.uppercase()}"
+                        else -> "PENDING · ${item.via.uppercase()}"
+                    }
+                    Text(
+                        text = header,
+                        color = AgentBuddyColors.inkMuted,
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        letterSpacing = 0.4.sp,
+                    )
+                    Spacer(Modifier.height(5.dp))
+                    Text(
+                        text = item.riskAssessment,
+                        color = AgentBuddyColors.inkPrimary,
+                        fontSize = 13.sp,
+                        lineHeight = 20.sp,
+                    )
+                }
             }
         }
     }
@@ -1029,6 +1127,136 @@ private fun sample(idx: Int = 0) = listOf(
 
 private fun sampleList() = listOf(sample(0), sample(1), sample(2))
 
+private fun sampleAskUserQuestion(): ApprovalQueueItem {
+    val input = mapOf(
+        "questions" to kotlinx.serialization.json.JsonArray(
+            listOf(
+                kotlinx.serialization.json.JsonObject(
+                    mapOf(
+                        "question" to kotlinx.serialization.json.JsonPrimitive("Which database should the project use?"),
+                        "header" to kotlinx.serialization.json.JsonPrimitive("Database"),
+                        "multiSelect" to kotlinx.serialization.json.JsonPrimitive(false),
+                        "options" to kotlinx.serialization.json.JsonArray(
+                            listOf(
+                                kotlinx.serialization.json.JsonObject(
+                                    mapOf(
+                                        "label" to kotlinx.serialization.json.JsonPrimitive("PostgreSQL"),
+                                        "description" to kotlinx.serialization.json.JsonPrimitive("Robust relational DB."),
+                                    ),
+                                ),
+                                kotlinx.serialization.json.JsonObject(
+                                    mapOf(
+                                        "label" to kotlinx.serialization.json.JsonPrimitive("SQLite"),
+                                        "description" to kotlinx.serialization.json.JsonPrimitive("Lightweight embedded DB."),
+                                    ),
+                                ),
+                            ),
+                        ),
+                    ),
+                ),
+                kotlinx.serialization.json.JsonObject(
+                    mapOf(
+                        "question" to kotlinx.serialization.json.JsonPrimitive("Which features should we enable?"),
+                        "header" to kotlinx.serialization.json.JsonPrimitive("Features"),
+                        "multiSelect" to kotlinx.serialization.json.JsonPrimitive(true),
+                        "options" to kotlinx.serialization.json.JsonArray(
+                            listOf(
+                                kotlinx.serialization.json.JsonObject(
+                                    mapOf(
+                                        "label" to kotlinx.serialization.json.JsonPrimitive("Auth"),
+                                        "description" to kotlinx.serialization.json.JsonPrimitive("User login / signup."),
+                                    ),
+                                ),
+                                kotlinx.serialization.json.JsonObject(
+                                    mapOf(
+                                        "label" to kotlinx.serialization.json.JsonPrimitive("Billing"),
+                                        "description" to kotlinx.serialization.json.JsonPrimitive("Stripe integration."),
+                                    ),
+                                ),
+                            ),
+                        ),
+                    ),
+                ),
+            ),
+        ),
+    )
+    val request = ApprovalRequest(
+        id = "preview-auq",
+        source = Source.CLAUDE_CODE,
+        toolType = ToolType.ASK_USER_QUESTION,
+        hookInput = com.mikepenz.agentbuddy.model.HookInput(
+            sessionId = "sess-auq",
+            toolName = "AskUserQuestion",
+            toolInput = input,
+            cwd = "/Users/mike/dev/agent-buddy",
+        ),
+        timestamp = kotlinx.datetime.Clock.System.now(),
+        rawRequestJson = "{}",
+    )
+    val qd = com.mikepenz.agentbuddy.model.SpecialToolParser.parseUserQuestion(input)
+    return ApprovalQueueItem(
+        id = "preview-auq",
+        tool = "AskUserQuestion",
+        toolType = ToolType.ASK_USER_QUESTION,
+        source = Source.CLAUDE_CODE,
+        summary = "• Which database should the project use?\n• Which features should we enable?",
+        risk = null,
+        via = "claude",
+        timestamp = "14:02:50",
+        elapsedSeconds = 0,
+        ttlSeconds = 0,
+        session = "sess-auq",
+        prompt = "Claude Code needs answers before it can continue.",
+        workingDir = "/Users/mike/dev/agent-buddy",
+        riskAssessment = "Risk analysis is skipped for AskUserQuestion.",
+        riskAnalysisEnabled = false,
+        questionData = qd,
+        request = request,
+    )
+}
+
+private fun samplePlan(): ApprovalQueueItem {
+    val planText = "## Migration Plan\n\n1. Audit existing code\n2. Freeze dependencies\n3. Run baseline tests\n4. Apply migrations\n5. Update documentation\n6. Re-run integration suite"
+    val input = mapOf(
+        "plan" to kotlinx.serialization.json.JsonPrimitive(planText),
+    )
+    val request = ApprovalRequest(
+        id = "preview-plan",
+        source = Source.CLAUDE_CODE,
+        toolType = ToolType.PLAN,
+        hookInput = com.mikepenz.agentbuddy.model.HookInput(
+            sessionId = "sess-plan",
+            toolName = "ExitPlanMode",
+            toolInput = input,
+            cwd = "/Users/mike/dev/agent-buddy",
+        ),
+        timestamp = kotlinx.datetime.Clock.System.now(),
+        rawRequestJson = "{}",
+    )
+    val pd = com.mikepenz.agentbuddy.model.SpecialToolParser.parsePlanReview(input)
+    return ApprovalQueueItem(
+        id = "preview-plan",
+        tool = "ExitPlanMode",
+        toolType = ToolType.PLAN,
+        source = Source.CLAUDE_CODE,
+        summary = "## Migration Plan\n1. Audit existing code\n2. Freeze dependencies",
+        risk = null,
+        via = "claude",
+        timestamp = "14:03:02",
+        elapsedSeconds = 0,
+        ttlSeconds = 0,
+        session = "sess-plan",
+        prompt = "Claude Code wants to exit plan mode and start executing.",
+        workingDir = "/Users/mike/dev/agent-buddy",
+        riskAssessment = "Risk analysis is skipped for Plan approvals.",
+        riskAnalysisEnabled = false,
+        planData = pd,
+        request = request,
+    )
+}
+
+private fun specialSampleList() = listOf(sampleAskUserQuestion(), samplePlan(), sample(0))
+
 @Preview(widthDp = 1088, heightDp = 860)
 @Composable
 private fun PreviewApprovalsScreen() {
@@ -1121,6 +1349,76 @@ private fun PreviewApprovalsMediumDetail() {
             modifier = Modifier.width(620.dp).fillMaxHeight(),
             initialMediumDetailId = sampleList().first().id,
         )
+    }
+}
+
+@Preview(widthDp = 1088, heightDp = 860)
+@Composable
+private fun PreviewApprovalsSpecialWide() {
+    PreviewScaffold {
+        ApprovalsScreen(items = specialSampleList())
+    }
+}
+
+@Preview(widthDp = 620, heightDp = 860)
+@Composable
+private fun PreviewApprovalsSpecialMediumList() {
+    PreviewScaffold {
+        ApprovalsScreen(
+            items = specialSampleList(),
+            modifier = Modifier.width(620.dp).fillMaxHeight(),
+        )
+    }
+}
+
+@Preview(widthDp = 620, heightDp = 860)
+@Composable
+private fun PreviewApprovalsSpecialMediumAskDetail() {
+    PreviewScaffold {
+        ApprovalsScreen(
+            items = specialSampleList(),
+            modifier = Modifier.width(620.dp).fillMaxHeight(),
+            initialMediumDetailId = "preview-auq",
+        )
+    }
+}
+
+@Preview(widthDp = 620, heightDp = 860)
+@Composable
+private fun PreviewApprovalsSpecialMediumPlanDetail() {
+    PreviewScaffold {
+        ApprovalsScreen(
+            items = specialSampleList(),
+            modifier = Modifier.width(620.dp).fillMaxHeight(),
+            initialMediumDetailId = "preview-plan",
+        )
+    }
+}
+
+@Preview(widthDp = 400, heightDp = 420)
+@Composable
+private fun PreviewQueueRowSpecial() {
+    PreviewScaffold {
+        androidx.compose.foundation.layout.Column(
+            modifier = Modifier.width(400.dp).padding(10.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            QueueRow(item = sampleAskUserQuestion(), active = false, onClick = {})
+            QueueRow(item = samplePlan(), active = true, onClick = {})
+        }
+    }
+}
+
+@Preview(widthDp = 620, heightDp = 420)
+@Composable
+private fun PreviewMediumQueueRowSpecial() {
+    PreviewScaffold {
+        androidx.compose.foundation.layout.Column(
+            modifier = Modifier.width(620.dp),
+        ) {
+            MediumQueueRow(item = sampleAskUserQuestion(), onClick = {})
+            MediumQueueRow(item = samplePlan(), onClick = {})
+        }
     }
 }
 

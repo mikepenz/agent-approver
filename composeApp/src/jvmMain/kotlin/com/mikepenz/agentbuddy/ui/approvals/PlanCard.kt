@@ -48,24 +48,37 @@ import com.mikepenz.agentbuddy.ui.components.SlimDenyButton
 import com.mikepenz.agentbuddy.ui.theme.PreviewScaffold
 import kotlinx.datetime.Clock
 
+class PlanReviewFormState internal constructor(
+    internal val feedbackState: androidx.compose.runtime.MutableState<String>,
+    internal val expandedState: androidx.compose.runtime.MutableState<Boolean>,
+) {
+    var feedback: String
+        get() = feedbackState.value
+        set(value) { feedbackState.value = value }
+    var expanded: Boolean
+        get() = expandedState.value
+        set(value) { expandedState.value = value }
+}
+
 @Composable
-fun PlanCard(
+fun rememberPlanReviewFormState(initiallyExpanded: Boolean = false): PlanReviewFormState {
+    val feedback = remember { mutableStateOf("") }
+    val expanded = remember { mutableStateOf(initiallyExpanded) }
+    return remember(feedback, expanded) { PlanReviewFormState(feedback, expanded) }
+}
+
+@Composable
+fun PlanReviewForm(
     request: ApprovalRequest,
     planData: PlanReviewData,
-    onApprove: (String?) -> Unit,
-    onDeny: (String) -> Unit,
+    state: PlanReviewFormState,
     onPopOut: ((title: String, content: String) -> Unit)? = null,
-    slimButtons: Boolean = false,
+    modifier: Modifier = Modifier,
 ) {
-    var feedback by remember { mutableStateOf("") }
-    var planExpanded by remember { mutableStateOf(false) }
-
     val trimmedPlan = planData.plan.trim()
     val lineCount = trimmedPlan.count { it == '\n' } + 1
     val canExpand = lineCount > 3
-
-    Column(modifier = Modifier.fillMaxWidth()) {
-        // No timeout label + pop-out
+    Column(modifier = modifier.fillMaxWidth()) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -81,7 +94,6 @@ fun PlanCard(
                 }
             }
         }
-
         if (request.hookInput.cwd.isNotBlank()) {
             Text(
                 text = request.hookInput.cwd,
@@ -91,8 +103,6 @@ fun PlanCard(
                 overflow = TextOverflow.Ellipsis,
             )
         }
-
-        // Allowed prompts section
         if (planData.allowedPrompts.isNotEmpty()) {
             Spacer(Modifier.height(8.dp))
             Text(
@@ -119,13 +129,10 @@ fun PlanCard(
                 }
             }
         }
-
         Spacer(Modifier.height(8.dp))
-
-        // Plan content (collapsed/expanded)
-        if (planExpanded && canExpand) {
+        if (state.expanded && canExpand) {
             Surface(
-                onClick = { planExpanded = false },
+                onClick = { state.expanded = false },
                 modifier = Modifier
                     .fillMaxWidth()
                     .heightIn(max = 300.dp),
@@ -146,7 +153,7 @@ fun PlanCard(
             }
         } else {
             Surface(
-                onClick = { planExpanded = true },
+                onClick = { state.expanded = true },
                 enabled = canExpand,
                 modifier = Modifier.fillMaxWidth(),
                 color = Color(0xFF1E1E1E),
@@ -163,84 +170,69 @@ fun PlanCard(
                 }
             }
         }
-
         Spacer(Modifier.height(8.dp))
-
-        // Feedback input
         OutlinedTextField(
-            value = feedback,
-            onValueChange = { feedback = it },
+            value = state.feedback,
+            onValueChange = { state.feedback = it },
             modifier = Modifier.fillMaxWidth(),
             placeholder = { Text("Refine plan with instructions...", fontSize = 12.sp) },
             minLines = 2,
             maxLines = 4,
             textStyle = LocalTextStyle.current.copy(fontSize = 12.sp),
         )
+    }
+}
 
-        Spacer(Modifier.height(8.dp))
-
-        // Button logic: if feedback present, show "Refine Plan"; otherwise "Reject" + "Approve Plan"
-        val hasMessage = feedback.isNotBlank()
-
-        if (slimButtons) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
-            ) {
-                if (hasMessage) {
-                    Spacer(Modifier.weight(1f))
-                    SlimDenyButton(
-                        label = "Refine Plan",
-                        icon = null,
-                        onClick = { onDeny(feedback) },
-                    )
-                } else {
-                    SlimDenyButton(
-                        modifier = Modifier.weight(1f),
-                        label = "Reject",
-                        onClick = { onDeny("") },
-                    )
-                    SlimAllowButton(
-                        modifier = Modifier.weight(1f),
-                        label = "Approve Plan",
-                        onClick = { onApprove(null) },
-                    )
-                }
-            }
+@Composable
+fun PlanReviewActionBar(
+    state: PlanReviewFormState,
+    onApprove: (String?) -> Unit,
+    onDeny: (String) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val hasMessage = state.feedback.isNotBlank()
+    Row(
+        modifier = modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        if (hasMessage) {
+            Spacer(Modifier.weight(1f))
+            SlimDenyButton(
+                label = "Refine Plan",
+                icon = null,
+                onClick = { onDeny(state.feedback) },
+            )
         } else {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                if (hasMessage) {
-                    Spacer(Modifier.weight(1f))
-                    OutlinedButton(
-                        onClick = { onDeny(feedback) },
-                        colors = ButtonDefaults.outlinedButtonColors(
-                            contentColor = MaterialTheme.colorScheme.tertiary,
-                        ),
-                    ) {
-                        Text("Refine Plan")
-                    }
-                } else {
-                    OutlinedButton(
-                        onClick = { onDeny("") },
-                        modifier = Modifier.weight(1f),
-                        colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
-                    ) {
-                        Text("Reject")
-                    }
-                    Button(
-                        onClick = { onApprove(null) },
-                        modifier = Modifier.weight(1f),
-                    ) {
-                        Text("Approve Plan")
-                    }
-                }
-            }
+            SlimDenyButton(
+                modifier = Modifier.weight(1f),
+                label = "Reject",
+                onClick = { onDeny("") },
+            )
+            SlimAllowButton(
+                modifier = Modifier.weight(1f),
+                label = "Approve Plan",
+                onClick = { onApprove(null) },
+            )
         }
     }
 }
+
+@Composable
+fun PlanCard(
+    request: ApprovalRequest,
+    planData: PlanReviewData,
+    onApprove: (String?) -> Unit,
+    onDeny: (String) -> Unit,
+    onPopOut: ((title: String, content: String) -> Unit)? = null,
+) {
+    val state = rememberPlanReviewFormState()
+    Column(modifier = Modifier.fillMaxWidth()) {
+        PlanReviewForm(request, planData, state, onPopOut)
+        Spacer(Modifier.height(8.dp))
+        PlanReviewActionBar(state, onApprove, onDeny)
+    }
+}
+
 
 @Preview
 @Composable
@@ -307,7 +299,7 @@ private fun PreviewPlanCardSlimButtons() {
                 ),
                 onApprove = {},
                 onDeny = {},
-                slimButtons = true,
+
             )
         }
     }
