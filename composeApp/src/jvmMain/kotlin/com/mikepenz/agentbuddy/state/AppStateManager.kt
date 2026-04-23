@@ -20,6 +20,14 @@ data class AppState(
     val settings: AppSettings = AppSettings(),
     val riskResults: Map<String, RiskAnalysis> = emptyMap(),
     val preToolUseLog: List<PreToolUseEvent> = emptyList(),
+    val notices: List<AppNotice> = emptyList(),
+)
+
+data class AppNotice(
+    val id: String,
+    val message: String,
+    val detail: String? = null,
+    val timestamp: kotlinx.datetime.Instant = Clock.System.now(),
 )
 
 class AppStateManager(
@@ -249,5 +257,27 @@ class AppStateManager(
 
     fun clearPreToolUseLog() {
         _state.update { it.copy(preToolUseLog = emptyList()) }
+    }
+
+    /**
+     * Append a user-visible notice and log to file. Called by [ErrorReporter]
+     * whenever defensive parsing or a composable render catches an exception,
+     * so users can report unexpected payload shapes instead of silently losing
+     * an approval card.
+     */
+    fun reportError(message: String, throwable: Throwable? = null) {
+        logger.e(throwable) { message }
+        val notice = AppNotice(
+            id = java.util.UUID.randomUUID().toString(),
+            message = message,
+            detail = throwable?.let { "${it::class.java.simpleName}: ${it.message}" },
+        )
+        _state.update { current ->
+            current.copy(notices = (listOf(notice) + current.notices).take(10))
+        }
+    }
+
+    fun dismissNotice(id: String) {
+        _state.update { it.copy(notices = it.notices.filter { n -> n.id != id }) }
     }
 }

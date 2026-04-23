@@ -2,9 +2,8 @@ package com.mikepenz.agentbuddy.ui.approvals
 
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.runtime.Composable
+import com.mikepenz.agentbuddy.util.asStringOrNull
 import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.contentOrNull
-import kotlinx.serialization.json.jsonPrimitive
 
 @Composable
 fun ToolContentSummary(toolName: String, toolInput: Map<String, JsonElement>, cwd: String = "") {
@@ -28,25 +27,25 @@ fun ToolContentSummary(toolName: String, toolInput: Map<String, JsonElement>, cw
 /** Single-line plain-text summary of the tool operation for queue rows. */
 fun toolSummaryText(toolName: String, toolInput: Map<String, JsonElement>): String = when {
     toolName.equals("Bash", ignoreCase = true) ->
-        toolInput["command"]?.jsonPrimitive?.contentOrNull ?: toolName
+        toolInput["command"].asStringOrNull() ?: toolName
     toolName.equals("Read", ignoreCase = true) ||
     toolName.equals("Edit", ignoreCase = true) ||
     toolName.equals("Write", ignoreCase = true) ||
     toolName.equals("MultiEdit", ignoreCase = true) ->
-        toolInput["file_path"]?.jsonPrimitive?.contentOrNull ?: toolName
+        toolInput["file_path"].asStringOrNull() ?: toolName
     toolName.equals("WebFetch", ignoreCase = true) ->
-        toolInput["url"]?.jsonPrimitive?.contentOrNull ?: toolName
+        toolInput["url"].asStringOrNull() ?: toolName
     toolName.equals("WebSearch", ignoreCase = true) ->
-        toolInput["query"]?.jsonPrimitive?.contentOrNull ?: toolName
+        toolInput["query"].asStringOrNull() ?: toolName
     toolName.equals("Grep", ignoreCase = true) ->
         buildString {
-            toolInput["pattern"]?.jsonPrimitive?.contentOrNull?.let { append(it) }
-            toolInput["path"]?.jsonPrimitive?.contentOrNull?.let { append(" in $it") }
+            toolInput["pattern"].asStringOrNull()?.let { append(it) }
+            toolInput["path"].asStringOrNull()?.let { append(" in $it") }
         }.ifBlank { toolName }
     toolName.equals("Glob", ignoreCase = true) ->
-        toolInput["pattern"]?.jsonPrimitive?.contentOrNull ?: toolName
+        toolInput["pattern"].asStringOrNull() ?: toolName
     else ->
-        toolInput.values.firstOrNull()?.jsonPrimitive?.contentOrNull?.take(120) ?: toolName
+        toolInput.values.firstOrNull().asStringOrNull()?.take(120) ?: toolName
 }
 
 fun toolPopOutContent(toolName: String, toolInput: Map<String, JsonElement>): String {

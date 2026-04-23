@@ -21,6 +21,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.mikepenz.agentbuddy.ui.approvals.ApprovalsTabHost
+import com.mikepenz.agentbuddy.ui.components.NoticeBannerStack
 import com.mikepenz.agentbuddy.ui.history.HistoryTabHost
 import com.mikepenz.agentbuddy.ui.protectionlog.ProtectionLogTabHost
 import com.mikepenz.agentbuddy.ui.settings.SettingsTabHost
@@ -52,6 +53,7 @@ fun App(
     val appViewModel: AppViewModel = metroViewModel()
     val tabState by appViewModel.tabState.collectAsState()
     val selectedTab by appViewModel.selectedTab.collectAsState()
+    val notices by appViewModel.notices.collectAsState()
     val visibleTabs = visibleTabs(tabState.devMode)
     val currentTab = resolveTab(selectedTab, tabState.devMode)
 
@@ -70,6 +72,7 @@ fun App(
                 )
             } else {
                 Column(modifier = Modifier.fillMaxSize()) {
+                    NoticeBannerStack(notices = notices, onDismiss = appViewModel::dismissNotice)
                     if (tabState.awayMode) {
                         Surface(
                             color = MaterialTheme.colorScheme.tertiaryContainer,

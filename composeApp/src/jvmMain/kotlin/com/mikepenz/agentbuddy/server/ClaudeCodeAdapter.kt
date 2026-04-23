@@ -42,7 +42,7 @@ class ClaudeCodeAdapter {
                 rawRequestJson = rawJson,
             )
         } catch (e: Exception) {
-            logger.w(e) { "Failed to parse hook JSON" }
+            com.mikepenz.agentbuddy.logging.ErrorReporter.report("Failed to parse Claude Code hook JSON", e)
             null
         }
     }

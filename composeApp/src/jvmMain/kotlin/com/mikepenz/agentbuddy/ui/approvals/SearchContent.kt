@@ -24,16 +24,15 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.mikepenz.agentbuddy.ui.theme.PreviewScaffold
 import com.mikepenz.agentbuddy.ui.theme.ToolSearchColor
+import com.mikepenz.agentbuddy.util.asIntOrNull
+import com.mikepenz.agentbuddy.util.asStringOrNull
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.contentOrNull
-import kotlinx.serialization.json.intOrNull
-import kotlinx.serialization.json.jsonPrimitive
 
 @Composable
 fun SearchContent(toolName: String, toolInput: Map<String, JsonElement>) {
-    val pattern = toolInput["pattern"]?.jsonPrimitive?.contentOrNull ?: ""
-    val path = toolInput["path"]?.jsonPrimitive?.contentOrNull
+    val pattern = toolInput["pattern"].asStringOrNull() ?: ""
+    val path = toolInput["path"].asStringOrNull()
 
     Column(modifier = Modifier.fillMaxWidth()) {
         Text(
@@ -72,9 +71,9 @@ fun SearchContent(toolName: String, toolInput: Map<String, JsonElement>) {
             }
 
             if (toolName.equals("Grep", ignoreCase = true)) {
-                val glob = toolInput["glob"]?.jsonPrimitive?.contentOrNull
-                val outputMode = toolInput["output_mode"]?.jsonPrimitive?.contentOrNull
-                val context = toolInput["context"]?.jsonPrimitive?.intOrNull
+                val glob = toolInput["glob"].asStringOrNull()
+                val outputMode = toolInput["output_mode"].asStringOrNull()
+                val context = toolInput["context"].asIntOrNull()
 
                 if (!glob.isNullOrBlank()) {
                     SmallBadge(text = glob, color = ToolSearchColor)
@@ -162,14 +161,14 @@ private fun PreviewGlob() {
 }
 
 fun searchPopOutContent(toolName: String, toolInput: Map<String, JsonElement>): String {
-    val pattern = toolInput["pattern"]?.jsonPrimitive?.contentOrNull ?: ""
-    val path = toolInput["path"]?.jsonPrimitive?.contentOrNull ?: ""
+    val pattern = toolInput["pattern"].asStringOrNull() ?: ""
+    val path = toolInput["path"].asStringOrNull() ?: ""
     return buildString {
         appendLine("**Pattern:** `$pattern`")
         if (path.isNotBlank()) appendLine("**Path:** `$path`")
         if (toolName.equals("Grep", ignoreCase = true)) {
-            val glob = toolInput["glob"]?.jsonPrimitive?.contentOrNull
-            val outputMode = toolInput["output_mode"]?.jsonPrimitive?.contentOrNull
+            val glob = toolInput["glob"].asStringOrNull()
+            val outputMode = toolInput["output_mode"].asStringOrNull()
             if (!glob.isNullOrBlank()) appendLine("**Glob:** `$glob`")
             if (!outputMode.isNullOrBlank()) appendLine("**Mode:** $outputMode")
         }

@@ -21,15 +21,14 @@ import com.mikepenz.markdown.compose.elements.highlightedCodeBlock
 import com.mikepenz.markdown.compose.elements.highlightedCodeFence
 import com.mikepenz.markdown.m3.Markdown
 import com.mikepenz.markdown.m3.markdownColor
+import com.mikepenz.agentbuddy.util.asStringOrNull
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.contentOrNull
-import kotlinx.serialization.json.jsonPrimitive
 
 @Composable
 fun BashContent(toolInput: Map<String, JsonElement>, cwd: String = "") {
-    val command = toolInput["command"]?.jsonPrimitive?.contentOrNull ?: ""
-    val description = toolInput["description"]?.jsonPrimitive?.contentOrNull
+    val command = toolInput["command"].asStringOrNull() ?: ""
+    val description = toolInput["description"].asStringOrNull()
 
     Column(modifier = Modifier.fillMaxWidth()) {
         if (!description.isNullOrBlank()) {
@@ -118,8 +117,8 @@ private fun PreviewBashNoDescription() {
 }
 
 fun bashPopOutContent(toolInput: Map<String, JsonElement>): String {
-    val command = toolInput["command"]?.jsonPrimitive?.contentOrNull ?: ""
-    val description = toolInput["description"]?.jsonPrimitive?.contentOrNull
+    val command = toolInput["command"].asStringOrNull() ?: ""
+    val description = toolInput["description"].asStringOrNull()
     return buildString {
         if (!description.isNullOrBlank()) appendLine("**$description**\n")
         appendLine("```bash\n$command\n```")

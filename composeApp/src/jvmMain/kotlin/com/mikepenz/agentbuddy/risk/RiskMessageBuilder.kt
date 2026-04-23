@@ -1,10 +1,10 @@
 package com.mikepenz.agentbuddy.risk
 
 import com.mikepenz.agentbuddy.model.HookInput
+import com.mikepenz.agentbuddy.util.asStringOrNull
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
-import kotlinx.serialization.json.jsonPrimitive
 
 object RiskMessageBuilder {
 
@@ -25,11 +25,11 @@ object RiskMessageBuilder {
 
     private fun formatToolInput(toolName: String, toolInput: Map<String, JsonElement>): String {
         return when (toolName.lowercase()) {
-            "bash" -> toolInput["command"]?.jsonPrimitive?.contentOrNull ?: toolInput.toString()
+            "bash" -> toolInput["command"].asStringOrNull() ?: toolInput.toString()
             "edit" -> {
-                val filePath = toolInput["file_path"]?.jsonPrimitive?.contentOrNull ?: ""
-                val oldStr = toolInput["old_string"]?.jsonPrimitive?.contentOrNull ?: ""
-                val newStr = toolInput["new_string"]?.jsonPrimitive?.contentOrNull ?: ""
+                val filePath = toolInput["file_path"].asStringOrNull() ?: ""
+                val oldStr = toolInput["old_string"].asStringOrNull() ?: ""
+                val newStr = toolInput["new_string"].asStringOrNull() ?: ""
                 "File: $filePath\nOld: $oldStr\nNew: $newStr"
             }
             else -> toolInput.entries.joinToString("\n") { (k, v) ->

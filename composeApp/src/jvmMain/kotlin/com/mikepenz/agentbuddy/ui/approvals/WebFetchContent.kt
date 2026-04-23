@@ -24,17 +24,16 @@ import androidx.compose.ui.unit.dp
 import com.mikepenz.agentbuddy.ui.icons.FeatherExternalLink
 import com.mikepenz.agentbuddy.ui.theme.PreviewScaffold
 import com.mikepenz.agentbuddy.ui.theme.ToolWebColor
+import com.mikepenz.agentbuddy.util.asStringOrNull
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.contentOrNull
-import kotlinx.serialization.json.jsonPrimitive
 import java.awt.Desktop
 import java.net.URI
 
 @Composable
 fun WebFetchContent(toolInput: Map<String, JsonElement>) {
-    val url = toolInput["url"]?.jsonPrimitive?.contentOrNull ?: ""
-    val prompt = toolInput["prompt"]?.jsonPrimitive?.contentOrNull
+    val url = toolInput["url"].asStringOrNull() ?: ""
+    val prompt = toolInput["prompt"].asStringOrNull()
 
     Column(modifier = Modifier.fillMaxWidth()) {
         Row(
@@ -142,8 +141,8 @@ private fun PreviewWebFetchNoPrompt() {
 }
 
 fun webFetchPopOutContent(toolInput: Map<String, JsonElement>): String {
-    val url = toolInput["url"]?.jsonPrimitive?.contentOrNull ?: ""
-    val prompt = toolInput["prompt"]?.jsonPrimitive?.contentOrNull
+    val url = toolInput["url"].asStringOrNull() ?: ""
+    val prompt = toolInput["prompt"].asStringOrNull()
     return buildString {
         appendLine("**URL:** $url")
         if (!prompt.isNullOrBlank()) {

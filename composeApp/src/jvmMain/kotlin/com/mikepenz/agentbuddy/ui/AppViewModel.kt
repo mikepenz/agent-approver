@@ -8,6 +8,7 @@ import com.mikepenz.agentbuddy.di.AppScope
 import com.mikepenz.agentbuddy.hook.CopilotBridge
 import com.mikepenz.agentbuddy.hook.HookRegistry
 import com.mikepenz.agentbuddy.hook.RegistrationEvents
+import com.mikepenz.agentbuddy.state.AppNotice
 import com.mikepenz.agentbuddy.state.AppStateManager
 import dev.zacsweers.metro.ContributesIntoMap
 import dev.zacsweers.metro.Inject
@@ -35,7 +36,7 @@ import kotlinx.coroutines.withContext
 @ViewModelKey
 @ContributesIntoMap(AppScope::class)
 class AppViewModel(
-    stateManager: AppStateManager,
+    private val stateManager: AppStateManager,
     env: AppEnvironment,
     private val hookRegistry: HookRegistry,
     private val copilotBridge: CopilotBridge,
@@ -114,6 +115,12 @@ class AppViewModel(
     fun selectTab(index: Int) {
         _selectedTab.value = index
     }
+
+    val notices: StateFlow<List<AppNotice>> = stateManager.state
+        .map { it.notices }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+
+    fun dismissNotice(id: String) = stateManager.dismissNotice(id)
 }
 
 /**

@@ -41,7 +41,7 @@ import com.mikepenz.agentbuddy.state.PreToolUseEvent
 import com.mikepenz.agentbuddy.state.ProtectionLogConclusion
 import com.mikepenz.agentbuddy.ui.approvals.ToolBadge
 import kotlinx.datetime.Clock
-import kotlinx.serialization.json.jsonPrimitive
+import com.mikepenz.agentbuddy.util.asStringOrNull
 import kotlin.time.Duration.Companion.hours
 import kotlin.time.Duration.Companion.minutes
 
@@ -71,20 +71,20 @@ private fun summaryText(event: PreToolUseEvent): String {
     val input = event.request.hookInput
     return when {
         input.toolName.equals("Bash", ignoreCase = true) ->
-            input.toolInput["command"]?.jsonPrimitive?.content ?: input.toolName
+            input.toolInput["command"].asStringOrNull() ?: input.toolName
         input.toolName.equals("Edit", ignoreCase = true) ||
                 input.toolName.equals("Write", ignoreCase = true) ||
                 input.toolName.equals("Read", ignoreCase = true) ->
-            input.toolInput["file_path"]?.jsonPrimitive?.content ?: input.toolName
+            input.toolInput["file_path"].asStringOrNull() ?: input.toolName
         input.toolName.equals("WebFetch", ignoreCase = true) ->
-            input.toolInput["url"]?.jsonPrimitive?.content ?: input.toolName
+            input.toolInput["url"].asStringOrNull() ?: input.toolName
         input.toolName.equals("WebSearch", ignoreCase = true) ->
-            input.toolInput["query"]?.jsonPrimitive?.content ?: input.toolName
+            input.toolInput["query"].asStringOrNull() ?: input.toolName
         input.toolName.equals("Grep", ignoreCase = true) ||
                 input.toolName.equals("Glob", ignoreCase = true) ->
-            input.toolInput["pattern"]?.jsonPrimitive?.content ?: input.toolName
+            input.toolInput["pattern"].asStringOrNull() ?: input.toolName
         event.request.toolType == ToolType.ASK_USER_QUESTION ->
-            input.toolInput["question"]?.jsonPrimitive?.content?.take(80) ?: "Question"
+            input.toolInput["question"].asStringOrNull()?.take(80) ?: "Question"
         event.request.toolType == ToolType.PLAN -> "Plan"
         else -> input.toolName
     }

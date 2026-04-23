@@ -33,16 +33,15 @@ import com.mikepenz.markdown.compose.elements.highlightedCodeBlock
 import com.mikepenz.markdown.compose.elements.highlightedCodeFence
 import com.mikepenz.markdown.m3.Markdown
 import com.mikepenz.markdown.m3.markdownColor
+import com.mikepenz.agentbuddy.util.asBooleanOrNull
+import com.mikepenz.agentbuddy.util.asIntOrNull
+import com.mikepenz.agentbuddy.util.asStringOrNull
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.booleanOrNull
-import kotlinx.serialization.json.contentOrNull
-import kotlinx.serialization.json.intOrNull
-import kotlinx.serialization.json.jsonPrimitive
 
 @Composable
 fun FileOperationContent(toolName: String, toolInput: Map<String, JsonElement>) {
-    val filePath = toolInput["file_path"]?.jsonPrimitive?.contentOrNull ?: ""
+    val filePath = toolInput["file_path"].asStringOrNull() ?: ""
     val extension = filePath.substringAfterLast('.', "")
 
     Column(modifier = Modifier.fillMaxWidth()) {
@@ -73,8 +72,8 @@ fun FileOperationContent(toolName: String, toolInput: Map<String, JsonElement>) 
 
 @Composable
 private fun ReadDetail(toolInput: Map<String, JsonElement>) {
-    val offset = toolInput["offset"]?.jsonPrimitive?.intOrNull
-    val limit = toolInput["limit"]?.jsonPrimitive?.intOrNull
+    val offset = toolInput["offset"].asIntOrNull()
+    val limit = toolInput["limit"].asIntOrNull()
     val rangeText = when {
         offset != null && limit != null -> "Lines ${offset + 1}\u2013${offset + limit}"
         offset != null -> "From line ${offset + 1}"
@@ -97,9 +96,9 @@ private fun ReadDetail(toolInput: Map<String, JsonElement>) {
 
 @Composable
 private fun EditDetail(toolInput: Map<String, JsonElement>, extension: String) {
-    val oldStr = toolInput["old_string"]?.jsonPrimitive?.contentOrNull ?: ""
-    val newStr = toolInput["new_string"]?.jsonPrimitive?.contentOrNull ?: ""
-    val replaceAll = toolInput["replace_all"]?.jsonPrimitive?.booleanOrNull ?: false
+    val oldStr = toolInput["old_string"].asStringOrNull() ?: ""
+    val newStr = toolInput["new_string"].asStringOrNull() ?: ""
+    val replaceAll = toolInput["replace_all"].asBooleanOrNull() ?: false
 
     if (replaceAll) {
         Surface(
@@ -144,7 +143,7 @@ private fun EditDetail(toolInput: Map<String, JsonElement>, extension: String) {
 
 @Composable
 private fun WriteDetail(toolInput: Map<String, JsonElement>, extension: String) {
-    val content = toolInput["content"]?.jsonPrimitive?.contentOrNull ?: ""
+    val content = toolInput["content"].asStringOrNull() ?: ""
     var expanded by remember { mutableStateOf(false) }
     val lineCount = content.count { it == '\n' } + 1
     val canExpand = lineCount > 3
@@ -302,13 +301,13 @@ private fun PreviewWrite() {
 }
 
 fun fileOperationPopOutContent(toolName: String, toolInput: Map<String, JsonElement>): String {
-    val filePath = toolInput["file_path"]?.jsonPrimitive?.contentOrNull ?: ""
+    val filePath = toolInput["file_path"].asStringOrNull() ?: ""
     val extension = filePath.substringAfterLast('.', "")
     val lang = languageFromExtension(extension)
     return when (toolName.lowercase()) {
         "read" -> {
-            val offset = toolInput["offset"]?.jsonPrimitive?.intOrNull
-            val limit = toolInput["limit"]?.jsonPrimitive?.intOrNull
+            val offset = toolInput["offset"].asIntOrNull()
+            val limit = toolInput["limit"].asIntOrNull()
             val range = when {
                 offset != null && limit != null -> "Lines ${offset + 1}\u2013${offset + limit}"
                 offset != null -> "From line ${offset + 1}"
@@ -319,9 +318,9 @@ fun fileOperationPopOutContent(toolName: String, toolInput: Map<String, JsonElem
         }
 
         "edit" -> {
-            val oldStr = toolInput["old_string"]?.jsonPrimitive?.contentOrNull ?: ""
-            val newStr = toolInput["new_string"]?.jsonPrimitive?.contentOrNull ?: ""
-            val replaceAll = toolInput["replace_all"]?.jsonPrimitive?.booleanOrNull ?: false
+            val oldStr = toolInput["old_string"].asStringOrNull() ?: ""
+            val newStr = toolInput["new_string"].asStringOrNull() ?: ""
+            val replaceAll = toolInput["replace_all"].asBooleanOrNull() ?: false
             buildString {
                 appendLine("**File:** `$filePath`")
                 if (replaceAll) appendLine("**\u26A0 Replace All**")
@@ -334,7 +333,7 @@ fun fileOperationPopOutContent(toolName: String, toolInput: Map<String, JsonElem
         }
 
         "write" -> {
-            val content = toolInput["content"]?.jsonPrimitive?.contentOrNull ?: ""
+            val content = toolInput["content"].asStringOrNull() ?: ""
             "**File:** `$filePath`\n\n```$lang\n$content\n```"
         }
 

@@ -10,7 +10,7 @@ import com.mikepenz.agentbuddy.model.ToolType
 import com.mikepenz.agentbuddy.ui.components.DecisionStatus
 import dev.zacsweers.metrox.viewmodel.metroViewModel
 import kotlinx.datetime.Instant
-import kotlinx.serialization.json.jsonPrimitive
+import com.mikepenz.agentbuddy.util.asStringOrNull
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.days
 import kotlin.time.Duration.Companion.hours
@@ -59,8 +59,8 @@ internal fun ApprovalResult.toHistoryEntry(now: Instant): HistoryEntry {
         }
     val assessmentText = riskAnalysis?.let { "Level ${it.risk} — ${it.message}" }
         ?: protectionDetail
-    val promptText = req.hookInput.toolInput["prompt"]?.jsonPrimitive?.content
-        ?: req.hookInput.toolInput["question"]?.jsonPrimitive?.content
+    val promptText = req.hookInput.toolInput["prompt"].asStringOrNull()
+        ?: req.hookInput.toolInput["question"].asStringOrNull()
 
     return HistoryEntry(
         id = req.id,
@@ -99,15 +99,15 @@ private fun summaryText(request: ApprovalRequest): String {
     val name = request.hookInput.toolName
     val input = request.hookInput.toolInput
     return when {
-        name.equals("Bash", true) -> input["command"]?.jsonPrimitive?.content ?: name
+        name.equals("Bash", true) -> input["command"].asStringOrNull() ?: name
         name.equals("Edit", true) || name.equals("Write", true) || name.equals("Read", true) ->
-            input["file_path"]?.jsonPrimitive?.content ?: name
-        name.equals("WebFetch", true) -> input["url"]?.jsonPrimitive?.content ?: name
-        name.equals("WebSearch", true) -> input["query"]?.jsonPrimitive?.content ?: name
+            input["file_path"].asStringOrNull() ?: name
+        name.equals("WebFetch", true) -> input["url"].asStringOrNull() ?: name
+        name.equals("WebSearch", true) -> input["query"].asStringOrNull() ?: name
         name.equals("Grep", true) || name.equals("Glob", true) ->
-            input["pattern"]?.jsonPrimitive?.content ?: name
+            input["pattern"].asStringOrNull() ?: name
         request.toolType == ToolType.ASK_USER_QUESTION ->
-            input["question"]?.jsonPrimitive?.content?.take(120) ?: "Question"
+            input["question"].asStringOrNull()?.take(120) ?: "Question"
         request.toolType == ToolType.PLAN -> "Plan"
         else -> name
     }

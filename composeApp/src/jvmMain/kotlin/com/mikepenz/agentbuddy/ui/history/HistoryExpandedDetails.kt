@@ -49,13 +49,13 @@ import com.mikepenz.agentbuddy.ui.icons.LucideGlobe
 import com.mikepenz.agentbuddy.ui.theme.AgentBuddyColors
 import com.mikepenz.agentbuddy.ui.theme.ToolWeb
 import com.mikepenz.agentbuddy.ui.theme.WarnYellow
+import com.mikepenz.agentbuddy.util.asArrayOrNull
+import com.mikepenz.agentbuddy.util.asBooleanOrNull
+import com.mikepenz.agentbuddy.util.asObjectOrNull
+import com.mikepenz.agentbuddy.util.asStringOrNull
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.booleanOrNull
-import kotlinx.serialization.json.contentOrNull
-import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
 import java.awt.Desktop
 import java.net.URI
 
@@ -209,8 +209,8 @@ private fun ToolDetailBlock(entry: HistoryEntry) {
 
 @Composable
 private fun BashDetail(toolInput: Map<String, JsonElement>) {
-    val command = toolInput["command"]?.jsonPrimitive?.contentOrNull.orEmpty()
-    val description = toolInput["description"]?.jsonPrimitive?.contentOrNull
+    val command = toolInput["command"].asStringOrNull().orEmpty()
+    val description = toolInput["description"].asStringOrNull()
     if (command.isBlank() && description.isNullOrBlank()) return
 
     DetailCard {
@@ -236,8 +236,8 @@ private fun BashDetail(toolInput: Map<String, JsonElement>) {
 
 @Composable
 private fun WebFetchDetail(toolInput: Map<String, JsonElement>) {
-    val url = toolInput["url"]?.jsonPrimitive?.contentOrNull.orEmpty()
-    val prompt = toolInput["prompt"]?.jsonPrimitive?.contentOrNull
+    val url = toolInput["url"].asStringOrNull().orEmpty()
+    val prompt = toolInput["prompt"].asStringOrNull()
     if (url.isBlank() && prompt.isNullOrBlank()) return
 
     DetailCard {
@@ -296,10 +296,10 @@ private fun WebFetchDetail(toolInput: Map<String, JsonElement>) {
 
 @Composable
 private fun EditDetail(toolInput: Map<String, JsonElement>) {
-    val path = toolInput["file_path"]?.jsonPrimitive?.contentOrNull.orEmpty()
-    val oldStr = toolInput["old_string"]?.jsonPrimitive?.contentOrNull.orEmpty()
-    val newStr = toolInput["new_string"]?.jsonPrimitive?.contentOrNull.orEmpty()
-    val replaceAll = toolInput["replace_all"]?.jsonPrimitive?.booleanOrNull == true
+    val path = toolInput["file_path"].asStringOrNull().orEmpty()
+    val oldStr = toolInput["old_string"].asStringOrNull().orEmpty()
+    val newStr = toolInput["new_string"].asStringOrNull().orEmpty()
+    val replaceAll = toolInput["replace_all"].asBooleanOrNull() == true
     if (path.isBlank() && oldStr.isBlank() && newStr.isBlank()) return
 
     DetailCard {
@@ -328,8 +328,8 @@ private fun EditDetail(toolInput: Map<String, JsonElement>) {
 
 @Composable
 private fun WriteDetail(toolInput: Map<String, JsonElement>) {
-    val path = toolInput["file_path"]?.jsonPrimitive?.contentOrNull.orEmpty()
-    val content = toolInput["content"]?.jsonPrimitive?.contentOrNull.orEmpty()
+    val path = toolInput["file_path"].asStringOrNull().orEmpty()
+    val content = toolInput["content"].asStringOrNull().orEmpty()
     if (path.isBlank() && content.isBlank()) return
 
     DetailCard {
@@ -342,9 +342,9 @@ private fun WriteDetail(toolInput: Map<String, JsonElement>) {
 
 @Composable
 private fun ReadDetail(toolInput: Map<String, JsonElement>) {
-    val path = toolInput["file_path"]?.jsonPrimitive?.contentOrNull.orEmpty()
-    val offset = toolInput["offset"]?.jsonPrimitive?.contentOrNull?.toIntOrNull()
-    val limit = toolInput["limit"]?.jsonPrimitive?.contentOrNull?.toIntOrNull()
+    val path = toolInput["file_path"].asStringOrNull().orEmpty()
+    val offset = toolInput["offset"].asStringOrNull()?.toIntOrNull()
+    val limit = toolInput["limit"].asStringOrNull()?.toIntOrNull()
     if (path.isBlank()) return
 
     val range = when {
@@ -375,10 +375,10 @@ private fun AskUserQuestionDetail(toolInput: Map<String, JsonElement>) {
         DetailField(label = "Questions") {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 questions.forEachIndexed { idx, element ->
-                    val obj = element.jsonObject
-                    val header = obj["header"]?.jsonPrimitive?.contentOrNull.orEmpty()
-                    val question = obj["question"]?.jsonPrimitive?.contentOrNull.orEmpty()
-                    val multi = obj["multiSelect"]?.jsonPrimitive?.booleanOrNull == true
+                    val obj = element.asObjectOrNull() ?: return@forEachIndexed
+                    val header = obj["header"].asStringOrNull().orEmpty()
+                    val question = obj["question"].asStringOrNull().orEmpty()
+                    val multi = obj["multiSelect"].asBooleanOrNull() == true
                     val options = (obj["options"] as? JsonArray).orEmpty()
                     Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
                         if (header.isNotBlank()) {
@@ -400,9 +400,9 @@ private fun AskUserQuestionDetail(toolInput: Map<String, JsonElement>) {
                         if (options.isNotEmpty()) {
                             Column(modifier = Modifier.padding(start = 8.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                                 options.forEach { optEl ->
-                                    val opt = optEl.jsonObject
-                                    val label = opt["label"]?.jsonPrimitive?.contentOrNull.orEmpty()
-                                    val desc = opt["description"]?.jsonPrimitive?.contentOrNull.orEmpty()
+                                    val opt = optEl.asObjectOrNull() ?: return@forEach
+                                    val label = opt["label"].asStringOrNull().orEmpty()
+                                    val desc = opt["description"].asStringOrNull().orEmpty()
                                     val bullet = if (multi) "☐" else "○"
                                     val text = buildString {
                                         append(bullet); append("  ")

@@ -111,7 +111,7 @@ class CopilotAdapter {
                 rawRequestJson = rawJson,
             )
         } catch (e: Exception) {
-            logger.w(e) { "Failed to parse Copilot hook JSON" }
+            com.mikepenz.agentbuddy.logging.ErrorReporter.report("Failed to parse Copilot hook JSON", e)
             null
         }
     }

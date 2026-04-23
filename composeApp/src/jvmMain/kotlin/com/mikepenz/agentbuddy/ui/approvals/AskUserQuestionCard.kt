@@ -39,14 +39,13 @@ import com.mikepenz.agentbuddy.ui.components.SlimAllowButton
 import com.mikepenz.agentbuddy.ui.components.SlimDenyButton
 import com.mikepenz.agentbuddy.ui.theme.PreviewScaffold
 import kotlinx.datetime.Clock
+import com.mikepenz.agentbuddy.util.asArrayOrNull
+import com.mikepenz.agentbuddy.util.asObjectOrNull
+import com.mikepenz.agentbuddy.util.asStringOrNull
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.contentOrNull
-import kotlinx.serialization.json.jsonArray
-import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
 
 @Composable
 fun AskUserQuestionCard(
@@ -230,21 +229,21 @@ internal fun buildUpdatedInput(
     val questionsElement = originalInput["questions"] ?: return result
 
     try {
-        val questionsArray = questionsElement.jsonArray
+        val questionsArray = questionsElement.asArrayOrNull() ?: return result
         val answersMap = mutableMapOf<String, JsonElement>()
 
         questionsArray.forEachIndexed { qIdx, questionElement ->
-            val obj = questionElement.jsonObject
-            val questionText = obj["question"]?.jsonPrimitive?.contentOrNull ?: return@forEachIndexed
+            val obj = questionElement.asObjectOrNull() ?: return@forEachIndexed
+            val questionText = obj["question"].asStringOrNull() ?: return@forEachIndexed
 
             val customAnswer = customAnswers[qIdx]?.takeIf { it.isNotBlank() }
             val answerValue = if (customAnswer != null) {
                 customAnswer
             } else {
                 val selectedIndices = selections[qIdx] ?: emptySet()
-                val options = (obj["options"] as? JsonArray)
+                val options = obj["options"].asArrayOrNull()
                 selectedIndices.sorted().mapNotNull { idx ->
-                    options?.getOrNull(idx)?.jsonObject?.get("label")?.jsonPrimitive?.contentOrNull
+                    options?.getOrNull(idx)?.asObjectOrNull()?.get("label").asStringOrNull()
                 }.joinToString(", ")
             }
 

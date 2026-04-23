@@ -68,7 +68,10 @@ interface AppProviders {
         databaseStorage = databaseStorage,
         settingsStorage = settingsStorage,
         devMode = env.devMode,
-    ).also { it.initialize() }
+    ).also {
+        it.initialize()
+        com.mikepenz.agentbuddy.logging.ErrorReporter.bind(it)
+    }
 
     @Provides
     @SingleIn(AppScope::class)

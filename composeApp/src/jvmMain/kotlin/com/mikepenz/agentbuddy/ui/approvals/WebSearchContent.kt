@@ -18,18 +18,18 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.mikepenz.agentbuddy.ui.theme.PreviewScaffold
 import com.mikepenz.agentbuddy.ui.theme.ToolWebColor
-import kotlinx.serialization.json.JsonElement
+import com.mikepenz.agentbuddy.util.asArrayOrNull
+import com.mikepenz.agentbuddy.util.asStringOrNull
+import com.mikepenz.agentbuddy.util.strings
 import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.contentOrNull
-import kotlinx.serialization.json.jsonArray
-import kotlinx.serialization.json.jsonPrimitive
 
 @Composable
 fun WebSearchContent(toolInput: Map<String, JsonElement>) {
-    val query = toolInput["query"]?.jsonPrimitive?.contentOrNull ?: ""
-    val allowed = toolInput["allowed_domains"]?.jsonArray?.mapNotNull { it.jsonPrimitive.contentOrNull }.orEmpty()
-    val blocked = toolInput["blocked_domains"]?.jsonArray?.mapNotNull { it.jsonPrimitive.contentOrNull }.orEmpty()
+    val query = toolInput["query"].asStringOrNull() ?: ""
+    val allowed = toolInput["allowed_domains"].asArrayOrNull()?.strings().orEmpty()
+    val blocked = toolInput["blocked_domains"].asArrayOrNull()?.strings().orEmpty()
 
     Column(modifier = Modifier.fillMaxWidth()) {
         Surface(
@@ -74,9 +74,9 @@ fun WebSearchContent(toolInput: Map<String, JsonElement>) {
 }
 
 fun webSearchPopOutContent(toolInput: Map<String, JsonElement>): String {
-    val query = toolInput["query"]?.jsonPrimitive?.contentOrNull ?: ""
-    val allowed = toolInput["allowed_domains"]?.jsonArray?.mapNotNull { it.jsonPrimitive.contentOrNull }.orEmpty()
-    val blocked = toolInput["blocked_domains"]?.jsonArray?.mapNotNull { it.jsonPrimitive.contentOrNull }.orEmpty()
+    val query = toolInput["query"].asStringOrNull() ?: ""
+    val allowed = toolInput["allowed_domains"].asArrayOrNull()?.strings().orEmpty()
+    val blocked = toolInput["blocked_domains"].asArrayOrNull()?.strings().orEmpty()
     return buildString {
         appendLine("**Query:** $query")
         if (allowed.isNotEmpty()) {
