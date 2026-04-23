@@ -61,6 +61,7 @@ import io.github.kdroidfilter.nucleus.window.material.MaterialDecoratedWindow
 import io.github.kdroidfilter.nucleus.window.material.MaterialTitleBar
 import java.awt.Desktop
 import java.awt.Dimension
+import java.awt.Toolkit
 import java.awt.desktop.AppReopenedListener
 
 private const val MIN_WINDOW_WIDTH = 360
@@ -275,9 +276,20 @@ fun ApplicationScope.AgentBuddyShell(graph: AppGraph, devMode: Boolean, exitAppl
                             onPopOut = { title, content -> popOutState = title to content },
                             onShowLicenses = { showLicenses = true },
                             onExpand = {
-                                val targetPx = (800 * window.graphicsConfiguration.defaultTransform.scaleX).toInt()
-                                if (window.width < targetPx) {
-                                    window.setSize(targetPx, window.height.coerceAtLeast(600))
+                                val gc = window.graphicsConfiguration
+                                val screenBounds = gc.bounds
+                                val insets = Toolkit.getDefaultToolkit().getScreenInsets(gc)
+                                val availableWidth = screenBounds.width - insets.left - insets.right
+                                val availableHeight = screenBounds.height - insets.top - insets.bottom
+                                val desiredWidthPx = (800 * gc.defaultTransform.scaleX).toInt()
+                                val desiredHeightPx = window.height.coerceAtLeast(600)
+                                val targetWidthPx = desiredWidthPx.coerceAtMost(availableWidth)
+                                val targetHeightPx = desiredHeightPx.coerceAtMost(availableHeight)
+                                if (window.width < targetWidthPx || window.height < targetHeightPx) {
+                                    window.setSize(
+                                        targetWidthPx.coerceAtLeast(window.width.coerceAtMost(availableWidth)),
+                                        targetHeightPx.coerceAtLeast(window.height.coerceAtMost(availableHeight)),
+                                    )
                                     window.setLocationRelativeTo(null)
                                 }
                             },
