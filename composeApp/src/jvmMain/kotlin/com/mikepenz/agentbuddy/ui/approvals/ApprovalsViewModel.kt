@@ -2,10 +2,13 @@ package com.mikepenz.agentbuddy.ui.approvals
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import co.touchlab.kermit.Logger
 import com.mikepenz.agentbuddy.di.AppScope
 import com.mikepenz.agentbuddy.model.AppSettings
 import com.mikepenz.agentbuddy.model.ApprovalRequest
 import com.mikepenz.agentbuddy.model.Decision
+import com.mikepenz.agentbuddy.model.RiskAnalysis
+import com.mikepenz.agentbuddy.model.RiskAnalysisBackend
 import com.mikepenz.agentbuddy.model.ToolType
 import com.mikepenz.agentbuddy.risk.ActiveRiskAnalyzerHolder
 import com.mikepenz.agentbuddy.risk.RiskAutoActionOrchestrator
@@ -46,6 +49,7 @@ class ApprovalsViewModel(
     private val orchestrator: RiskAutoActionOrchestrator,
 ) : ViewModel() {
 
+    private val log = Logger.withTag("ApprovalsViewModel")
     private val _uiState = MutableStateFlow(ApprovalsUiState())
     val uiState: StateFlow<ApprovalsUiState> = _uiState.asStateFlow()
 
@@ -132,6 +136,10 @@ class ApprovalsViewModel(
             // Master kill-switch (tray menu). When off, fall through to manual
             // resolution for both bands without changing the stored levels.
             if (!freshSettings.autoDecisionsEnabled) return@onSuccess
+            // Defensive: only the 1..5 band represents a real risk verdict. A
+            // sentinel value (e.g. 0) from a failed-analysis path must never
+            // trigger auto-actions.
+            if (analysis.risk !in 1..5) return@onSuccess
             when {
                 freshSettings.autoApproveLevel > 0 && analysis.risk <= freshSettings.autoApproveLevel -> {
                     orchestrator.runAutoApprove(
@@ -156,33 +164,58 @@ class ApprovalsViewModel(
                 }
             }
         }.onFailure { error ->
+            // Surface the actual exception in both the diagnostics log and the
+            // pending-approval card. Previously every failure was collapsed to
+            // a one-word label ("Error" / "Ollama offline") which left the user
+            // with no clue why analysis failed.
+            log.e(error) { "Risk analysis failed for ${approval.id} (tool=${approval.hookInput.toolName})" }
+            val detail = error.message?.takeIf { it.isNotBlank() }
+                ?: error::class.simpleName
+                ?: "Unknown error"
             _uiState.update { ui ->
-                val message = when {
-                    error.message?.contains("CLI not found") == true -> "CLI not found"
-                    error.message?.contains("Ollama not reachable") == true -> "Ollama offline"
-                    error.message?.contains("timed out") == true -> "Timeout"
-                    else -> "Error"
-                }
                 ui.copy(
                     riskStatuses = ui.riskStatuses + (approval.id to RiskStatus.ERROR),
-                    riskErrors = ui.riskErrors + (approval.id to message),
+                    riskErrors = ui.riskErrors + (approval.id to detail),
                 )
             }
         }
     }
 
+    /**
+     * Builds a synthetic [RiskAnalysis] carrying the captured analyzer error
+     * so manual resolution preserves the failure reason in history. `risk = 0`
+     * (out of the 1..5 band) marks the entry as "no real analysis" — the
+     * auto-decision branches above already require risk in 1..5, so this
+     * cannot retrigger them.
+     */
+    private fun errorRiskAnalysis(requestId: String): RiskAnalysis? {
+        val message = _uiState.value.riskErrors[requestId] ?: return null
+        val backend = stateManager.state.value.settings.riskAnalysisBackend
+        val source = when (backend) {
+            RiskAnalysisBackend.CLAUDE -> "claude"
+            RiskAnalysisBackend.COPILOT -> "copilot"
+            RiskAnalysisBackend.OLLAMA -> "ollama"
+        }
+        return RiskAnalysis(
+            risk = 0,
+            label = "error",
+            message = message,
+            source = source,
+        )
+    }
+
     // ----- Approval actions (called by ApprovalsTab) -----
 
     fun onApprove(requestId: String, feedback: String?) {
-        stateManager.resolve(requestId, Decision.APPROVED, feedback, null, null)
+        stateManager.resolve(requestId, Decision.APPROVED, feedback, errorRiskAnalysis(requestId), null)
     }
 
     fun onAlwaysAllow(requestId: String) {
-        stateManager.resolve(requestId, Decision.ALWAYS_ALLOWED, "Always allowed", null, null)
+        stateManager.resolve(requestId, Decision.ALWAYS_ALLOWED, "Always allowed", errorRiskAnalysis(requestId), null)
     }
 
     fun onDeny(requestId: String, feedback: String) {
-        stateManager.resolve(requestId, Decision.DENIED, feedback, null, null)
+        stateManager.resolve(requestId, Decision.DENIED, feedback, errorRiskAnalysis(requestId), null)
     }
 
     fun onApproveWithInput(requestId: String, updatedInput: Map<String, JsonElement>) {
@@ -190,14 +223,14 @@ class ApprovalsViewModel(
             requestId = requestId,
             decision = Decision.APPROVED,
             feedback = "User answered question",
-            riskAnalysis = null,
+            riskAnalysis = errorRiskAnalysis(requestId),
             rawResponseJson = null,
             updatedInput = updatedInput,
         )
     }
 
     fun onDismiss(requestId: String) {
-        stateManager.resolve(requestId, Decision.DENIED, "Dismissed", null, null)
+        stateManager.resolve(requestId, Decision.DENIED, "Dismissed", errorRiskAnalysis(requestId), null)
     }
 
     fun onCancelAutoDeny(requestId: String) {
