@@ -88,6 +88,8 @@ data class HistoryEntry(
     val toolInput: Map<String, JsonElement> = emptyMap(),
     val rawRequestJson: String? = null,
     val rawResponseJson: String? = null,
+    /** Raw validation LLM output (Ollama JSON / Claude CLI stdout / Copilot stdout). */
+    val rawValidationResponseJson: String? = null,
 )
 
 /**

@@ -23,7 +23,8 @@ open class DatabaseStorage(
     /**
      * Optional column-level cipher applied to sensitive columns
      * (`raw_request_json`, `raw_response_json`, `tool_input_json`, `feedback`,
-     * `protection_detail`, `risk_message`). Pass `null` to disable encryption
+     * `protection_detail`, `risk_message`, `risk_raw_response`). Pass `null` to
+     * disable encryption
      * — this is the test default so existing tests continue to pass without
      * key plumbing. Production wiring in `AppProviders` always supplies a
      * real cipher backed by [DbKeyManager].
@@ -88,6 +89,7 @@ open class DatabaseStorage(
                     protection_detail TEXT,
                     raw_request_json  TEXT NOT NULL,
                     raw_response_json TEXT,
+                    risk_raw_response TEXT,
                     requested_at      TEXT NOT NULL,
                     decided_at        TEXT NOT NULL,
                     tool_input_json   TEXT NOT NULL DEFAULT '{}'
@@ -102,6 +104,12 @@ open class DatabaseStorage(
         if (!hasColumn("history", "tool_input_json")) {
             connection.createStatement().use { stmt ->
                 stmt.executeUpdate("ALTER TABLE history ADD COLUMN tool_input_json TEXT NOT NULL DEFAULT '{}'")
+            }
+        }
+        // Migrate older databases that pre-date the risk_raw_response column.
+        if (!hasColumn("history", "risk_raw_response")) {
+            connection.createStatement().use { stmt ->
+                stmt.executeUpdate("ALTER TABLE history ADD COLUMN risk_raw_response TEXT")
             }
         }
         backfillToolInputJson()
@@ -205,9 +213,9 @@ open class DatabaseStorage(
                 decision, feedback,
                 risk_level, risk_label, risk_message, risk_source,
                 protection_module, protection_rule, protection_detail,
-                raw_request_json, raw_response_json,
+                raw_request_json, raw_response_json, risk_raw_response,
                 requested_at, decided_at, tool_input_json
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """.trimIndent()
 
         connection.prepareStatement(sql).use { ps ->
@@ -236,9 +244,12 @@ open class DatabaseStorage(
             ps.setString(16, encNullable(result.protectionDetail))
             ps.setString(17, enc(result.request.rawRequestJson))
             ps.setString(18, encNullable(result.rawResponseJson))
-            ps.setString(19, result.request.timestamp.toString())
-            ps.setString(20, result.decidedAt.toString())
-            ps.setString(21, enc(json.encodeToString(toolInputSerializer, result.request.hookInput.toolInput)))
+            // Encrypted at rest: the raw LLM payload echoes the prompt (working
+            // dir, tool args) and the model's free-form explanation back to us.
+            ps.setString(19, encNullable(result.riskAnalysis?.rawResponse))
+            ps.setString(20, result.request.timestamp.toString())
+            ps.setString(21, result.decidedAt.toString())
+            ps.setString(22, enc(json.encodeToString(toolInputSerializer, result.request.hookInput.toolInput)))
             ps.executeUpdate()
         }
 
@@ -496,6 +507,7 @@ open class DatabaseStorage(
             label = rs.getString("risk_label") ?: "",
             message = decNullable(rs.getString("risk_message")) ?: "",
             source = rs.getString("risk_source") ?: "",
+            rawResponse = decNullable(rs.getString("risk_raw_response")),
         )
 
         val toolInput: Map<String, JsonElement> = decNullable(rs.getString("tool_input_json"))

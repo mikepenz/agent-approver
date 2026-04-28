@@ -27,4 +27,12 @@ data class RiskAnalysis(
     val label: String = "",
     val message: String,
     val source: String = "",
+    /**
+     * Raw text returned by the validation LLM (Ollama JSON envelope, Claude CLI
+     * stdout, Copilot stdout). Useful for diagnosing why the parsed result is
+     * wrong — e.g. the model emitted prose instead of structured JSON. Null when
+     * the analyzer doesn't capture it (legacy entries) or when capture fails.
+     * Truncated at the analyzer to keep storage and UI responsive.
+     */
+    val rawResponse: String? = null,
 )

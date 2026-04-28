@@ -100,6 +100,9 @@ class OllamaRiskAnalyzerTest {
             assertEquals(2, analysis.risk)
             assertEquals("Low", analysis.label)
             assertEquals("ollama", analysis.source)
+            // Raw body is captured verbatim so the history can show what the model
+            // actually emitted (helpful when the parsed result looks suspicious).
+            assertEquals(chatBody, analysis.rawResponse)
         } finally {
             analyzer.shutdown()
         }

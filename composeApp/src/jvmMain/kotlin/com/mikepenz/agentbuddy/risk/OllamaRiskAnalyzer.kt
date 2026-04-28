@@ -294,6 +294,7 @@ class OllamaRiskAnalyzer(
             label = parsed.label,
             message = parsed.explanation,
             source = "ollama",
+            rawResponse = rawBody.take(MAX_RAW_RESPONSE_CHARS),
         )
     }
 
@@ -348,5 +349,7 @@ class OllamaRiskAnalyzer(
         private const val DEFAULT_TIMEOUT_MS = 60_000L
         private const val MAX_REQUEST_TIMEOUT_MS = 600_000L
         private const val CONNECT_TIMEOUT_MS = 5_000L
+        /** Cap the raw response payload we keep on each [RiskAnalysis] (history + DB). */
+        private const val MAX_RAW_RESPONSE_CHARS = 65_536
     }
 }

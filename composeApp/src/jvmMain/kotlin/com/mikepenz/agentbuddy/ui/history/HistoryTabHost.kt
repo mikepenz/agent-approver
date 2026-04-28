@@ -81,6 +81,7 @@ internal fun ApprovalResult.toHistoryEntry(now: Instant): HistoryEntry {
         toolInput = req.hookInput.toolInput,
         rawRequestJson = req.rawRequestJson.takeIf { it.isNotBlank() },
         rawResponseJson = rawResponseJson?.takeIf { it.isNotBlank() },
+        rawValidationResponseJson = riskAnalysis?.rawResponse?.takeIf { it.isNotBlank() },
     )
 }
 

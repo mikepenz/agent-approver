@@ -110,6 +110,27 @@ class DatabaseStorageTest {
     }
 
     @Test
+    fun rawValidationResponseRoundtrip() {
+        val rawLlm = """{"model":"llama3.2","message":{"role":"assistant","content":"{\"level\":2}"}}"""
+        val result = makeApprovalResult(
+            id = "raw-llm-1",
+            decision = Decision.APPROVED,
+            riskAnalysis = RiskAnalysis(
+                risk = 2,
+                label = "Low",
+                message = "ls",
+                source = "ollama",
+                rawResponse = rawLlm,
+            ),
+        )
+
+        storage.insert(result)
+        val loaded = storage.loadAll().first()
+
+        assertEquals(rawLlm, loaded.riskAnalysis?.rawResponse)
+    }
+
+    @Test
     fun insertAndLoadProtectionHit() {
         val result = makeApprovalResult(
             id = "prot-1",

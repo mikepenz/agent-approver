@@ -128,6 +128,7 @@ class ClaudeCliRiskAnalyzer(
                 label = structuredOutput.label,
                 message = structuredOutput.explanation,
                 source = "claude",
+                rawResponse = rawOutput.take(MAX_RAW_RESPONSE_CHARS),
             )
         }
 
@@ -155,6 +156,8 @@ class ClaudeCliRiskAnalyzer(
     companion object {
         private const val TIMEOUT_MS = 30_000L
         private const val PROCESS_TIMEOUT_SECONDS = 25L
+        /** Cap the raw stdout we keep on each [RiskAnalysis] (history + DB). */
+        private const val MAX_RAW_RESPONSE_CHARS = 65_536
 
         private const val JSON_SCHEMA = """{"type":"object","properties":{"level":{"type":"integer"},"label":{"type":"string"},"explanation":{"type":"string"}},"required":["level","label","explanation"]}"""
     }

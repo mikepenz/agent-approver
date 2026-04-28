@@ -187,6 +187,7 @@ class CopilotRiskAnalyzer(
             label = response.label,
             message = response.explanation,
             source = "copilot",
+            rawResponse = rawContent.take(MAX_RAW_RESPONSE_CHARS),
         )
     }
 
@@ -220,6 +221,8 @@ class CopilotRiskAnalyzer(
     companion object {
         private const val TIMEOUT_MS = 30_000L
         private const val SEND_TIMEOUT_MS = 25_000L
+        /** Cap the raw content we keep on each [RiskAnalysis] (history + DB). */
+        private const val MAX_RAW_RESPONSE_CHARS = 65_536
 
         /**
          * Build an environment map that ensures `node` is on the PATH.

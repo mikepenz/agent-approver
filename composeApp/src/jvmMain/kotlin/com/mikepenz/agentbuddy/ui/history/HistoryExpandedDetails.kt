@@ -88,6 +88,7 @@ internal fun HistoryExpandedDetails(
         }
         RawJsonBlock(title = "Raw request", json = entry.rawRequestJson)
         RawJsonBlock(title = "Raw response", json = entry.rawResponseJson)
+        RawJsonBlock(title = "Raw validation response", json = entry.rawValidationResponseJson)
     }
 }
 
