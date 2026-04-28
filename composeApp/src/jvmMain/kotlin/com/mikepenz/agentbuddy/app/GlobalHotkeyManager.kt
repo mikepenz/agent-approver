@@ -5,6 +5,7 @@ import com.mikepenz.agentbuddy.di.AppEnvironment
 import com.mikepenz.agentbuddy.di.AppScope
 import com.mikepenz.agentbuddy.model.Decision
 import com.mikepenz.agentbuddy.model.GlobalHotkey
+import com.mikepenz.agentbuddy.model.HotkeyModifier
 import com.mikepenz.agentbuddy.state.AppStateManager
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.SingleIn
@@ -107,17 +108,16 @@ class GlobalHotkeyManager(
             log.w { "Cannot register $role hotkey ($target) — Nucleus not initialized" }
             return
         }
-        // Translate to platform-native bits. Nucleus' .dylib/.so/.dll pass
-        // these directly to Carbon / X11 / WM_HOTKEY, so they have to match
-        // the OS APIs — AWT VK_* + our internal flag bits would otherwise be
-        // garbage to Carbon (kVK_*) or X11.
-        val nativeMods = HotkeyTranslation.nativeModifiers(target.modifiers)
-        val nativeKey = HotkeyTranslation.nativeKeyCode(target.keyCode)
+        // Nucleus' native bridges (Carbon on macOS, X11 on Linux, WM_HOTKEY
+        // on Windows) already translate AWT VK_* codes to the appropriate
+        // platform key codes and expect the portable modifier bitmask
+        // (1=ALT, 2=CONTROL, 4=SHIFT, 8=META). We pass through unchanged.
+        val portableMods = target.modifiers.fold(0) { acc, m -> acc or m.portableFlag() }
         val handle = runCatching {
             onEdt<Long> {
                 GlobalHotKeyManager.register(
-                    nativeMods,
-                    nativeKey,
+                    portableMods,
+                    target.keyCode,
                     HotKeyListener { mods, key ->
                         log.d { "$role hotkey listener fired (mods=$mods, key=$key)" }
                         onHotkeyFired(role)
@@ -125,27 +125,27 @@ class GlobalHotkeyManager(
                 )
             }
         }.getOrElse {
-            log.e(it) {
-                "Failed to register $role hotkey: $target " +
-                    "(awtKey=${target.keyCode} → nativeKey=$nativeKey, nativeMods=$nativeMods)"
-            }
+            log.e(it) { "Failed to register $role hotkey: $target (mods=$portableMods, key=${target.keyCode})" }
             return
         }
-        // Nucleus uses 0L for "manager not ready" / unsupported-platform
-        // fall-through and -1L for "native bridge returned an error". Treat
-        // anything <= 0 as a failed registration.
+        // Nucleus returns 0L for "manager not ready" / unsupported-platform
+        // fall-through and -1L when its native bridge reports an error
+        // (e.g. macOS' RegisterEventHotKey returned non-noErr because the
+        // shortcut conflicts with a system-reserved combo, or AWT key code
+        // isn't in the bridge's translation table). Treat anything <= 0 as
+        // a failed registration and surface Nucleus' lastError so the user
+        // can tell why.
         if (handle <= 0L) {
             log.w {
                 "Nucleus refused to register $role hotkey $target " +
-                    "(awtKey=${target.keyCode} → nativeKey=$nativeKey, nativeMods=$nativeMods, " +
-                    "handle=$handle): ${GlobalHotKeyManager.lastError}"
+                    "(mods=$portableMods, key=${target.keyCode}, handle=$handle): " +
+                    "${GlobalHotKeyManager.lastError}"
             }
             return
         }
         setHandle(role, handle, target)
         log.i {
-            "Registered $role hotkey: $target " +
-                "(awtKey=${target.keyCode} → nativeKey=$nativeKey, nativeMods=$nativeMods, handle=$handle)"
+            "Registered $role hotkey: $target (mods=$portableMods, key=${target.keyCode}, handle=$handle)"
         }
     }
 
@@ -186,6 +186,20 @@ class GlobalHotkeyManager(
     }
 
     private enum class HotkeyRole { APPROVE, DENY }
+}
+
+/**
+ * Portable modifier bitmask the Nucleus native bridges expect (regardless of
+ * OS). Values come from Nucleus' own internal `HotKeyModifier.nativeFlag` —
+ * each native bridge translates them to its platform's representation
+ * (Carbon `cmdKey/shiftKey/...` on macOS, `MOD_*` on Windows, etc.) before
+ * calling the OS API.
+ */
+private fun HotkeyModifier.portableFlag(): Int = when (this) {
+    HotkeyModifier.ALT -> 1
+    HotkeyModifier.CONTROL -> 2
+    HotkeyModifier.SHIFT -> 4
+    HotkeyModifier.META -> 8
 }
 
 /**
