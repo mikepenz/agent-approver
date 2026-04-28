@@ -11,6 +11,7 @@ import com.mikepenz.agentbuddy.model.RiskAnalysis
 import com.mikepenz.agentbuddy.model.RiskAnalysisBackend
 import com.mikepenz.agentbuddy.model.ToolType
 import com.mikepenz.agentbuddy.risk.ActiveRiskAnalyzerHolder
+import com.mikepenz.agentbuddy.risk.RiskAnalyzerException
 import com.mikepenz.agentbuddy.risk.RiskAutoActionOrchestrator
 import com.mikepenz.agentbuddy.state.AppStateManager
 import dev.zacsweers.metro.ContributesIntoMap
@@ -73,6 +74,15 @@ class ApprovalsViewModel(
      */
     private val userInteractionTimestamps = mutableMapOf<String, ComparableTimeMark>()
 
+    /**
+     * Per-request raw model output captured from a [RiskAnalyzerException] when
+     * the analyzer reached the model but couldn't parse the reply. Stashed here
+     * (not in UI state) because the pending card has no use for it — it's only
+     * needed when the user resolves manually so we can attach it to the
+     * synthetic [RiskAnalysis] that lands in history.
+     */
+    private val errorRawResponses = mutableMapOf<String, String>()
+
     /** IDs we've already kicked off analysis for, so re-emissions don't re-trigger. */
     private val knownIds = mutableSetOf<String>()
 
@@ -98,6 +108,7 @@ class ApprovalsViewModel(
         val currentIds = pending.map { it.id }.toSet()
         knownIds.removeAll { it !in currentIds }
         userInteractionTimestamps.keys.removeAll { it !in currentIds }
+        errorRawResponses.keys.removeAll { it !in currentIds }
         _uiState.update { ui ->
             ui.copy(
                 riskStatuses = ui.riskStatuses.filterKeys { it in currentIds },
@@ -172,6 +183,13 @@ class ApprovalsViewModel(
             val detail = error.message?.takeIf { it.isNotBlank() }
                 ?: error::class.simpleName
                 ?: "Unknown error"
+            // Stash the raw model output (when present) so manual resolution
+            // can preserve it on the synthetic RiskAnalysis written to history.
+            // Only RiskAnalyzerException carries it; bare connection failures
+            // have nothing to record.
+            (error as? RiskAnalyzerException)?.rawResponse?.takeIf { it.isNotBlank() }?.let {
+                errorRawResponses[approval.id] = it
+            } ?: errorRawResponses.remove(approval.id)
             _uiState.update { ui ->
                 ui.copy(
                     riskStatuses = ui.riskStatuses + (approval.id to RiskStatus.ERROR),
@@ -201,6 +219,7 @@ class ApprovalsViewModel(
             label = "error",
             message = message,
             source = source,
+            rawResponse = errorRawResponses[requestId],
         )
     }
 

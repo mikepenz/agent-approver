@@ -249,24 +249,43 @@ class OllamaRiskAnalyzer(
 
         if (!response.status.isSuccess()) {
             val body = runCatching { response.bodyAsText() }.getOrDefault("")
+            val raw = body.take(MAX_RAW_RESPONSE_CHARS).ifBlank { null }
             if (response.status == HttpStatusCode.NotFound && body.contains("not found", ignoreCase = true)) {
-                throw RuntimeException("model '$model' not found — run: ollama pull $model")
+                throw RiskAnalyzerException(
+                    "model '$model' not found — run: ollama pull $model",
+                    rawResponse = raw,
+                )
             }
-            throw RuntimeException("Ollama returned ${response.status.value}: ${body.take(200)}")
+            throw RiskAnalyzerException(
+                "Ollama returned ${response.status.value}: ${body.take(200)}",
+                rawResponse = raw,
+            )
         }
 
         val rawBody = response.bodyAsText()
         if (Logging.verbose) log.d { "Raw response: ${rawBody.take(200)}" }
-        val chatResponse = json.decodeFromString<ChatResponse>(rawBody)
+        val chatResponse = try {
+            json.decodeFromString<ChatResponse>(rawBody)
+        } catch (e: Exception) {
+            throw RiskAnalyzerException(
+                "Failed to parse Ollama envelope: ${e.message ?: e::class.simpleName}",
+                rawResponse = rawBody.take(MAX_RAW_RESPONSE_CHARS),
+                cause = e,
+            )
+        }
         val content = chatResponse.message?.content
-            ?: throw RuntimeException("No message.content in Ollama response")
+            ?: throw RiskAnalyzerException(
+                "No message.content in Ollama response",
+                rawResponse = rawBody.take(MAX_RAW_RESPONSE_CHARS),
+            )
 
         val parsed = try {
             json.decodeFromString<RiskResponse>(content)
         } catch (e: Exception) {
-            throw RuntimeException(
-                "Failed to parse risk JSON from model output: ${content.take(300)}",
-                e,
+            throw RiskAnalyzerException(
+                "Failed to parse risk JSON from model output",
+                rawResponse = rawBody.take(MAX_RAW_RESPONSE_CHARS),
+                cause = e,
             )
         }
         val level = parsed.level.coerceIn(1, 5)
