@@ -989,26 +989,38 @@ private fun RecentSimilarList(tool: String) {
                     tint = AgentBuddyColors.inkMuted,
                     modifier = Modifier.size(12.dp),
                 )
-                Row(verticalAlignment = Alignment.CenterVertically) {
+                // The inner row carries weight so the path ellipsizes when
+                // the window is narrow — without weight Compose would let it
+                // grow to its intrinsic width and squeeze the trailing
+                // timestamp Text down to a single character column.
+                Row(
+                    modifier = Modifier.weight(1f),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
                     Text(
                         text = "Similar $tool call in ",
                         color = AgentBuddyColors.inkSecondary,
                         fontSize = 12.sp,
+                        maxLines = 1,
+                        softWrap = false,
                     )
                     Text(
                         text = row.third,
                         color = AgentBuddyColors.inkPrimary,
                         fontSize = 12.sp,
                         fontFamily = FontFamily.Monospace,
+                        maxLines = 1,
+                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f, fill = false),
                     )
                 }
-                Spacer(Modifier.weight(1f))
                 StatusPill(status = row.second, size = TagSize.SMALL)
                 Text(
                     text = row.first,
                     color = AgentBuddyColors.inkMuted,
                     fontSize = 11.sp,
-                    modifier = Modifier.width(80.dp),
+                    maxLines = 1,
+                    softWrap = false,
                     textAlign = androidx.compose.ui.text.style.TextAlign.End,
                 )
             }
