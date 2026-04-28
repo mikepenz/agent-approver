@@ -71,10 +71,7 @@ jobs:
           rm -f "$CERTIFICATE_PATH"
 
       - name: Build distributable app
-        # writeNucleusExecutableMarker depends on createDistributable and
-        # drops `.nucleus-executable-type` into Contents/MacOS BEFORE the
-        # subsequent codesign step seals the bundle.
-        run: ./gradlew :composeApp:writeNucleusExecutableMarker --stacktrace
+        run: ./gradlew :composeApp:createDistributable --stacktrace
 
       - name: Sign app bundle (inside-out)
         env:
