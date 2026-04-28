@@ -33,6 +33,37 @@ sealed class UpdateUiState {
  */
 class UpdateManager(private val scope: CoroutineScope) {
 
+    init {
+        // Nucleus's `ExecutableRuntime.type()` reads `-Dnucleus.executable.type`
+        // or a `.nucleus-executable-type` marker file next to the launcher,
+        // both of which are populated by the Nucleus plugin's *packaging*
+        // task. Our CI bypasses that task — it runs `createDistributable`
+        // and packages DMG/ZIP/MSI/DEB manually — so neither signal is
+        // present in installed builds, and `isUpdateSupported()` would
+        // wrongly return `false`.
+        //
+        // Set the system property here, but ONLY when running inside a real
+        // jpackage installation (`jpackage.app-version` is injected by
+        // jpackage launchers exclusively — never in dev / IDE / `java -jar`,
+        // so the dev-build gate is preserved). Do NOT set
+        // `config.executableType`: on macOS the runtime forces it null so
+        // the FileSelector can prefer `.zip` over `.dmg` for silent
+        // in-place updates (see Nucleus NucleusUpdater.kt comment block
+        // around the `format` resolution). Setting it would break that.
+        if (System.getProperty("jpackage.app-version") != null &&
+            System.getProperty("nucleus.executable.type") == null
+        ) {
+            val osName = System.getProperty("os.name", "").lowercase()
+            val type = when {
+                "mac" in osName -> "dmg"
+                "win" in osName -> "msi"
+                "linux" in osName -> "deb"
+                else -> null
+            }
+            if (type != null) System.setProperty("nucleus.executable.type", type)
+        }
+    }
+
     private val updater = NucleusUpdater {
         provider = GitHubProvider(owner = "mikepenz", repo = "agent-buddy")
         currentVersion = VERSION
