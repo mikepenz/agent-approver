@@ -43,6 +43,17 @@ data class AppSettings(
      * configured levels.
      */
     val autoDecisionsEnabled: Boolean = true,
+    /**
+     * Minimum visible age (seconds) before an auto-approve fires. 0 = resolve
+     * as soon as analysis settles. Bump to e.g. 5 to leave a manual-review
+     * window in which the user can deny the request before it disappears.
+     */
+    val autoApproveDelaySeconds: Int = 0,
+    /**
+     * Visible countdown (seconds) before an auto-deny fires. The card shows
+     * a cancel overlay during this window so the user can intervene.
+     */
+    val autoDenyCountdownSeconds: Int = 15,
     val awayMode: Boolean = false,
     val newestApprovalFirst: Boolean = false,
     val prominentAlwaysAllow: Boolean = false,

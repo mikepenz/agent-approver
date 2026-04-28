@@ -80,6 +80,7 @@ fun ApprovalCard(
     onDismiss: () -> Unit,
     autoDenyActive: Boolean,
     onCancelAutoDeny: () -> Unit,
+    autoDenyCountdownSeconds: Int = 15,
     onUserInteraction: () -> Unit = {},
     awayMode: Boolean = false,
     prominentAlwaysAllow: Boolean = false,
@@ -228,7 +229,10 @@ fun ApprovalCard(
 
             // Auto-deny overlay
             if (autoDenyActive) {
-                AutoDenyOverlay(onCancel = onCancelAutoDeny)
+                AutoDenyOverlay(
+                    onCancel = onCancelAutoDeny,
+                    countdownMillis = autoDenyCountdownSeconds.coerceAtLeast(1) * 1_000,
+                )
             }
         }
     }
@@ -383,11 +387,14 @@ fun RiskBadge(riskResult: RiskAnalysis?, riskStatus: RiskStatus, riskError: Stri
 }
 
 @Composable
-private fun AutoDenyOverlay(onCancel: () -> Unit) {
+private fun AutoDenyOverlay(
+    onCancel: () -> Unit,
+    countdownMillis: Int = AUTO_DENY_COUNTDOWN.inWholeMilliseconds.toInt(),
+) {
     var progress by remember { mutableStateOf(1f) }
     val animatedProgress by animateFloatAsState(
         targetValue = progress,
-        animationSpec = tween(durationMillis = AUTO_DENY_COUNTDOWN.inWholeMilliseconds.toInt(), easing = LinearEasing),
+        animationSpec = tween(durationMillis = countdownMillis, easing = LinearEasing),
     )
 
     LaunchedEffect(Unit) {

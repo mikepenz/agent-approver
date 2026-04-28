@@ -34,7 +34,9 @@ class RiskAutoActionOrchestrator(
 
     /**
      * Auto-approve a risk-1 request once the user has been quiet for [USER_QUIET_PERIOD].
-     * Mirrors the original 500ms initial nudge before checking quiet state.
+     * Mirrors the original 500ms initial nudge before checking quiet state. Honours
+     * [com.mikepenz.agentbuddy.model.AppSettings.autoApproveDelaySeconds] so the
+     * user can require a visible review window before the request disappears.
      */
     suspend fun runAutoApprove(
         approvalId: String,
@@ -42,6 +44,11 @@ class RiskAutoActionOrchestrator(
         timestamps: () -> Map<String, ComparableTimeMark>,
     ) {
         delay(500)
+        val configuredDelay = stateManager.state.value.settings.autoApproveDelaySeconds.coerceAtLeast(0)
+        if (configuredDelay > 0) delay(configuredDelay.seconds)
+        // Verify the request is still present after the configurable delay; the
+        // user may have resolved it manually during the window.
+        if (stateManager.state.value.pendingApprovals.none { it.id == approvalId }) return
         waitUntilUserQuiet(approvalId, timestamps)
         if (stateManager.state.value.pendingApprovals.any { it.id == approvalId }) {
             stateManager.resolve(
@@ -73,8 +80,12 @@ class RiskAutoActionOrchestrator(
 
             startCountdown()
             val countdownStartedAt = timeSource.markNow()
+            // Read the configured countdown each iteration so a settings change
+            // during a re-armed retry takes effect immediately.
+            val countdown = stateManager.state.value.settings.autoDenyCountdownSeconds
+                .coerceAtLeast(1).seconds
             var interrupted = false
-            while (countdownStartedAt.elapsedNow() < AUTO_DENY_COUNTDOWN) {
+            while (countdownStartedAt.elapsedNow() < countdown) {
                 delay(200)
                 // Request was resolved manually (or otherwise removed) — stop the countdown.
                 if (stateManager.state.value.pendingApprovals.none { it.id == approvalId }) {

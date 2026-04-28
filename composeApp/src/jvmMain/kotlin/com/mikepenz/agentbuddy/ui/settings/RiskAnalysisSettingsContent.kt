@@ -185,6 +185,40 @@ fun RiskAnalysisSettingsContent(
                 )
             },
         )
+        SettingItem(
+            label = "Auto-approve delay",
+            desc = "Seconds to leave the request visible before resolving. 0 = immediate.",
+            right = {
+                SettingsTextInput(
+                    value = settings.autoApproveDelaySeconds.toString(),
+                    onChange = { raw ->
+                        val parsed = raw.filter { it.isDigit() }.toIntOrNull()?.coerceIn(0, 120)
+                        if (parsed != null) {
+                            onSettingsChange(settings.copy(autoApproveDelaySeconds = parsed))
+                        }
+                    },
+                    width = 80.dp,
+                    mono = true,
+                )
+            },
+        )
+        SettingItem(
+            label = "Auto-deny countdown",
+            desc = "Seconds to show the countdown overlay before auto-denying.",
+            right = {
+                SettingsTextInput(
+                    value = settings.autoDenyCountdownSeconds.toString(),
+                    onChange = { raw ->
+                        val parsed = raw.filter { it.isDigit() }.toIntOrNull()?.coerceIn(1, 120)
+                        if (parsed != null) {
+                            onSettingsChange(settings.copy(autoDenyCountdownSeconds = parsed))
+                        }
+                    },
+                    width = 80.dp,
+                    mono = true,
+                )
+            },
+        )
     }
 
     SystemPromptSection(settings = settings, onSettingsChange = onSettingsChange)

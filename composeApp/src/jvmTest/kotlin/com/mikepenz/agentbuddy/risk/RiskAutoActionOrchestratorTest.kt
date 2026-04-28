@@ -1,5 +1,6 @@
 package com.mikepenz.agentbuddy.risk
 
+import com.mikepenz.agentbuddy.model.AppSettings
 import com.mikepenz.agentbuddy.model.ApprovalRequest
 import com.mikepenz.agentbuddy.model.Decision
 import com.mikepenz.agentbuddy.model.HookInput
@@ -226,6 +227,59 @@ class RiskAutoActionOrchestratorTest {
         assertEquals(Decision.APPROVED, state.state.value.history.first().decision)
         // The orchestrator did not double-add an AUTO_DENIED entry.
         assertEquals(1, state.state.value.history.size)
+    }
+
+    @Test
+    fun `autoApproveDelaySeconds delays the resolution`() = runTest {
+        val state = AppStateManager()
+        state.updateSettings(AppSettings(autoApproveDelaySeconds = 5))
+        state.addPending(newRequest())
+        val orchestrator = RiskAutoActionOrchestrator(state, testScheduler.timeSource)
+
+        val timestamps = mutableMapOf<String, ComparableTimeMark>()
+        val approveAnalysis = RiskAnalysis(risk = 1, label = "Safe", message = "ls")
+        val job = launch { orchestrator.runAutoApprove(approvalId, approveAnalysis) { timestamps.toMap() } }
+
+        // 500ms nudge + part of the configured delay → still pending.
+        advanceTimeBy(3.seconds); runCurrent()
+        assertEquals(1, state.state.value.pendingApprovals.size)
+
+        // Past the 5-second window plus the nudge → resolves.
+        advanceTimeBy(3.seconds); runCurrent()
+        job.join()
+        assertEquals(Decision.AUTO_APPROVED, state.state.value.history.first().decision)
+    }
+
+    @Test
+    fun `autoDenyCountdownSeconds overrides the default countdown`() = runTest {
+        val state = AppStateManager()
+        state.updateSettings(AppSettings(autoDenyCountdownSeconds = 5))
+        state.addPending(newRequest())
+        val orchestrator = RiskAutoActionOrchestrator(state, testScheduler.timeSource)
+
+        val timestamps = mutableMapOf<String, ComparableTimeMark>()
+        var countdownActive = false
+        val job = launch {
+            orchestrator.runAutoDenyWithRetry(
+                approvalId = approvalId,
+                analysis = analysis,
+                timestamps = { timestamps.toMap() },
+                startCountdown = { countdownActive = true },
+                cancelCountdown = { countdownActive = false },
+                isCountdownActive = { countdownActive },
+            )
+        }
+        runCurrent()
+        assertTrue(countdownActive)
+
+        // 4s in — still pending under the 5s configured countdown.
+        advanceTimeBy(4.seconds); runCurrent()
+        assertEquals(1, state.state.value.pendingApprovals.size)
+
+        // Past the 5s configured countdown → resolves (much faster than the default 15s).
+        advanceTimeBy(2.seconds); runCurrent()
+        job.join()
+        assertEquals(Decision.AUTO_DENIED, state.state.value.history.first().decision)
     }
 
     @Test
