@@ -110,10 +110,21 @@ class ClaudeCliRiskAnalyzer(
     }
 
     private fun parseResult(rawOutput: String): RiskAnalysis {
-        val wrapper = json.decodeFromString<ClaudeJsonResponse>(rawOutput)
+        val wrapper = try {
+            json.decodeFromString<ClaudeJsonResponse>(rawOutput)
+        } catch (e: Exception) {
+            throw RiskAnalyzerException(
+                "Failed to parse Claude CLI envelope: ${e.message ?: e::class.simpleName}",
+                rawResponse = rawOutput.take(MAX_RAW_RESPONSE_CHARS),
+                cause = e,
+            )
+        }
 
         if (wrapper.isError) {
-            throw RuntimeException("Claude returned error: ${wrapper.result.take(200)}")
+            throw RiskAnalyzerException(
+                "Claude returned error: ${wrapper.result.take(200)}",
+                rawResponse = rawOutput.take(MAX_RAW_RESPONSE_CHARS),
+            )
         }
 
         val structuredOutput = wrapper.structuredOutput
@@ -132,7 +143,10 @@ class ClaudeCliRiskAnalyzer(
             )
         }
 
-        throw RuntimeException("No structured_output in response")
+        throw RiskAnalyzerException(
+            "No structured_output in Claude response",
+            rawResponse = rawOutput.take(MAX_RAW_RESPONSE_CHARS),
+        )
     }
 
     @Serializable

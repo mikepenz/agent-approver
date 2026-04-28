@@ -57,8 +57,14 @@ internal fun ApprovalResult.toHistoryEntry(now: Instant): HistoryEntry {
                 "Resolved externally (decided in harness or harness exited)"
             else -> null
         }
-    val assessmentText = riskAnalysis?.let { "Level ${it.risk} — ${it.message}" }
-        ?: protectionDetail
+    val assessmentText = riskAnalysis?.let {
+        // risk = 0 / label = "error" is the synthetic entry recorded by
+        // ApprovalsViewModel when the analyzer itself failed; show it as a
+        // failure reason rather than as "Level 0 — …" which reads as a real
+        // verdict.
+        if (it.risk !in 1..5) "Analysis failed — ${it.message}"
+        else "Level ${it.risk} — ${it.message}"
+    } ?: protectionDetail
     val promptText = req.hookInput.toolInput["prompt"].asStringOrNull()
         ?: req.hookInput.toolInput["question"].asStringOrNull()
 

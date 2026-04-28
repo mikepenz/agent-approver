@@ -172,11 +172,22 @@ class CopilotRiskAnalyzer(
         val firstBrace = rawContent.indexOf('{')
         val lastBrace = rawContent.lastIndexOf('}')
         if (firstBrace == -1 || lastBrace == -1 || lastBrace <= firstBrace) {
-            throw RuntimeException("No JSON object found in Copilot response: ${rawContent.take(200)}")
+            throw RiskAnalyzerException(
+                "No JSON object found in Copilot response",
+                rawResponse = rawContent.take(MAX_RAW_RESPONSE_CHARS),
+            )
         }
         val cleaned = rawContent.substring(firstBrace, lastBrace + 1)
 
-        val response = json.decodeFromString<RiskResponse>(cleaned)
+        val response = try {
+            json.decodeFromString<RiskResponse>(cleaned)
+        } catch (e: Exception) {
+            throw RiskAnalyzerException(
+                "Failed to parse risk JSON from Copilot output: ${e.message ?: e::class.simpleName}",
+                rawResponse = rawContent.take(MAX_RAW_RESPONSE_CHARS),
+                cause = e,
+            )
+        }
         val level = response.level.coerceIn(1, 5)
         log.i {
             if (Logging.verbose) "Risk: level=$level (${response.label}) - ${response.explanation}"
