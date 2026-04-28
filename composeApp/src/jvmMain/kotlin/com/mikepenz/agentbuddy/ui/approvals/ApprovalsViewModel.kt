@@ -129,6 +129,9 @@ class ApprovalsViewModel(
             // toggling autoApproveLevel / autoDenyLevel while analysis is
             // in flight takes effect immediately.
             val freshSettings = stateManager.state.value.settings
+            // Master kill-switch (tray menu). When off, fall through to manual
+            // resolution for both bands without changing the stored levels.
+            if (!freshSettings.autoDecisionsEnabled) return@onSuccess
             when {
                 freshSettings.autoApproveLevel > 0 && analysis.risk <= freshSettings.autoApproveLevel -> {
                     orchestrator.runAutoApprove(

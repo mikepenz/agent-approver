@@ -106,6 +106,32 @@ class ApprovalsViewModelAutoApproveTest {
     }
 
     @Test
+    fun `autoDecisionsEnabled false suppresses auto-approve even when level allows it`() = runTest {
+        val state = AppStateManager()
+        state.updateSettings(
+            AppSettings(
+                autoApproveLevel = 1,
+                riskAnalysisEnabled = true,
+                autoDecisionsEnabled = false,
+            ),
+        )
+
+        val analyzerHolder = ActiveRiskAnalyzerHolder().apply {
+            set(StubAnalyzer(RiskAnalysis(risk = 1, label = "Safe", message = "ls")))
+        }
+        val orchestrator = RiskAutoActionOrchestrator(state, testScheduler.timeSource)
+
+        ApprovalsViewModel(state, analyzerHolder, orchestrator)
+        runCurrent()
+
+        state.addPending(newRequest())
+        advanceTimeBy(20.seconds); runCurrent()
+
+        assertEquals(1, state.state.value.pendingApprovals.size, "approval should remain pending while paused")
+        assertTrue(state.state.value.history.isEmpty())
+    }
+
+    @Test
     fun `auto-approve respects fresh settings updated after analysis is queued`() = runTest {
         val state = AppStateManager()
         // Start with auto-approve OFF.

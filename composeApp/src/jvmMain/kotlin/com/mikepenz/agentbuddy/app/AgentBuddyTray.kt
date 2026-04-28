@@ -42,6 +42,7 @@ fun ApplicationScope.AgentBuddyTray(
     val visible by trayManager.visible.collectAsState()
     val pendingCount = state.pendingApprovals.size
     val awayMode = state.settings.awayMode
+    val autoDecisionsEnabled = state.settings.autoDecisionsEnabled
     val capSettings = state.settings.capabilitySettings
 
     // Menu-bar theme: white logo on dark bars, black on light. Observed via
@@ -76,6 +77,17 @@ fun ApplicationScope.AgentBuddyTray(
                 environment.appScope.launch {
                     val current = stateManager.state.value.settings
                     stateManager.updateSettings(current.copy(awayMode = checked))
+                }
+            },
+        )
+
+        CheckableItem(
+            label = "Auto-decisions",
+            checked = autoDecisionsEnabled,
+            onCheckedChange = { checked ->
+                environment.appScope.launch {
+                    val current = stateManager.state.value.settings
+                    stateManager.updateSettings(current.copy(autoDecisionsEnabled = checked))
                 }
             },
         )

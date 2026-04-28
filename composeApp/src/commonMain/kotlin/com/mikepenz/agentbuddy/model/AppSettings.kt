@@ -35,6 +35,14 @@ data class AppSettings(
     val riskAnalysisCustomPrompt: String = "",
     val autoApproveLevel: Int = 0,
     val autoDenyLevel: Int = 0,
+    /**
+     * Master switch over both [autoApproveLevel] and [autoDenyLevel]. When
+     * false, every analyzed request waits for a manual decision regardless
+     * of the configured bands. Toggleable from the tray menu so the user
+     * can pause auto-decisions for a session without losing their
+     * configured levels.
+     */
+    val autoDecisionsEnabled: Boolean = true,
     val awayMode: Boolean = false,
     val newestApprovalFirst: Boolean = false,
     val prominentAlwaysAllow: Boolean = false,
