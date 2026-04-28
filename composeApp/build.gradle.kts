@@ -195,7 +195,7 @@ val nucleusMarkerInfo: Pair<String, String>? = run {
 }
 
 val writeNucleusExecutableMarker = tasks.register("writeNucleusExecutableMarker") {
-    description = "Writes Nucleus's .nucleus-executable-type marker next to the launcher"
+    description = "Writes Nucleus's executable-type marker + rewrites launcher cfg"
     group = "compose desktop"
     dependsOn("createDistributable")
 
@@ -204,21 +204,90 @@ val writeNucleusExecutableMarker = tasks.register("writeNucleusExecutableMarker"
 
     if (info != null) {
         val (type, relPath) = info
+        val appImageDir = layout.buildDirectory.dir("compose/binaries/main/app").get().asFile
         val markerProvider = layout.buildDirectory
             .file("compose/binaries/main/app/$relPath/.nucleus-executable-type")
+        // Don't declare the cfg as an output — packageMsi/packageDeb rewrite
+        // it themselves via the plugin's own updateExecutableTypeInAppImage,
+        // and registering an outputs.file would create a fake stale-input
+        // chain that re-triggers our task on every run.
         outputs.file(markerProvider)
 
         val versionStr = appVersion
         doLast {
             val markerFile = markerProvider.get().asFile
             markerFile.parentFile.mkdirs()
-            // Format per ExecutableRuntime.readMarkerFile:
-            //   line 1: type (parsed via parseType, e.g. "dmg")
-            //   line 2: optional version (used by markerVersion())
+            // Marker file is what ExecutableRuntime.readMarkerFile() reads
+            // when no cfg is present (e.g. GraalVM native-image). Belt-and-
+            // suspenders alongside the cfg rewrite below, since the runtime
+            // checks the system property FIRST and only falls through to the
+            // marker file if the property is unset.
             markerFile.writeText("$type\n$versionStr\n")
             logger.lifecycle("Wrote Nucleus marker: ${markerFile.absolutePath} (type=$type)")
+
+            // Critical: rewrite -Dnucleus.executable.type=<x> in the launcher
+            // cfg from "dev" (which createDistributable hardcodes) to the
+            // platform-appropriate value. Mirrors the Nucleus plugin's own
+            // updateExecutableTypeInCfg — the plugin already does this from
+            // packageDmg/packageMsi/packageDeb, but our CI uses
+            // createDistributable + manual hdiutil for macOS, which never
+            // runs that step. Linux/Windows go through packageDeb/packageMsi
+            // and get this same rewrite from the plugin afterwards (idempotent).
+            val cfgFiles = appImageDir.walkTopDown()
+                .filter { f ->
+                    f.isFile && f.extension.equals("cfg", ignoreCase = true) && f.name != "jvm.cfg"
+                }
+                .toList()
+            if (cfgFiles.isEmpty()) {
+                logger.warn("No launcher .cfg files under ${appImageDir.absolutePath} — Nucleus type rewrite skipped")
+                return@doLast
+            }
+            cfgFiles.forEach { cfg -> rewriteCfgExecutableType(cfg, type, logger) }
         }
     }
+}
+
+// Rewrites `java-options=-Dnucleus.executable.type=<x>` inside a jpackage
+// `.cfg` launcher file. Logic mirrors Nucleus plugin's
+// updateExecutableTypeInCfg (plugin-build/.../internal/ExecutableType.kt).
+fun rewriteCfgExecutableType(
+    cfgFile: java.io.File,
+    type: String,
+    logger: org.gradle.api.logging.Logger,
+) {
+    val javaOptionsSection = "[JavaOptions]"
+    val prefix = "java-options=-Dnucleus.executable.type="
+    val updatedOption = "$prefix$type"
+
+    val lines = cfgFile.readLines().toMutableList()
+    var inJavaOptions = false
+    var sectionIndex = -1
+    var replaced = false
+
+    lines.forEachIndexed { i, line ->
+        val trimmed = line.trim()
+        when {
+            trimmed == javaOptionsSection -> {
+                inJavaOptions = true
+                if (sectionIndex == -1) sectionIndex = i
+            }
+            trimmed.startsWith("[") -> inJavaOptions = false
+            inJavaOptions && trimmed.startsWith(prefix) && !replaced -> {
+                lines[i] = updatedOption
+                replaced = true
+            }
+        }
+    }
+    if (!replaced) {
+        if (sectionIndex == -1) {
+            lines += javaOptionsSection
+            lines += updatedOption
+        } else {
+            lines.add(sectionIndex + 1, updatedOption)
+        }
+    }
+    cfgFile.writeText(lines.joinToString(System.lineSeparator()))
+    logger.lifecycle("Rewrote nucleus.executable.type=$type in ${cfgFile.absolutePath}")
 }
 
 // Make the platform package* tasks pick up the marker so it lands inside
