@@ -87,17 +87,30 @@ Gradle dependency verification is enabled via `gradle/verification-metadata.xml`
 
 Commit the updated `gradle/verification-metadata.xml` alongside dependency changes. Platform-specific artifacts (Compose Desktop, Skiko) and CI-injected dependencies are covered by `<trusted-artifacts>` rules.
 
-### Nucleus Native Binary Audit (April 2026, refreshed for v1.12.0)
+### Nucleus Native Binary Audit (April 2026, refreshed for v1.14.4)
 
-Nucleus (`io.github.kdroidfilter:nucleus.*`) ships pre-compiled native binaries (.dylib/.so/.dll) across several JARs at v1.12.0. Direct modules used here: `decorated-window-core`, `decorated-window-jni`, `decorated-window-material3`, `notification-macos`, `notification-linux`, and `global-hotkey` (re-introduced for the OS-level approve/deny shortcut feature). Security audit findings are unchanged:
+Nucleus (`io.github.kdroidfilter:nucleus.*`) ships pre-compiled native binaries (.dylib/.so/.dll) across several JARs at v1.14.4. Direct modules used here: `darkmode-detector`, `decorated-window-core`, `decorated-window-jni`, `decorated-window-material3`, `notification-macos`, `notification-linux`, `global-hotkey`, and `updater-runtime` (pure Kotlin, no natives). Security audit findings are unchanged from the v1.12.0 audit; the chain-of-trust below establishes byte-level continuity.
 
-- **Source**: Open-source (MIT), single maintainer (Elie Gambache / `kdroidFilter`), ~173 stars, created Feb 2026.
-- **Build pipeline**: Natives are compiled from source in GitHub Actions CI (`build-natives.yaml`), not committed to the repo. Standard `clang`/`gcc` invocations.
-- **Binary analysis**: All binaries are small (4–76 KB), contain only expected symbols (Cocoa/AppKit, X11, D-Bus, Shell_Notify), no network calls, no exec/system, no crypto.
+- **Source**: Open-source (MIT), single maintainer (Elie Gambache / `kdroidFilter`).
+- **Build pipeline**: Natives are compiled from source in GitHub Actions CI (`build-natives.yaml`), not committed to the repo. Standard `clang` (macOS) / `gcc` (Linux) / MSVC 14.44 (Windows) invocations.
+- **Binary analysis**: All binaries are small (~3–135 KB). Imports restricted to platform system frameworks only — Cocoa/AppKit/Foundation/Carbon (macOS), X11/D-Bus/glib (Linux), `ADVAPI32`/`USER32`/`dwmapi`/`KERNEL32`/MSVC CRT (Windows). Zero networking, zero process exec, zero remote-thread/memory-injection, zero persistence APIs (no `SMLoginItem*`/`LSSharedFileList*`/`HKLM\\…\\Run` writes), zero crypto, zero anti-debug, zero `__mod_init_func` or `DllMain` side effects, zero declared ObjC classes. Exports are exclusively `Java_io_github_kdroidfilter_nucleus_*` JNI symbols matching the Kotlin `Native*Bridge` classes.
 - **Verification**: SHA-256 checksums pinned in `verification-metadata.xml`.
-- **Version alignment note**: ComposeNativeTray 1.3.0 transitively depends on Nucleus 1.12.0; we pin all direct Nucleus deps to the same version to avoid a split resolution.
+- **Version alignment note**: ComposeNativeTray 1.3.0 transitively depends on Nucleus 1.12.0; we pin all direct Nucleus deps to the same version to avoid a split resolution. Currently aligned at 1.14.4 across all direct deps.
 
-**When bumping the Nucleus version**: Re-audit the native source code in the [Nucleus repo](https://github.com/kdroidFilter/Nucleus) for changes to `.m`, `.c`, or build scripts. Check that the CI pipeline (`build-natives.yaml`) still compiles from source without injecting additional binaries. Run `strings` on the new `.dylib`/`.so` files to verify no suspicious additions (network URLs, exec calls, credential access). This is necessary because Nucleus is a young, single-maintainer project without reproducible build attestation.
+**Chain of trust v1.12.0 → v1.14.1 → v1.14.4** (established April 2026):
+
+| Module | macOS dylib | Linux .so | Windows DLL |
+|---|---|---|---|
+| `darkmode-detector` | byte-identical 1.12 → 1.14.4 | byte-identical 1.12 → 1.14.4 | functionally identical 1.14.1 → 1.14.4 (only PE TimeDateStamp differs) |
+| `decorated-window-core` | byte-identical 1.12 → 1.14.4 | byte-identical 1.12 → 1.14.4 | functionally identical 1.14.1 → 1.14.4 |
+| `decorated-window-jni` | changed 1.12 → 1.14.1, identical 1.14.1 → 1.14.4 (re-audited deeply) | byte-identical 1.12 → 1.14.4 | functionally identical 1.14.1 → 1.14.4 |
+| `global-hotkey` | byte-identical 1.12 → 1.14.4 | byte-identical 1.12 → 1.14.4 | functionally identical 1.14.1 → 1.14.4 |
+| `notification-macos`, `notification-linux`, `decorated-window-material3` | jars byte-identical 1.14.1 ≡ 1.14.4 | — | — |
+| `core-runtime`, `freedesktop-icons`, `updater-runtime` | jars byte-identical 1.14.1 ≡ 1.14.4 (pure Kotlin or no natives) | — | — |
+
+Source-side: zero native code changes between v1.14.1 and v1.14.4 tags. Two small Kotlin UI fixes in `decorated-window-core` (focus + dialog background). Zero CI workflow changes. Release commit GPG-verified. The Windows DLL byte changes between 1.14.1 and 1.14.4 are MSVC link-time non-determinism only (PE TimeDateStamp + its echo in the Debug Directory; six bytes total per binary; every other byte identical).
+
+**When bumping the Nucleus version**: Re-audit the upstream `kdroidFilter/Nucleus` repo `vOLD..vNEW` for changes to `.m`/`.c`/`.cpp`/`.swift`/`.rs` source under each used module dir, plus `.github/workflows/build-natives.yaml` and any reusable workflows. Confirm the CI pipeline still compiles natives from source without injecting downloaded artifacts. Diff SHA-256s of the pre-existing dylibs/sos/dlls against the previous version; if any *unchanged* binary now differs without a corresponding source change, treat it as a build-system smell and investigate. For any *changed* binary, run `llvm-objdump --macho -p`, `llvm-nm -u`, and `strings -a` (compare against prior version) — flag any new networking / exec / persistence / privilege / injection imports. Refresh `verification-metadata.xml`. This rigor is necessary because Nucleus is a young, single-maintainer project without reproducible build attestation; falls back to Maven Central GPG signatures + GPG-verified release commits as the trust root.
 
 ### ComposeNativeTray Native Binary Audit (April 2026)
 
