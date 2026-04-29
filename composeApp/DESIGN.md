@@ -1,4 +1,4 @@
-# Agent Buddy — Design System
+# Agent Belay — Design System
 
 This document describes the Compose design-system primitives and the
 preview-driven visual-regression workflow that ships with the app.
@@ -8,9 +8,9 @@ It complements `README.md` (product overview) and `CLAUDE.md`
 Canonical design spec:
 <https://api.anthropic.com/v1/design/h/sFpNYNZE1FmpRSLF6oAjZQ>
 
-Theme source of truth: `src/jvmMain/kotlin/com/mikepenz/agentbuddy/ui/theme/Theme.kt`.
+Theme source of truth: `src/jvmMain/kotlin/com/mikepenz/agentbelay/ui/theme/Theme.kt`.
 
-Shared primitives: `src/jvmMain/kotlin/com/mikepenz/agentbuddy/ui/components/`.
+Shared primitives: `src/jvmMain/kotlin/com/mikepenz/agentbelay/ui/components/`.
 
 ## Theme tokens
 
@@ -28,10 +28,10 @@ non-`@Composable` scopes (top-level `val`s, data-class defaults).
 Inside `@Composable` functions prefer the accessor below so the theme
 swap takes effect.
 
-### 2. Theme-aware semantic tokens (`AgentBuddyColors`)
+### 2. Theme-aware semantic tokens (`AgentBelayColors`)
 
-`AgentBuddyColors.<token>` is a read-only composable accessor backed by
-a `staticCompositionLocalOf<AgentBuddyColorsPalette>`. Available
+`AgentBelayColors.<token>` is a read-only composable accessor backed by
+a `staticCompositionLocalOf<AgentBelayColorsPalette>`. Available
 tokens:
 
 | Token group | Names |
@@ -42,10 +42,10 @@ tokens:
 | Emerald accent | `accentEmerald`, `accentEmeraldInk`, `accentEmeraldTint` |
 | Theme flag | `isDark` |
 
-Palettes: `AgentBuddyColorsDark`, `AgentBuddyColorsLight`. Selection
-happens in `AgentBuddyTheme(themeMode = …)`.
+Palettes: `AgentBelayColorsDark`, `AgentBelayColorsLight`. Selection
+happens in `AgentBelayTheme(themeMode = …)`.
 
-### Dimensions (`AgentBuddyDimens`)
+### Dimensions (`AgentBelayDimens`)
 
 Canonical density / iconography tokens:
 
@@ -68,7 +68,7 @@ Canonical density / iconography tokens:
 | Primitive | File | Purpose |
 |---|---|---|
 | `PillSegmented` | `PillSegmented.kt` | Pill-style segmented control; `Role.Tab`, `selected` semantics |
-| `AgentBuddyCard` | `DesignPrimitives.kt` | Bordered card surface with theme-aware hairline |
+| `AgentBelayCard` | `DesignPrimitives.kt` | Bordered card surface with theme-aware hairline |
 | `StatusPill` | `DesignPrimitives.kt` | Approval decision pills (Approved, Denied, Auto-*, Protection-Blocked) |
 | `ToolTag` | `DesignPrimitives.kt` | Coloured tool-name tag (Bash, Web, Edit, …) |
 | `RiskPill` | `DesignPrimitives.kt` | Risk score 1–5 pill with via-label (claude / copilot / ollama) |
@@ -94,7 +94,7 @@ Each screen has `@Preview` functions covering the full matrix:
 | SettingsScreen (General / Integrations / Risk / Protections / Capabilities) | — | ✅ | — | ✅ | ✅ | ✅ | ✅ |
 | AppSidebar | — | — | — | ✅ | — | ✅ | ✅ |
 | SlimWindow | ✅ | — | — | ✅ (AskUserQuestion / Plan) | — | ✅ | ✅ |
-| AgentBuddyShell | — | — | — | ✅ | — | — | ✅ |
+| AgentBelayShell | — | — | — | ✅ | — | — | ✅ |
 | ProtectionLogTab | ✅ | — | — | ✅ | — | — | ✅ |
 | ContentDetailWindow / LicensesWindow | — | ✅ (Licenses) | — | ✅ | — | — | ✅ |
 | CommandPaletteHost | ✅ (Closed) | — | — | ✅ (Open) | — | — | ✅ |
@@ -113,13 +113,13 @@ $COMPOSE_BUDDY_CLI render \
   --project . \
   --module :composeApp \
   --renderer desktop \
-  --output /tmp/agent-approver-previews \
+  --output /tmp/agent-belay-previews \
   --build --format agent --hierarchy --semantics all
 
 # re-render a subset (no --build after pure preview edits)
 $COMPOSE_BUDDY_CLI render \
   --project . --module :composeApp --renderer desktop \
-  --output /tmp/agent-approver-previews \
+  --output /tmp/agent-belay-previews \
   --preview "*Sidebar*"
 ```
 
@@ -129,7 +129,7 @@ bounds + semantics, used by the iteration plan for a11y audits
 
 ## Adding a new preview
 
-1. **Wrap in `PreviewScaffold`** — provides `AgentBuddyTheme` and sane
+1. **Wrap in `PreviewScaffold`** — provides `AgentBelayTheme` and sane
    defaults:
 
    ```kotlin

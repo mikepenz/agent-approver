@@ -2,10 +2,10 @@
 #
 # generate-icons.sh
 #
-# Generates app icons for Agent Buddy from SVG sources.
+# Generates app icons for Agent Belay from SVG sources.
 # Produces:
 #   - icons/app.icns        (macOS traditional icon)
-#   - icons/AgentBuddy.icon (macOS 26+ layered icon, no background)
+#   - icons/AgentBelay.icon (macOS 26+ layered icon, no background)
 #   - icons/app.ico            (Windows)
 #   - icons/app.png            (Linux, 512x512)
 #
@@ -135,7 +135,7 @@ fi
 # --- macOS 26+ Layered Icon ---
 echo "Generating macOS layered icon..."
 
-LAYERED_DIR="$ICONS_DIR/AgentBuddy.icon"
+LAYERED_DIR="$ICONS_DIR/AgentBelay.icon"
 mkdir -p "$LAYERED_DIR/Assets"
 
 # Foreground: Claude logo + badge on transparent background (NO solid background)
@@ -154,7 +154,7 @@ cat > "$LAYERED_DIR/icon.json" << 'JSONEOF'
   ]
 }
 JSONEOF
-echo "  Created icons/AgentBuddy.icon/"
+echo "  Created icons/AgentBelay.icon/"
 
 # --- Windows .ico ---
 echo "Generating Windows .ico..."

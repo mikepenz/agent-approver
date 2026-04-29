@@ -31,7 +31,7 @@ require(appPackageVersion.matches(Regex("\\d+\\.\\d+\\.\\d+"))) {
 }
 
 val generateVersion = project.tasks.register<VersionTask>("generateVersion") {
-    packageString.set("com.mikepenz.agentbuddy")
+    packageString.set("com.mikepenz.agentbelay")
     version.set(appVersion)
     store(resources)
     into(layout.buildDirectory.dir("generated-version/kotlin/"))
@@ -109,7 +109,7 @@ aboutLibraries {
 }
 
 nucleus.application {
-    mainClass = "com.mikepenz.agentbuddy.MainKt"
+    mainClass = "com.mikepenz.agentbelay.MainKt"
 
     jvmArgs += listOf(
         "--add-opens", "java.desktop/java.awt=ALL-UNNAMED",
@@ -122,11 +122,11 @@ nucleus.application {
 
     nativeDistributions {
         targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb)
-        packageName = "AgentBuddy"
+        packageName = "AgentBelay"
         packageVersion = appPackageVersion
         description = "Centralized approval UI for AI agent tool requests"
         vendor = "mikepenz"
-        homepage = "https://github.com/mikepenz/agent-buddy"
+        homepage = "https://github.com/mikepenz/agent-belay"
 
         cleanupNativeLibs = true
 
@@ -134,9 +134,9 @@ nucleus.application {
 
         macOS {
             iconFile.set(project.file("../icons/app.icns"))
-            layeredIconDir.set(project.file("../icons/AgentBuddy.icon"))
-            bundleID = "com.mikepenz.agentbuddy"
-            dockName = "Agent Buddy"
+            layeredIconDir.set(project.file("../icons/AgentBelay.icon"))
+            bundleID = "com.mikepenz.agentbelay"
+            dockName = "Agent Belay"
             appCategory = "public.app-category.developer-tools"
             infoPlist {
                 extraKeysRawXml = """
@@ -187,9 +187,9 @@ composeBuddy {
 val nucleusMarkerInfo: Pair<String, String>? = run {
     val osName = System.getProperty("os.name", "").lowercase()
     when {
-        "mac" in osName -> "dmg" to "AgentBuddy.app/Contents/MacOS"
-        "win" in osName -> "msi" to "AgentBuddy"
-        "linux" in osName -> "deb" to "AgentBuddy/bin"
+        "mac" in osName -> "dmg" to "AgentBelay.app/Contents/MacOS"
+        "win" in osName -> "msi" to "AgentBelay"
+        "linux" in osName -> "deb" to "AgentBelay/bin"
         else -> null
     }
 }

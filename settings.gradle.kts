@@ -1,4 +1,4 @@
-rootProject.name = "AgentBuddy"
+rootProject.name = "AgentBelay"
 enableFeaturePreview("TYPESAFE_PROJECT_ACCESSORS")
 
 pluginManagement {

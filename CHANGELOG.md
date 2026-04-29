@@ -16,12 +16,16 @@ All notable changes to this project will be documented in this file.
   app state. macOS no longer renders the menu-bar icon as a template image
   with a separately-coloured badge overlay; the baked-in coloured badge is
   used on all platforms.
-- Renamed project from **Agent Approver** to **Agent Buddy** (repo `mikepenz/agent-buddy`).
-  Package, bundle ID, and data-directory names updated accordingly. Existing installs
-  auto-migrate on first launch: data dir (`AgentApprover/` → `AgentBuddy/`), DB file,
-  hook bridge dir (`~/.agent-approver/` → `~/.agent-buddy/`), Claude `SessionStart`
-  command paths, Copilot hook file (`agent-approver.json` → `agent-buddy.json`), and
-  keyring service entry are all moved in place.
+- Renamed project from **Agent Buddy** to **Agent Belay** (repo `mikepenz/agent-belay`).
+  Kotlin package (`com.mikepenz.agentbuddy` → `com.mikepenz.agentbelay`), macOS bundle ID
+  (`com.mikepenz.agentbuddy` → `com.mikepenz.agentbelay`), and data-directory names
+  updated accordingly. Existing installs auto-migrate on first launch: data dir
+  (`AgentBuddy/` → `AgentBelay/`), DB file (`agent-buddy.db` → `agent-belay.db`),
+  hook bridge dir (`~/.agent-buddy/` → `~/.agent-belay/`), Claude `SessionStart`
+  command paths, Copilot hook file (`agent-buddy.json` → `agent-belay.json`), and
+  keyring service entry are all moved in place. Users still on the original
+  Agent Approver build also migrate in one launch — both legacy steps run in
+  chronological order.
 
 ## [1.7.0] - 2026-04-04
 

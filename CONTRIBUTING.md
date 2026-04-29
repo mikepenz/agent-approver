@@ -1,4 +1,4 @@
-# Contributing to Agent Buddy
+# Contributing to Agent Belay
 
 Thank you for your interest in contributing! This guide will help you get started.
 
@@ -13,8 +13,8 @@ Thank you for your interest in contributing! This guide will help you get starte
 
 ```bash
 # Clone the repository
-git clone https://github.com/mikepenz/agent-buddy.git
-cd agent-buddy
+git clone https://github.com/mikepenz/agent-belay.git
+cd agent-belay
 
 # Build the project
 ./gradlew build
@@ -30,13 +30,13 @@ cd agent-buddy
 
 ### Reporting Bugs
 
-- Use the [GitHub Issues](https://github.com/mikepenz/agent-buddy/issues) page
+- Use the [GitHub Issues](https://github.com/mikepenz/agent-belay/issues) page
 - Include steps to reproduce, expected behavior, and actual behavior
 - Include your OS and Java version
 
 ### Suggesting Features
 
-- Open a [GitHub Issue](https://github.com/mikepenz/agent-buddy/issues) describing the feature
+- Open a [GitHub Issue](https://github.com/mikepenz/agent-belay/issues) describing the feature
 - Explain the use case and why it would be valuable
 
 ### Submitting Changes

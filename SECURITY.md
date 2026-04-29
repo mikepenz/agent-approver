@@ -2,7 +2,7 @@
 
 ## Reporting a Vulnerability
 
-If you discover a security vulnerability in Agent Buddy, please report it responsibly.
+If you discover a security vulnerability in Agent Belay, please report it responsibly.
 
 **Do not open a public GitHub issue for security vulnerabilities.**
 
@@ -17,7 +17,7 @@ Instead, please send an email to [opensource-sec@mikepenz.dev](mailto:opensource
 **Data-at-rest protection for the SQLite history database**
 
 Sensitive history columns are now AES-GCM encrypted at the application layer
-before being written to `agent-buddy.db`. The encrypted columns are
+before being written to `agent-belay.db`. The encrypted columns are
 `raw_request_json`, `raw_response_json`, `tool_input_json`, `feedback`,
 `protection_detail`, and `risk_message`. Indexed / filterable columns
 (`id`, `type`, `source`, `tool_name`, `tool_type`, `session_id`, `decision`,
@@ -37,7 +37,7 @@ possible, falling back to a file only when the keyring is unavailable:
 
 | Platform | Primary store                                   | Fallback                 |
 |----------|-------------------------------------------------|--------------------------|
-| macOS    | Keychain (`com.mikepenz.agentbuddy` / `db.key`) | `<dataDir>/db.key` (0600) |
+| macOS    | Keychain (`com.mikepenz.agentbelay` / `db.key`) | `<dataDir>/db.key` (0600) |
 | Windows  | Credential Manager (same service/account)        | `<dataDir>\db.key` (ACL)  |
 | Linux    | freedesktop Secret Service (GNOME Keyring / KWallet) | `<dataDir>/db.key` (0600) |
 
@@ -53,7 +53,7 @@ By default the application no longer writes raw commands, AI explanations, or
 request/response bodies into log streams. A new `verboseLogging` setting
 (default `false`) re-enables full detail when explicitly toggled in
 Settings → Diagnostics. The flag is read at every sensitive call site through
-`com.mikepenz.agentbuddy.logging.Logging.verbose` and is updated
+`com.mikepenz.agentbelay.logging.Logging.verbose` and is updated
 synchronously from `AppStateManager.updateSettings`, so no restart is required.
 
 **Remaining gaps**
