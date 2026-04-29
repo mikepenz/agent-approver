@@ -166,4 +166,85 @@ class LegacyDataMigrationTest {
         val perm = root["hooks"]!!.jsonObject["PermissionRequest"]!!.jsonArray
         assertEquals(1, perm.size)
     }
+
+    @Test
+    fun `claudeSettings_allEventCommandPaths_rewritten`() {
+        // Migration must rewrite command-type hook paths in any event array,
+        // not just SessionStart — users may have wired bridge scripts into
+        // PreToolUse / Stop / custom events that we don't ourselves register.
+        val claudeDir = File(fakeHome, ".claude").also { it.mkdirs() }
+        val legacyDir = File(fakeHome, ".agent-approver").absolutePath
+        val settings = """
+            {
+              "hooks": {
+                "SessionStart": [
+                  { "matcher": "", "hooks": [ { "type": "command", "command": "$legacyDir/claude-session-start.sh" } ] }
+                ],
+                "PreToolUse": [
+                  { "matcher": "", "hooks": [ { "type": "command", "command": "$legacyDir/pretool.sh" } ] }
+                ],
+                "Stop": [
+                  { "matcher": "", "hooks": [ { "type": "command", "command": "$legacyDir/stop.sh" } ] }
+                ],
+                "CustomFutureEvent": [
+                  { "matcher": "", "hooks": [ { "type": "command", "command": "$legacyDir/future.sh" } ] }
+                ],
+                "PermissionRequest": [
+                  { "matcher": "", "hooks": [ { "type": "http", "url": "http://localhost:19532/approve" } ] }
+                ]
+              }
+            }
+        """.trimIndent()
+        File(claudeDir, "settings.json").writeText(settings)
+
+        LegacyDataMigration.run(approverToBelayStep("/tmp/no-legacy", "/tmp/no-new"))
+
+        val newDir = File(fakeHome, ".agent-belay").absolutePath
+        val root = json.parseToJsonElement(File(claudeDir, "settings.json").readText()).jsonObject
+        val hooks = root["hooks"]!!.jsonObject
+
+        for (event in listOf("SessionStart", "PreToolUse", "Stop", "CustomFutureEvent")) {
+            val cmd = hooks[event]!!.jsonArray[0].jsonObject["hooks"]!!.jsonArray[0]
+                .jsonObject["command"]!!.jsonPrimitive.content
+            assertTrue(cmd.startsWith(newDir), "$event command not rewritten: $cmd")
+            assertFalse(cmd.contains(legacyDir), "$event still contains legacy path: $cmd")
+        }
+
+        // HTTP hooks have no brand-string and must remain untouched.
+        val http = hooks["PermissionRequest"]!!.jsonArray[0]
+            .jsonObject["hooks"]!!.jsonArray[0].jsonObject["url"]!!.jsonPrimitive.content
+        assertEquals("http://localhost:19532/approve", http)
+    }
+
+    @Test
+    fun `copilotHookFile_existingTargetWithStalePaths_rewrittenInPlace`() {
+        // Defensive case: the new-named hook file already exists (e.g. user
+        // re-registered Copilot in Belay) but still has stale `.agent-approver`
+        // paths from a partial earlier migration. The migrator must rewrite
+        // those paths in place rather than leaving them broken.
+        val copilotDir = File(fakeHome, ".copilot/hooks").also { it.mkdirs() }
+        val legacyDir = File(fakeHome, ".agent-approver").absolutePath
+        val newDir = File(fakeHome, ".agent-belay").absolutePath
+        val staleNewFile = """
+            {
+              "version": 1,
+              "hooks": {
+                "preToolUse": [
+                  { "type": "command", "bash": "$legacyDir/copilot-hook.sh", "timeoutSec": 300 }
+                ],
+                "permissionRequest": [
+                  { "type": "command", "bash": "$legacyDir/copilot-approve.sh", "timeoutSec": 300 }
+                ]
+              }
+            }
+        """.trimIndent()
+        File(copilotDir, "agent-belay.json").writeText(staleNewFile)
+
+        LegacyDataMigration.run(approverToBelayStep("/tmp/no-legacy", "/tmp/no-new"))
+
+        val rewritten = File(copilotDir, "agent-belay.json").readText()
+        assertTrue(rewritten.contains("$newDir/copilot-hook.sh"))
+        assertTrue(rewritten.contains("$newDir/copilot-approve.sh"))
+        assertFalse(rewritten.contains(legacyDir), "rewritten file still contains legacy path: $rewritten")
+    }
 }

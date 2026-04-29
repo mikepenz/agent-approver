@@ -7,7 +7,6 @@ import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import java.io.File
@@ -65,7 +64,7 @@ object LegacyDataMigration {
             safe { migrateDataDir(step) },
             safe { migrateHookBridgeDir(home, step) },
             safe { migrateCopilotHookFile(home, step) },
-            safe { migrateClaudeSettingsSessionStartPaths(home, step) },
+            safe { migrateClaudeSettingsCommandPaths(home, step) },
         ).any { it }
         if (didAny) {
             logger.i { "Migrated legacy data (${step.legacyHookDirName} -> ${step.newHookDirName})" }
@@ -128,23 +127,40 @@ object LegacyDataMigration {
     /**
      * Moves the legacy Copilot hook file (e.g. `agent-buddy.json`) to the new
      * filename (e.g. `agent-belay.json`), rewriting any bash paths that still
-     * reference the legacy hook dir.
+     * reference the legacy hook dir. If the new file already exists with stale
+     * legacy paths (e.g. partially-completed prior migration), rewrites those
+     * paths in place. The whole-file string replace covers every event type
+     * Copilot CLI honours (`preToolUse`, `permissionRequest`, `sessionStart`)
+     * because hook entries reference our scripts via their absolute path.
      */
     internal fun migrateCopilotHookFile(home: String, step: Step): Boolean {
         val dir = File(home, ".copilot/hooks")
         val legacy = File(dir, step.legacyCopilotHookFile)
         val target = File(dir, step.newCopilotHookFile)
-        if (!legacy.isFile) return false
-        if (target.exists()) {
-            // New file already in place; drop the legacy to avoid double
-            // registration.
-            legacy.delete()
-            logger.i { "Removed redundant legacy Copilot hook file ${legacy.absolutePath}" }
-            return true
+        val legacyToken = "/${step.legacyHookDirName}/"
+        val newToken = "/${step.newHookDirName}/"
+
+        // Case 1: target already in place.
+        if (target.isFile) {
+            var didAny = false
+            // Rewrite any stale legacy paths inside the target file.
+            val current = target.readText()
+            if (current.contains(legacyToken)) {
+                target.writeText(current.replace(legacyToken, newToken))
+                logger.i { "Rewrote legacy paths inside ${target.absolutePath}" }
+                didAny = true
+            }
+            if (legacy.isFile) {
+                legacy.delete()
+                logger.i { "Removed redundant legacy Copilot hook file ${legacy.absolutePath}" }
+                didAny = true
+            }
+            return didAny
         }
 
-        val rewritten = legacy.readText()
-            .replace("/${step.legacyHookDirName}/", "/${step.newHookDirName}/")
+        // Case 2: only the legacy file exists — move + rewrite.
+        if (!legacy.isFile) return false
+        val rewritten = legacy.readText().replace(legacyToken, newToken)
         target.writeText(rewritten)
         legacy.delete()
         logger.i { "Migrated Copilot hook file -> ${target.absolutePath}" }
@@ -152,12 +168,16 @@ object LegacyDataMigration {
     }
 
     /**
-     * Claude's `~/.claude/settings.json` stores `SessionStart` command hooks
-     * with absolute paths that may point at the legacy bridge dir. Rewrite
-     * those paths so the hook continues to fire after the rebrand. HTTP hook
-     * URLs contain no brand and are left untouched.
+     * Claude's `~/.claude/settings.json` stores command-type hooks with
+     * absolute paths that may point at the legacy bridge dir. Walks every
+     * event array under `hooks` (`SessionStart`, `PreToolUse`, `PostToolUse`,
+     * `PermissionRequest`, `UserPromptSubmit`, `Stop`, …) and rewrites any
+     * `command` field containing `/<legacyHookDirName>/` so the hook keeps
+     * firing after the rebrand. HTTP hook URLs contain no brand and are left
+     * untouched. Unknown event names are preserved verbatim — we don't
+     * hardcode the event list, so future Claude additions migrate for free.
      */
-    internal fun migrateClaudeSettingsSessionStartPaths(home: String, step: Step): Boolean {
+    internal fun migrateClaudeSettingsCommandPaths(home: String, step: Step): Boolean {
         val file = File(home, ".claude/settings.json")
         if (!file.isFile) return false
 
@@ -169,37 +189,39 @@ object LegacyDataMigration {
         }
 
         val hooks = root["hooks"]?.jsonObject ?: return false
-        val sessionStart = hooks["SessionStart"]?.jsonArray ?: return false
+        val legacyToken = "/${step.legacyHookDirName}/"
+        val newToken = "/${step.newHookDirName}/"
 
         var mutated = false
-        val rewrittenEntries = sessionStart.map { entry ->
-            val obj = entry.jsonObject
-            val inner = obj["hooks"]?.jsonArray ?: return@map entry
-            val newInner = inner.map { h ->
-                val hObj = h.jsonObject
-                val type = hObj["type"]?.jsonPrimitive?.content
-                val cmd = hObj["command"]?.jsonPrimitive?.content
-                if (type == "command" && cmd != null && cmd.contains("/${step.legacyHookDirName}/")) {
-                    mutated = true
-                    val updated = cmd.replace("/${step.legacyHookDirName}/", "/${step.newHookDirName}/")
-                    buildJsonObject {
-                        hObj.forEach { (k, v) -> if (k != "command") put(k, v) }
-                        put("command", JsonPrimitive(updated))
-                    }
-                } else h
+        val rewrittenEvents = hooks.mapValues { (_, eventValue) ->
+            val eventArray = eventValue as? JsonArray ?: return@mapValues eventValue
+            val rewrittenEntries = eventArray.map entry@{ entry ->
+                val obj = entry as? JsonObject ?: return@entry entry
+                val inner = obj["hooks"] as? JsonArray ?: return@entry entry
+                val newInner = inner.map h@{ h ->
+                    val hObj = h as? JsonObject ?: return@h h
+                    val type = hObj["type"]?.jsonPrimitive?.content
+                    val cmd = hObj["command"]?.jsonPrimitive?.content
+                    if (type == "command" && cmd != null && cmd.contains(legacyToken)) {
+                        mutated = true
+                        val updated = cmd.replace(legacyToken, newToken)
+                        buildJsonObject {
+                            hObj.forEach { (k, v) -> if (k != "command") put(k, v) }
+                            put("command", JsonPrimitive(updated))
+                        }
+                    } else h
+                }
+                buildJsonObject {
+                    obj.forEach { (k, v) -> if (k != "hooks") put(k, v) }
+                    put("hooks", JsonArray(newInner))
+                }
             }
-            buildJsonObject {
-                obj.forEach { (k, v) -> if (k != "hooks") put(k, v) }
-                put("hooks", JsonArray(newInner))
-            }
+            JsonArray(rewrittenEntries)
         }
 
         if (!mutated) return false
 
-        val updatedHooks = buildJsonObject {
-            hooks.forEach { (k, v) -> if (k != "SessionStart") put(k, v) }
-            put("SessionStart", JsonArray(rewrittenEntries))
-        }
+        val updatedHooks = JsonObject(rewrittenEvents)
         val updatedRoot = buildJsonObject {
             root.forEach { (k, v) -> if (k != "hooks") put(k, v) }
             put("hooks", updatedHooks)
@@ -208,7 +230,7 @@ object LegacyDataMigration {
         val tmp = File(file.parentFile, "${file.name}.tmp")
         tmp.writeText(json.encodeToString(JsonElement.serializer(), updatedRoot))
         Files.move(tmp.toPath(), file.toPath(), StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE)
-        logger.i { "Rewrote Claude SessionStart command paths in ${file.absolutePath}" }
+        logger.i { "Rewrote Claude command-hook paths in ${file.absolutePath}" }
         return true
     }
 
