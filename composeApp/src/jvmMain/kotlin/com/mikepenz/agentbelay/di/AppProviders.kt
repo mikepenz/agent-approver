@@ -3,7 +3,9 @@ package com.mikepenz.agentbelay.di
 import com.mikepenz.agentbelay.capability.CapabilityEngine
 import com.mikepenz.agentbelay.capability.modules.ResponseCompressionCapability
 import com.mikepenz.agentbelay.capability.modules.SocraticThinkingCapability
+import com.mikepenz.agentbelay.hook.CodexBridge
 import com.mikepenz.agentbelay.hook.CopilotBridge
+import com.mikepenz.agentbelay.hook.DefaultCodexBridge
 import com.mikepenz.agentbelay.hook.DefaultCopilotBridge
 import com.mikepenz.agentbelay.hook.DefaultHookRegistry
 import com.mikepenz.agentbelay.hook.DefaultOpenCodeBridge
@@ -127,6 +129,10 @@ interface AppProviders {
     @Provides
     @SingleIn(AppScope::class)
     fun providePiBridge(): PiBridge = DefaultPiBridge
+
+    @Provides
+    @SingleIn(AppScope::class)
+    fun provideCodexBridge(): CodexBridge = DefaultCodexBridge
 
     @Provides
     @SingleIn(AppScope::class)

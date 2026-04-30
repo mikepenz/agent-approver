@@ -1,0 +1,15 @@
+{
+  "_fixture": {
+    "harness": "codex",
+    "scenario": "apply_patch — Codex's edit primitive, normalised to canonical Write tool name on parse",
+    "expected_outcome": "approved with optional updatedInput"
+  },
+  "session_id": "codex-abc123de-f456-7890-abcd-ef0123456789",
+  "cwd": "/Users/dev/project",
+  "hook_event_name": "PermissionRequest",
+  "tool_name": "apply_patch",
+  "tool_input": {
+    "file_path": "/Users/dev/project/src/main.kt",
+    "patch": "--- a/main.kt\n+++ b/main.kt\n"
+  }
+}

@@ -85,6 +85,15 @@ private val PiCapabilities = HarnessCapabilities(
     supportsAdditionalContextInjection = false,
 )
 
+private val CodexCapabilities = HarnessCapabilities(
+    supportsArgRewriting = true,
+    supportsAlwaysAllowWriteThrough = false,
+    supportsOutputRedaction = false,
+    supportsDefer = false,
+    supportsInterruptOnDeny = true,
+    supportsAdditionalContextInjection = false,
+)
+
 @Composable
 fun IntegrationsSettingsContent(
     settings: AppSettings,
@@ -92,6 +101,7 @@ fun IntegrationsSettingsContent(
     isCopilotRegistered: Boolean,
     isOpenCodeRegistered: Boolean = false,
     isPiRegistered: Boolean = false,
+    isCodexRegistered: Boolean = false,
     onSettingsChange: (AppSettings) -> Unit,
     onRegisterHook: () -> Unit,
     onUnregisterHook: () -> Unit,
@@ -101,6 +111,8 @@ fun IntegrationsSettingsContent(
     onUnregisterOpenCode: () -> Unit = {},
     onRegisterPi: () -> Unit = {},
     onUnregisterPi: () -> Unit = {},
+    onRegisterCodex: () -> Unit = {},
+    onUnregisterCodex: () -> Unit = {},
 ) {
     SettingSection(
         title = "Integrations",
@@ -156,6 +168,18 @@ fun IntegrationsSettingsContent(
                 onRegister = onRegisterPi,
                 onUnregister = onUnregisterPi,
             ),
+            IntegrationItemData(
+                id = "codex",
+                name = "Codex",
+                desc = "Managed block in ~/.codex/config.toml " +
+                    "(PreToolUse + PermissionRequest, requires Codex CLI with HTTP hooks support)",
+                color = Color(0xFF1F6FEB),
+                registered = isCodexRegistered,
+                capabilities = CodexCapabilities,
+                onRegister = onRegisterCodex,
+                onUnregister = onUnregisterCodex,
+                experimental = true,
+            ),
         )
         items.forEachIndexed { idx, it -> IntegrationRow(item = it, first = idx == 0) }
     }
@@ -171,6 +195,8 @@ private data class IntegrationItemData(
     val onRegister: () -> Unit,
     val onUnregister: () -> Unit,
     val extra: (@Composable () -> Unit)? = null,
+    /** Show an "Experimental" pill next to the name and a caveat below the description. */
+    val experimental: Boolean = false,
 )
 
 private data class CapabilityBadge(val label: String, val supported: Boolean)
@@ -223,11 +249,17 @@ private fun IntegrationRow(item: IntegrationItemData, first: Boolean) {
                         overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
                         modifier = Modifier.weight(1f, fill = false),
                     )
-                    if (item.registered) {
+                    StatusPill(
+                        status = if (item.registered) DecisionStatus.APPROVED
+                        else DecisionStatus.TIMEOUT,
+                        size = TagSize.SMALL,
+                        text = if (item.registered) "Registered" else DecisionStatus.TIMEOUT.label,
+                    )
+                    if (item.experimental) {
                         StatusPill(
-                            status = DecisionStatus.APPROVED,
+                            status = DecisionStatus.PENDING,
                             size = TagSize.SMALL,
-                            text = "Registered",
+                            text = "Experimental",
                         )
                     }
                 }

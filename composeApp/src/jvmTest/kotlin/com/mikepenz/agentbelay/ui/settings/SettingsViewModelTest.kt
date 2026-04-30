@@ -143,9 +143,17 @@ class SettingsViewModelTest {
         }
     }
 
+    private class FakeCodexBridge : com.mikepenz.agentbelay.hook.CodexBridge {
+        val registeredPorts: MutableSet<Int> = mutableSetOf()
+        override fun isRegistered(port: Int): Boolean = port in registeredPorts
+        override fun register(port: Int) { registeredPorts.add(port) }
+        override fun unregister(port: Int) { registeredPorts.remove(port) }
+    }
+
     private fun newVm(
         bridge: FakeCopilotBridge = FakeCopilotBridge(),
         piBridge: FakePiBridge = FakePiBridge(),
+        codexBridge: FakeCodexBridge = FakeCodexBridge(),
         registry: FakeHookRegistry = FakeHookRegistry(),
         copilotState: CopilotStateHolder = CopilotStateHolder(),
         ollamaState: OllamaStateHolder = OllamaStateHolder(),
@@ -170,6 +178,7 @@ class SettingsViewModelTest {
             copilotBridge = bridge,
             openCodeBridge = FakeOpenCodeBridge(),
             piBridge = piBridge,
+            codexBridge = codexBridge,
             copilotStateHolder = copilotState,
             ollamaStateHolder = ollamaState,
             openaiApiStateHolder = openaiApiState,

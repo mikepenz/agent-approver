@@ -1,0 +1,14 @@
+{
+  "_fixture": {
+    "harness": "codex",
+    "scenario": "PreToolUse — Protection Engine pre-check, same canonical schema as PermissionRequest"
+  },
+  "session_id": "codex-5d8e9b4a-2c3f-4d5e-9a1b-0c1d2e3f4a5b",
+  "cwd": "/tmp",
+  "hook_event_name": "PreToolUse",
+  "tool_name": "Bash",
+  "tool_input": {
+    "command": "rm -rf /tmp/scratch",
+    "description": "clean up"
+  }
+}

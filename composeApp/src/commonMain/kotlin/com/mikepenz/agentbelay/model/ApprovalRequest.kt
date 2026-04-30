@@ -33,4 +33,4 @@ data class ApprovalRequest(
 enum class ToolType { DEFAULT, ASK_USER_QUESTION, PLAN }
 
 @Serializable
-enum class Source { CLAUDE_CODE, COPILOT, OPENCODE, @SerialName("PI") PI }
+enum class Source { CLAUDE_CODE, COPILOT, OPENCODE, @SerialName("PI") PI, CODEX }

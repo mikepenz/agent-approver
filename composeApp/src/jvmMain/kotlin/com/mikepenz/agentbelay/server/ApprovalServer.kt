@@ -6,6 +6,7 @@ import com.mikepenz.agentbelay.harness.Harness
 import com.mikepenz.agentbelay.harness.HarnessRouteDeps
 import com.mikepenz.agentbelay.harness.claudecode.ClaudeCodeAdapter
 import com.mikepenz.agentbelay.harness.claudecode.ClaudeCodeHarness
+import com.mikepenz.agentbelay.harness.codex.CodexHarness
 import com.mikepenz.agentbelay.harness.copilot.CopilotHarness
 import com.mikepenz.agentbelay.harness.opencode.OpenCodeHarness
 import com.mikepenz.agentbelay.harness.pi.PiHarness
@@ -43,6 +44,7 @@ class ApprovalServer(
         CopilotHarness(),
         OpenCodeHarness(),
         PiHarness(),
+        CodexHarness(),
     )
 
     private val claudeCode = harnesses.first { it is ClaudeCodeHarness }

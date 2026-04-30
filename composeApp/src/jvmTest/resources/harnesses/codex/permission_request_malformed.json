@@ -1,0 +1,11 @@
+{
+  "_fixture": {
+    "harness": "codex",
+    "scenario": "Missing session_id — adapter must reject (returns null)",
+    "expected_outcome": "parse failure"
+  },
+  "cwd": "/tmp",
+  "hook_event_name": "PermissionRequest",
+  "tool_name": "Bash",
+  "tool_input": { "command": "ls" }
+}

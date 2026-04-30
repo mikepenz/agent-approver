@@ -119,6 +119,7 @@ internal fun HistoryEntry.matchesQuery(query: String): Boolean {
         Source.COPILOT -> "Copilot"
         Source.OPENCODE -> "OpenCode"
         Source.PI -> "Pi"
+        Source.CODEX -> "Codex"
     }
     return tool.lowercase().contains(q) ||
         summary.lowercase().contains(q) ||

@@ -1,6 +1,7 @@
 package com.mikepenz.agentbelay.harness
 
 import com.mikepenz.agentbelay.harness.claudecode.ClaudeCodeHarness
+import com.mikepenz.agentbelay.harness.codex.CodexHarness
 import com.mikepenz.agentbelay.harness.copilot.CopilotHarness
 import com.mikepenz.agentbelay.harness.pi.PiHarness
 import com.mikepenz.agentbelay.model.ApprovalRequest
@@ -109,6 +110,40 @@ class HarnessCapabilitiesTest {
         val obj = kotlinx.serialization.json.Json.parseToJsonElement(response.body).jsonObject
         assertEquals("allow", obj["behavior"]!!.jsonPrimitive.content)
         assertNotNull(obj["modifiedArgs"])
+    }
+
+    @Test
+    fun `Codex advertises arg rewriting but not output redaction`() {
+        val h = CodexHarness()
+        assertTrue(h.capabilities.supportsArgRewriting)
+        assertFalse(h.capabilities.supportsAlwaysAllowWriteThrough)
+        assertFalse(h.capabilities.supportsOutputRedaction)
+        assertFalse(h.capabilities.supportsDefer)
+        assertTrue(h.capabilities.supportsInterruptOnDeny)
+    }
+
+    @Test
+    fun `Codex post-tool-use redaction returns null sentinel`() {
+        val h = CodexHarness()
+        val response = h.adapter.buildPostToolUseRedactedResponse(
+            kotlinx.serialization.json.buildJsonObject {
+                put("stdout", JsonPrimitive("anything"))
+            }
+        )
+        assertNull(response, "Codex's postToolUse redaction is gated on a follow-up — adapter must return null today")
+    }
+
+    @Test
+    fun `Codex allow with updatedInput mirrors Claude's hookSpecificOutput shape`() {
+        val h = CodexHarness()
+        val response = h.adapter.buildPermissionAllowResponse(
+            fakeRequest(Source.CODEX),
+            updatedInput = mapOf("command" to JsonPrimitive("ls /safe")),
+        )
+        val obj = kotlinx.serialization.json.Json.parseToJsonElement(response.body).jsonObject
+        val decision = obj["hookSpecificOutput"]!!.jsonObject["decision"]!!.jsonObject
+        assertEquals("allow", decision["behavior"]!!.jsonPrimitive.content)
+        assertNotNull(decision["updatedInput"])
     }
 
     @Test
