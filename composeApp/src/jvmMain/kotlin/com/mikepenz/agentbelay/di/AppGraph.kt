@@ -10,6 +10,7 @@ import com.mikepenz.agentbelay.protection.ProtectionEngine
 import com.mikepenz.agentbelay.risk.ActiveRiskAnalyzerHolder
 import com.mikepenz.agentbelay.risk.ClaudeCliRiskAnalyzer
 import com.mikepenz.agentbelay.risk.CopilotStateHolder
+import com.mikepenz.agentbelay.risk.OpenaiApiStateHolder
 import com.mikepenz.agentbelay.risk.OllamaStateHolder
 import com.mikepenz.agentbelay.state.AppStateManager
 import com.mikepenz.agentbelay.storage.DatabaseStorage
@@ -43,6 +44,7 @@ interface AppGraph : ViewModelGraph {
     val activeRiskAnalyzerHolder: ActiveRiskAnalyzerHolder
     val copilotStateHolder: CopilotStateHolder
     val ollamaStateHolder: OllamaStateHolder
+    val openaiApiStateHolder: OpenaiApiStateHolder
     val trayManager: TrayManager
     val trayNotificationsManager: TrayNotificationsManager
     val capabilityEngine: CapabilityEngine

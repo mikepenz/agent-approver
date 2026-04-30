@@ -10,6 +10,9 @@ import com.mikepenz.agentbelay.risk.ClaudeCliRiskAnalyzer
 import com.mikepenz.agentbelay.risk.CopilotInitState
 import com.mikepenz.agentbelay.risk.CopilotRiskAnalyzer
 import com.mikepenz.agentbelay.risk.CopilotStateHolder
+import com.mikepenz.agentbelay.risk.OpenaiApiInitState
+import com.mikepenz.agentbelay.risk.OpenaiApiRiskAnalyzer
+import com.mikepenz.agentbelay.risk.OpenaiApiStateHolder
 import com.mikepenz.agentbelay.risk.OllamaInitState
 import com.mikepenz.agentbelay.risk.OllamaRiskAnalyzer
 import com.mikepenz.agentbelay.risk.OllamaStateHolder
@@ -43,12 +46,14 @@ class RiskAnalyzerLifecycle(
     private val activeAnalyzerHolder: ActiveRiskAnalyzerHolder,
     private val copilotStateHolder: CopilotStateHolder,
     private val ollamaStateHolder: OllamaStateHolder,
+    private val openaiApiStateHolder: OpenaiApiStateHolder,
     private val environment: AppEnvironment,
 ) {
     private val log = Logger.withTag("RiskAnalyzerLifecycle")
 
     private var copilotAnalyzer: CopilotRiskAnalyzer? = null
     private var ollamaAnalyzer: OllamaRiskAnalyzer? = null
+    private var openaiApiAnalyzer: OpenaiApiRiskAnalyzer? = null
     private var collectorJob: Job? = null
 
     /**
@@ -78,7 +83,11 @@ class RiskAnalyzerLifecycle(
                         old.riskAnalysisOllamaThinking == new.riskAnalysisOllamaThinking &&
                         old.riskAnalysisOllamaKeepAlive == new.riskAnalysisOllamaKeepAlive &&
                         old.riskAnalysisOllamaTimeoutSeconds == new.riskAnalysisOllamaTimeoutSeconds &&
-                        old.riskAnalysisOllamaNumCtx == new.riskAnalysisOllamaNumCtx
+                        old.riskAnalysisOllamaNumCtx == new.riskAnalysisOllamaNumCtx &&
+                        old.riskAnalysisOpenaiApiUrl == new.riskAnalysisOpenaiApiUrl &&
+                        old.riskAnalysisOpenaiApiModel == new.riskAnalysisOpenaiApiModel &&
+                        old.riskAnalysisOpenaiApiTimeoutSeconds == new.riskAnalysisOpenaiApiTimeoutSeconds &&
+                        old.riskAnalysisOpenaiApiNumCtx == new.riskAnalysisOpenaiApiNumCtx
                 }
                 .collect { settings -> applySettings(settings) }
         }
@@ -97,15 +106,18 @@ class RiskAnalyzerLifecycle(
         when (settings.riskAnalysisBackend) {
             RiskAnalysisBackend.COPILOT -> activateCopilot(settings, effectivePrompt)
             RiskAnalysisBackend.OLLAMA -> activateOllama(settings, effectivePrompt)
+            RiskAnalysisBackend.OPENAI_API -> activateOpenaiApi(settings, effectivePrompt)
             RiskAnalysisBackend.CLAUDE -> activateClaude()
         }
     }
 
     private suspend fun activateOllama(settings: AppSettings, effectivePrompt: String) {
-        // Tear down Copilot if it was previously active.
         copilotAnalyzer?.shutdown()
         copilotAnalyzer = null
         copilotStateHolder.setInitState(CopilotInitState.IDLE)
+        openaiApiAnalyzer?.shutdown()
+        openaiApiAnalyzer = null
+        openaiApiStateHolder.setInitState(OpenaiApiInitState.IDLE)
 
         var analyzer = ollamaAnalyzer
         val urlChanged = analyzer != null && analyzer.baseUrl != settings.riskAnalysisOllamaUrl.trimEnd('/')
@@ -179,6 +191,95 @@ class RiskAnalyzerLifecycle(
         analyzer.onError = { ollamaStateHolder.setLastError(it) }
     }
 
+    private suspend fun activateOpenaiApi(settings: AppSettings, effectivePrompt: String) {
+        copilotAnalyzer?.shutdown()
+        copilotAnalyzer = null
+        copilotStateHolder.setInitState(CopilotInitState.IDLE)
+        ollamaAnalyzer?.shutdown()
+        ollamaAnalyzer = null
+        ollamaStateHolder.setInitState(OllamaInitState.IDLE)
+
+        var analyzer = openaiApiAnalyzer
+        val urlChanged = analyzer != null && analyzer.baseUrl != settings.riskAnalysisOpenaiApiUrl.trimEnd('/')
+        if (urlChanged) {
+            analyzer.shutdown()
+            analyzer = null
+            openaiApiAnalyzer = null
+        }
+        if (analyzer == null) {
+            openaiApiStateHolder.setInitState(OpenaiApiInitState.CONNECTING)
+            openaiApiStateHolder.setLastError(null)
+            analyzer = OpenaiApiRiskAnalyzer(
+                baseUrl = settings.riskAnalysisOpenaiApiUrl,
+                model = settings.riskAnalysisOpenaiApiModel,
+                customSystemPrompt = settings.riskAnalysisCustomPrompt,
+            )
+            applyOpenaiApiTuning(analyzer, settings, effectivePrompt)
+            wireOpenaiApiListeners(analyzer)
+            try {
+                val models = analyzer.start()
+                openaiApiAnalyzer = analyzer
+                openaiApiStateHolder.setModels(models)
+                openaiApiStateHolder.setLastError(null)
+                openaiApiStateHolder.setInitState(OpenaiApiInitState.READY)
+                reconcileSelectedOpenaiApiModel(models, analyzer)
+            } catch (e: Exception) {
+                log.e(e) { "Failed to start OpenAI API analyzer" }
+                openaiApiStateHolder.setLastError(analyzer.lastError ?: e.message)
+                openaiApiStateHolder.setInitState(OpenaiApiInitState.ERROR)
+                openaiApiAnalyzer = analyzer
+                activeAnalyzerHolder.set(analyzer)
+                return
+            }
+        } else {
+            applyOpenaiApiTuning(analyzer, settings, effectivePrompt)
+        }
+        activeAnalyzerHolder.set(analyzer)
+    }
+
+    private fun applyOpenaiApiTuning(analyzer: OpenaiApiRiskAnalyzer, settings: AppSettings, effectivePrompt: String) {
+        analyzer.model = settings.riskAnalysisOpenaiApiModel
+        analyzer.systemPrompt = effectivePrompt
+        analyzer.timeoutMs = settings.riskAnalysisOpenaiApiTimeoutSeconds.coerceAtLeast(5).toLong() * 1_000L
+        analyzer.numCtx = settings.riskAnalysisOpenaiApiNumCtx
+    }
+
+    private fun reconcileSelectedOpenaiApiModel(models: List<String>, analyzer: OpenaiApiRiskAnalyzer) {
+        if (models.isEmpty()) return
+        val current = stateManager.state.value.settings.riskAnalysisOpenaiApiModel
+        if (current in models) return
+        val replacement = models.first()
+        log.w { "Selected OpenAI API model '$current' not available; falling back to '$replacement'" }
+        analyzer.model = replacement
+        stateManager.updateSettings(
+            stateManager.state.value.settings.copy(riskAnalysisOpenaiApiModel = replacement),
+        )
+    }
+
+    private fun wireOpenaiApiListeners(analyzer: OpenaiApiRiskAnalyzer) {
+        analyzer.onMetrics = { openaiApiStateHolder.setLastMetrics(it) }
+        analyzer.onError = { openaiApiStateHolder.setLastError(it) }
+    }
+
+    suspend fun refreshOpenaiApiModels(): Boolean {
+        val analyzer = openaiApiAnalyzer ?: return false
+        openaiApiStateHolder.setInitState(OpenaiApiInitState.CONNECTING)
+        return analyzer.listModels().fold(
+            onSuccess = { models ->
+                openaiApiStateHolder.setModels(models)
+                openaiApiStateHolder.setLastError(null)
+                openaiApiStateHolder.setInitState(OpenaiApiInitState.READY)
+                reconcileSelectedOpenaiApiModel(models, analyzer)
+                true
+            },
+            onFailure = {
+                openaiApiStateHolder.setLastError(analyzer.lastError ?: it.message)
+                openaiApiStateHolder.setInitState(OpenaiApiInitState.ERROR)
+                false
+            },
+        )
+    }
+
     /**
      * User-triggered refresh of `/api/tags`. Returns true on success, false on
      * failure. The state holder is updated with the new model list (or error).
@@ -203,10 +304,12 @@ class RiskAnalyzerLifecycle(
     }
 
     private suspend fun activateCopilot(settings: AppSettings, effectivePrompt: String) {
-        // Tear down Ollama if it was previously active.
         ollamaAnalyzer?.shutdown()
         ollamaAnalyzer = null
         ollamaStateHolder.setInitState(OllamaInitState.IDLE)
+        openaiApiAnalyzer?.shutdown()
+        openaiApiAnalyzer = null
+        openaiApiStateHolder.setInitState(OpenaiApiInitState.IDLE)
 
         var analyzer = copilotAnalyzer
         if (analyzer == null) {
@@ -243,12 +346,14 @@ class RiskAnalyzerLifecycle(
         ollamaAnalyzer?.shutdown()
         ollamaAnalyzer = null
         ollamaStateHolder.setInitState(OllamaInitState.IDLE)
+        openaiApiAnalyzer?.shutdown()
+        openaiApiAnalyzer = null
+        openaiApiStateHolder.setInitState(OpenaiApiInitState.IDLE)
         activeAnalyzerHolder.set(claudeAnalyzer)
     }
 
     /**
-     * Cancel the settings observer and tear down the Copilot client (if
-     * running) so its child process exits cleanly. Idempotent.
+     * Cancel the settings observer and tear down all analyzers. Idempotent.
      */
     fun shutdown() {
         collectorJob?.cancel()
@@ -257,5 +362,7 @@ class RiskAnalyzerLifecycle(
         copilotAnalyzer = null
         ollamaAnalyzer?.shutdown()
         ollamaAnalyzer = null
+        openaiApiAnalyzer?.shutdown()
+        openaiApiAnalyzer = null
     }
 }

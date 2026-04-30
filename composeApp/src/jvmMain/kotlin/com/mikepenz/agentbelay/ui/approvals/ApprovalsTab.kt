@@ -48,6 +48,7 @@ fun ApprovalsTab(
         RiskAnalysisBackend.CLAUDE -> "claude"
         RiskAnalysisBackend.COPILOT -> "copilot"
         RiskAnalysisBackend.OLLAMA -> "ollama"
+        RiskAnalysisBackend.OPENAI_API -> "openai"
     }
 
     val items = pendingApprovals.map { request ->

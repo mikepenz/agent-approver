@@ -6,7 +6,7 @@ import kotlinx.serialization.Serializable
 enum class ThemeMode { SYSTEM, DARK, LIGHT }
 
 @Serializable
-enum class RiskAnalysisBackend { CLAUDE, COPILOT, OLLAMA }
+enum class RiskAnalysisBackend { CLAUDE, COPILOT, OLLAMA, OPENAI_API }
 
 @Serializable
 data class AppSettings(
@@ -32,6 +32,10 @@ data class AppSettings(
     val riskAnalysisOllamaTimeoutSeconds: Int = 60,
     /** Optional `num_ctx` override. 0 = use model default. */
     val riskAnalysisOllamaNumCtx: Int = 0,
+    val riskAnalysisOpenaiApiUrl: String = "http://localhost:8080",
+    val riskAnalysisOpenaiApiModel: String = "llama3.2",
+    val riskAnalysisOpenaiApiTimeoutSeconds: Int = 60,
+    val riskAnalysisOpenaiApiNumCtx: Int = 0,
     val riskAnalysisCustomPrompt: String = "",
     val autoApproveLevel: Int = 0,
     val autoDenyLevel: Int = 0,
