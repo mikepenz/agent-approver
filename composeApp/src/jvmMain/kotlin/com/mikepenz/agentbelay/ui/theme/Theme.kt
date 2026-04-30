@@ -91,15 +91,18 @@ val ToolWebColor = ToolWeb               // oklch(0.78 0.13 48)
 // Source badge colors
 val SourceClaudeColor = Color(0xFFD97757)  // oklch(0.78 0.14 30) — Claude orange
 val SourceCopilotColor = VioletPurple      // oklch(0.74 0.14 290) — design-system violet
+val SourceOpenCodeColor = Color(0xFF10B981) // emerald green — OpenCode
 
 fun sourceColor(source: com.mikepenz.agentbelay.model.Source): Color = when (source) {
     com.mikepenz.agentbelay.model.Source.CLAUDE_CODE -> SourceClaudeColor
     com.mikepenz.agentbelay.model.Source.COPILOT -> SourceCopilotColor
+    com.mikepenz.agentbelay.model.Source.OPENCODE -> SourceOpenCodeColor
 }
 
 fun sourceLabel(source: com.mikepenz.agentbelay.model.Source): String = when (source) {
     com.mikepenz.agentbelay.model.Source.CLAUDE_CODE -> "Claude Code"
     com.mikepenz.agentbelay.model.Source.COPILOT -> "Copilot"
+    com.mikepenz.agentbelay.model.Source.OPENCODE -> "OpenCode"
 }
 
 fun riskColor(risk: Int): Color = when (risk) {

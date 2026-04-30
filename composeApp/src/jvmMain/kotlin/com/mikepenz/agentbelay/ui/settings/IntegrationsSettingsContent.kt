@@ -39,11 +39,14 @@ fun IntegrationsSettingsContent(
     settings: AppSettings,
     isHookRegistered: Boolean,
     isCopilotRegistered: Boolean,
+    isOpenCodeRegistered: Boolean = false,
     onSettingsChange: (AppSettings) -> Unit,
     onRegisterHook: () -> Unit,
     onUnregisterHook: () -> Unit,
     onRegisterCopilot: () -> Unit,
     onUnregisterCopilot: () -> Unit,
+    onRegisterOpenCode: () -> Unit = {},
+    onUnregisterOpenCode: () -> Unit = {},
 ) {
     SettingSection(
         title = "Integrations",
@@ -74,6 +77,16 @@ fun IntegrationsSettingsContent(
                         onChange = { onSettingsChange(settings.copy(copilotFailClosed = it)) },
                     )
                 },
+            ),
+            IntegrationItemData(
+                id = "opencode",
+                name = "OpenCode",
+                desc = "Plugin in ~/.config/opencode/plugin/agent-belay.ts " +
+                    "(tool.execute.before gate, fail-open)",
+                color = Color(0xFF10B981),
+                registered = isOpenCodeRegistered,
+                onRegister = onRegisterOpenCode,
+                onUnregister = onUnregisterOpenCode,
             ),
         )
         items.forEachIndexed { idx, it -> IntegrationRow(item = it, first = idx == 0) }

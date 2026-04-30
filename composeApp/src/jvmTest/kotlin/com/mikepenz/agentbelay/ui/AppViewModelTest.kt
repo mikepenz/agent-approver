@@ -3,6 +3,7 @@ package com.mikepenz.agentbelay.ui
 import com.mikepenz.agentbelay.di.AppEnvironment
 import com.mikepenz.agentbelay.hook.CopilotBridge
 import com.mikepenz.agentbelay.hook.HookRegistry
+import com.mikepenz.agentbelay.hook.OpenCodeBridge
 import com.mikepenz.agentbelay.hook.RegistrationEvents
 import com.mikepenz.agentbelay.model.ApprovalRequest
 import com.mikepenz.agentbelay.model.HookInput
@@ -68,6 +69,15 @@ class AppViewModelTest {
         override fun unregisterCapabilityHook(port: Int) {}
     }
 
+    private object FakeOpenCodeBridge : OpenCodeBridge {
+        override fun isRegistered(port: Int): Boolean = false
+        override fun register(port: Int) {}
+        override fun unregister(port: Int) {}
+        override fun isCapabilityHookRegistered(port: Int): Boolean = false
+        override fun registerCapabilityHook(port: Int) {}
+        override fun unregisterCapabilityHook(port: Int) {}
+    }
+
     private fun fakeUpdateManager() = UpdateManager(scope = CoroutineScope(SupervisorJob()))
 
     private fun newRequest(id: String = "r-1") = ApprovalRequest(
@@ -82,7 +92,7 @@ class AppViewModelTest {
     @Test
     fun `tabState reflects pending count and away mode`() = runTest {
         val state = AppStateManager()
-        val vm = AppViewModel(state, env(devMode = false), FakeHookRegistry, FakeCopilotBridge, RegistrationEvents(), fakeUpdateManager())
+        val vm = AppViewModel(state, env(devMode = false), FakeHookRegistry, FakeCopilotBridge, FakeOpenCodeBridge, RegistrationEvents(), fakeUpdateManager())
         runCurrent()
 
         assertEquals(0, vm.tabState.value.pendingCount)
@@ -103,7 +113,7 @@ class AppViewModelTest {
 
     @Test
     fun `selectTab updates the selected index`() = runTest {
-        val vm = AppViewModel(AppStateManager(), env(), FakeHookRegistry, FakeCopilotBridge, RegistrationEvents(), fakeUpdateManager())
+        val vm = AppViewModel(AppStateManager(), env(), FakeHookRegistry, FakeCopilotBridge, FakeOpenCodeBridge, RegistrationEvents(), fakeUpdateManager())
         runCurrent()
 
         assertEquals(0, vm.selectedTab.value)
@@ -113,7 +123,7 @@ class AppViewModelTest {
 
     @Test
     fun `devMode flag comes from environment`() = runTest {
-        val vm = AppViewModel(AppStateManager(), env(devMode = true), FakeHookRegistry, FakeCopilotBridge, RegistrationEvents(), fakeUpdateManager())
+        val vm = AppViewModel(AppStateManager(), env(devMode = true), FakeHookRegistry, FakeCopilotBridge, FakeOpenCodeBridge, RegistrationEvents(), fakeUpdateManager())
         runCurrent()
         assertTrue(vm.tabState.value.devMode)
     }

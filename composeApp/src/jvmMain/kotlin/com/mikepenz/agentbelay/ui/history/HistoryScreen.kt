@@ -117,6 +117,7 @@ internal fun HistoryEntry.matchesQuery(query: String): Boolean {
     val sourceLabel = when (source) {
         Source.CLAUDE_CODE -> "Claude Code"
         Source.COPILOT -> "Copilot"
+        Source.OPENCODE -> "OpenCode"
     }
     return tool.lowercase().contains(q) ||
         summary.lowercase().contains(q) ||

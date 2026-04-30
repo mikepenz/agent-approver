@@ -21,7 +21,7 @@ class ResponseCompressionCapabilityTest {
     @Test
     fun `supports both Claude Code and Copilot CLI`() {
         assertEquals(
-            setOf(AgentTarget.CLAUDE_CODE, AgentTarget.COPILOT_CLI),
+            setOf(AgentTarget.CLAUDE_CODE, AgentTarget.COPILOT_CLI, AgentTarget.OPENCODE),
             ResponseCompressionCapability.supportedTargets,
         )
     }

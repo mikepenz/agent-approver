@@ -8,6 +8,7 @@ import com.mikepenz.agentbelay.capability.HookEvent
 import com.mikepenz.agentbelay.di.AppScope
 import com.mikepenz.agentbelay.hook.CopilotBridge
 import com.mikepenz.agentbelay.hook.HookRegistry
+import com.mikepenz.agentbelay.hook.OpenCodeBridge
 import com.mikepenz.agentbelay.hook.RegistrationEvents
 import com.mikepenz.agentbelay.model.AppSettings
 import com.mikepenz.agentbelay.model.CapabilitySettings
@@ -62,6 +63,7 @@ import kotlinx.coroutines.withContext
 class SettingsViewModel(
     private val stateManager: AppStateManager,
     private val copilotBridge: CopilotBridge,
+    private val openCodeBridge: OpenCodeBridge,
     private val copilotStateHolder: CopilotStateHolder,
     private val ollamaStateHolder: OllamaStateHolder,
     private val riskAnalyzerLifecycle: RiskAnalyzerLifecycle,
@@ -99,6 +101,7 @@ class SettingsViewModel(
     // port-flow collector below and re-polled whenever the server port changes.
     private val isHookRegistered = MutableStateFlow(false)
     private val isCopilotRegistered = MutableStateFlow(false)
+    private val isOpenCodeRegistered = MutableStateFlow(false)
 
     /** Pre-combined Copilot lifecycle state to keep the main `combine` arity reasonable. */
     private val copilotState: kotlinx.coroutines.flow.Flow<Pair<List<Pair<String, String>>, CopilotInitState>> =
@@ -124,25 +127,27 @@ class SettingsViewModel(
             stateManager.state,
             isHookRegistered,
             isCopilotRegistered,
+            isOpenCodeRegistered,
             copilotState,
-            ollamaState,
-        ) { state, hookRegistered, copilotRegistered, copilot, ollama ->
-            UiBase(state, hookRegistered, copilotRegistered, copilot, ollama)
+        ) { state, hookRegistered, copilotRegistered, openCodeRegistered, copilot ->
+            UiBase(state, hookRegistered, copilotRegistered, openCodeRegistered, copilot)
         },
+        ollamaState,
         hotkeyErrors,
-    ) { base, hotkeys ->
+    ) { base, ollama, hotkeys ->
         SettingsUiState(
             settings = base.state.settings,
             historyCount = base.state.history.size,
             isHookRegistered = base.hookRegistered,
             isCopilotRegistered = base.copilotRegistered,
+            isOpenCodeRegistered = base.openCodeRegistered,
             copilotModels = base.copilot.first,
             copilotInitState = base.copilot.second,
-            ollamaModels = base.ollama.models,
-            ollamaInitState = base.ollama.initState,
-            ollamaLastError = base.ollama.lastError,
-            ollamaLastMetrics = base.ollama.lastMetrics,
-            ollamaVersion = base.ollama.version,
+            ollamaModels = ollama.models,
+            ollamaInitState = ollama.initState,
+            ollamaLastError = ollama.lastError,
+            ollamaLastMetrics = ollama.lastMetrics,
+            ollamaVersion = ollama.version,
             approveHotkeyError = hotkeys.first,
             denyHotkeyError = hotkeys.second,
         )
@@ -154,6 +159,7 @@ class SettingsViewModel(
             historyCount = stateManager.state.value.history.size,
             isHookRegistered = false,
             isCopilotRegistered = false,
+            isOpenCodeRegistered = false,
             copilotModels = copilotStateHolder.models.value,
             copilotInitState = copilotStateHolder.initState.value,
             ollamaModels = ollamaStateHolder.models.value,
@@ -176,11 +182,16 @@ class SettingsViewModel(
                 .map { it.settings.serverPort }
                 .distinctUntilChanged()
                 .collect { port ->
-                    val (claude, copilot) = withContext(ioDispatcher) {
-                        hookRegistry.isRegistered(port) to copilotBridge.isRegistered(port)
+                    val (claude, copilot, openCode) = withContext(ioDispatcher) {
+                        Triple(
+                            hookRegistry.isRegistered(port),
+                            copilotBridge.isRegistered(port),
+                            openCodeBridge.isRegistered(port),
+                        )
                     }
                     isHookRegistered.value = claude
                     isCopilotRegistered.value = copilot
+                    isOpenCodeRegistered.value = openCode
                 }
         }
 
@@ -296,9 +307,11 @@ class SettingsViewModel(
         // Copilot: sessionStart covers both events, register if anything is enabled.
         if (requiredEvents.isNotEmpty()) {
             copilotBridge.registerCapabilityHook(port, copilotFailClosed)
+            openCodeBridge.registerCapabilityHook(port)
         } else {
             hookRegistry.unregisterCapabilityHook(port)
             copilotBridge.unregisterCapabilityHook(port)
+            openCodeBridge.unregisterCapabilityHook(port)
         }
     }
 
@@ -338,6 +351,24 @@ class SettingsViewModel(
         }
     }
 
+    fun registerOpenCode() {
+        viewModelScope.launch(writeDispatcher) {
+            val port = stateManager.state.value.settings.serverPort
+            openCodeBridge.register(port)
+            isOpenCodeRegistered.value = openCodeBridge.isRegistered(port)
+            registrationEvents.emit()
+        }
+    }
+
+    fun unregisterOpenCode() {
+        viewModelScope.launch(writeDispatcher) {
+            val port = stateManager.state.value.settings.serverPort
+            openCodeBridge.unregister(port)
+            isOpenCodeRegistered.value = openCodeBridge.isRegistered(port)
+            registrationEvents.emit()
+        }
+    }
+
     fun clearHistory() {
         viewModelScope.launch(writeDispatcher) {
             stateManager.clearHistory()
@@ -369,6 +400,7 @@ data class SettingsUiState(
     val historyCount: Int,
     val isHookRegistered: Boolean,
     val isCopilotRegistered: Boolean,
+    val isOpenCodeRegistered: Boolean = false,
     val copilotModels: List<Pair<String, String>>,
     val copilotInitState: CopilotInitState,
     val ollamaModels: List<String> = emptyList(),
@@ -384,6 +416,6 @@ private data class UiBase(
     val state: com.mikepenz.agentbelay.state.AppState,
     val hookRegistered: Boolean,
     val copilotRegistered: Boolean,
+    val openCodeRegistered: Boolean,
     val copilot: Pair<List<Pair<String, String>>, CopilotInitState>,
-    val ollama: OllamaSnapshot,
 )
