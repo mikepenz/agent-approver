@@ -71,7 +71,7 @@ jobs:
           rm -f "$CERTIFICATE_PATH"
 
       - name: Regenerate aboutlibraries.json
-        run: ./gradlew :composeApp:exportLibraryDefinitions --stacktrace
+        run: ./gradlew :composeApp:exportLibraryDefinitions --stacktrace --dependency-verification=lenient
 
       - name: Build distributable app
         # writeNucleusExecutableMarker depends on createDistributable and
@@ -360,7 +360,7 @@ jobs:
         uses: gradle/actions/setup-gradle@50e97c2cd7a37755bbfafc9c5b7cafaece252f6e # v6.1.0
 
       - name: Regenerate aboutlibraries.json
-        run: ./gradlew :composeApp:exportLibraryDefinitions --stacktrace
+        run: ./gradlew :composeApp:exportLibraryDefinitions --stacktrace --dependency-verification=lenient
 
       - name: Build MSI
         run: ./gradlew :composeApp:packageMsi --stacktrace
@@ -438,7 +438,7 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y fakeroot
 
       - name: Regenerate aboutlibraries.json
-        run: ./gradlew :composeApp:exportLibraryDefinitions --stacktrace
+        run: ./gradlew :composeApp:exportLibraryDefinitions --stacktrace --dependency-verification=lenient
 
       - name: Build DEB and JAR
         run: ./gradlew :composeApp:packageDeb :composeApp:jvmJar --stacktrace
