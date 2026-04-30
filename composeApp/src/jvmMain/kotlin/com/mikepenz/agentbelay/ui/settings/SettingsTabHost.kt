@@ -18,8 +18,11 @@ fun SettingsTabHost(onShowLicenses: () -> Unit) {
     val viewModel: SettingsViewModel = metroViewModel()
     val ui by viewModel.uiState.collectAsState()
     val updateState by viewModel.updateState.collectAsState()
+    val selectedSubTabIndex by viewModel.selectedSubTabIndex.collectAsState()
 
     SettingsTab(
+        selectedSubTabIndex = selectedSubTabIndex,
+        onSubTabSelect = viewModel::selectSubTab,
         settings = ui.settings,
         isHookRegistered = ui.isHookRegistered,
         isCopilotRegistered = ui.isCopilotRegistered,
