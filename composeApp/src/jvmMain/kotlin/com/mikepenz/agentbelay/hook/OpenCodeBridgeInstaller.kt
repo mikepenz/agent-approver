@@ -1,4 +1,4 @@
-package com.mikepenz.agentbuddy.hook
+package com.mikepenz.agentbelay.hook
 
 import co.touchlab.kermit.Logger
 import java.io.File
@@ -8,16 +8,16 @@ import java.nio.file.StandardCopyOption
 private val logger = Logger.withTag("OpenCodeBridgeInstaller")
 
 /**
- * Installs Agent Buddy as a **global** plugin for OpenCode.
+ * Installs Agent Belay as a **global** plugin for OpenCode.
  *
  * OpenCode auto-discovers plugins from `~/.config/opencode/plugin/` — any `.ts`
  * file in that directory is loaded automatically. No config file entry is needed.
  *
  * A single file is written:
  *
- *  **Plugin file** at `~/.config/opencode/plugin/agent-buddy.ts` — an
+ *  **Plugin file** at `~/.config/opencode/plugin/agent-belay.ts` — an
  *  OpenCode plugin that intercepts `tool.execute.before` to POST approval
- *  requests to Agent Buddy, and optionally fetches capability context on
+ *  requests to Agent Belay, and optionally fetches capability context on
  *  session events.
  *
  * The server port is baked into the plugin source at registration time, so
@@ -25,7 +25,7 @@ private val logger = Logger.withTag("OpenCodeBridgeInstaller")
  */
 object OpenCodeBridgeInstaller {
 
-    private const val PLUGIN_FILE_NAME = "agent-buddy.ts"
+    private const val PLUGIN_FILE_NAME = "agent-belay.ts"
 
     private fun configDir(): File {
         val home = System.getProperty("user.home")
@@ -111,12 +111,9 @@ object OpenCodeBridgeInstaller {
             |            });
             |            if (res.ok) {
             |              const data = await res.json();
-            |              if (data.additionalContext) {
-            |                console.log("[Agent Buddy] Injected capability context");
-            |              }
             |            }
             |          } catch {
-            |            // Agent Buddy unreachable — no context injection (non-blocking)
+            |            // Agent Belay unreachable — no context injection (non-blocking)
             |          }
             |        }
             |      },
@@ -126,17 +123,17 @@ object OpenCodeBridgeInstaller {
         }
 
         return """
-            |// Agent Buddy plugin for OpenCode
-            |// Auto-generated — do not edit manually. Re-register in Agent Buddy to update.
+            |// Agent Belay plugin for OpenCode
+            |// Auto-generated — do not edit manually. Re-register in Agent Belay to update.
             |// Server: http://localhost:$port
             |
             |import type { PluginModule } from "@opencode-ai/plugin";
             |
             |const BASE_URL = "http://localhost:$port";
-            |const TIMEOUT_MS = 300000; // 5 minutes — matches Agent Buddy's default
+            |const TIMEOUT_MS = 300000; // 5 minutes — matches Agent Belay's default
             |
             |export default {
-            |  id: "agent-buddy",
+            |  id: "agent-belay",
             |  server: async (input) => {
             |    return {
             |      "tool.execute.before": async (hookInput, output) => {
@@ -157,7 +154,7 @@ object OpenCodeBridgeInstaller {
             |            signal: AbortSignal.timeout(TIMEOUT_MS),
             |          });
             |        } catch {
-            |          // Agent Buddy unreachable — fail open (allow tool execution)
+            |          // Agent Belay unreachable — fail open (allow tool execution)
             |          return;
             |        }
             |
@@ -169,7 +166,7 @@ object OpenCodeBridgeInstaller {
             |        const result = await response.json();
             |        if (result.behavior === "deny") {
             |          throw new Error(
-            |            result.message ?? "Blocked by Agent Buddy"
+            |            result.message ?? "Blocked by Agent Belay"
             |          );
             |        }
             |        // behavior === "allow" or unrecognized — proceed

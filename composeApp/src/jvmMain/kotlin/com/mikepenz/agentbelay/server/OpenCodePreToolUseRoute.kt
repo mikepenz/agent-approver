@@ -1,9 +1,9 @@
-package com.mikepenz.agentbuddy.server
+package com.mikepenz.agentbelay.server
 
 import co.touchlab.kermit.Logger
-import com.mikepenz.agentbuddy.model.*
-import com.mikepenz.agentbuddy.protection.ProtectionEngine
-import com.mikepenz.agentbuddy.state.AppStateManager
+import com.mikepenz.agentbelay.model.*
+import com.mikepenz.agentbelay.protection.ProtectionEngine
+import com.mikepenz.agentbelay.state.AppStateManager
 import io.ktor.http.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*

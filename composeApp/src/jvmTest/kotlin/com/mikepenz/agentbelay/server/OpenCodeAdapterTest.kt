@@ -1,7 +1,7 @@
-package com.mikepenz.agentbuddy.server
+package com.mikepenz.agentbelay.server
 
-import com.mikepenz.agentbuddy.model.Source
-import com.mikepenz.agentbuddy.model.ToolType
+import com.mikepenz.agentbelay.model.Source
+import com.mikepenz.agentbelay.model.ToolType
 import kotlinx.serialization.json.JsonPrimitive
 import kotlin.test.Test
 import kotlin.test.assertEquals

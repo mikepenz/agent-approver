@@ -1,8 +1,8 @@
-package com.mikepenz.agentbuddy.server
+package com.mikepenz.agentbelay.server
 
 import co.touchlab.kermit.Logger
-import com.mikepenz.agentbuddy.model.Decision
-import com.mikepenz.agentbuddy.state.AppStateManager
+import com.mikepenz.agentbelay.model.Decision
+import com.mikepenz.agentbelay.state.AppStateManager
 import io.ktor.http.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
@@ -28,7 +28,7 @@ fun Route.openCodeApprovalRoute(
             return@post
         }
 
-        val deferred = CompletableDeferred<com.mikepenz.agentbuddy.model.ApprovalResult>()
+        val deferred = CompletableDeferred<com.mikepenz.agentbelay.model.ApprovalResult>()
         stateManager.addPending(request, deferred)
         onNewApproval()
 

@@ -81,7 +81,7 @@ fun IntegrationsSettingsContent(
             IntegrationItemData(
                 id = "opencode",
                 name = "OpenCode",
-                desc = "Plugin in ~/.config/opencode/plugin/agent-buddy.ts " +
+                desc = "Plugin in ~/.config/opencode/plugin/agent-belay.ts " +
                     "(tool.execute.before gate, fail-open)",
                 color = Color(0xFF10B981),
                 registered = isOpenCodeRegistered,

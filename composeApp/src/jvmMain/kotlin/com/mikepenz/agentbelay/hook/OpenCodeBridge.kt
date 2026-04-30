@@ -1,8 +1,8 @@
-package com.mikepenz.agentbuddy.hook
+package com.mikepenz.agentbelay.hook
 
 /**
  * Thin interface over the [OpenCodeBridgeInstaller] singleton object so that
- * [com.mikepenz.agentbuddy.ui.settings.SettingsViewModel] can depend on it
+ * [com.mikepenz.agentbelay.ui.settings.SettingsViewModel] can depend on it
  * for unit-testing without touching the host filesystem.
  *
  * Mirrors [CopilotBridge] in shape: a single global registration call

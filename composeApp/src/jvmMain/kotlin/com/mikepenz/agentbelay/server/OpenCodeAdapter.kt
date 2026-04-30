@@ -1,10 +1,10 @@
-package com.mikepenz.agentbuddy.server
+package com.mikepenz.agentbelay.server
 
 import co.touchlab.kermit.Logger
-import com.mikepenz.agentbuddy.model.ApprovalRequest
-import com.mikepenz.agentbuddy.model.HookInput
-import com.mikepenz.agentbuddy.model.Source
-import com.mikepenz.agentbuddy.model.ToolType
+import com.mikepenz.agentbelay.model.ApprovalRequest
+import com.mikepenz.agentbelay.model.HookInput
+import com.mikepenz.agentbelay.model.Source
+import com.mikepenz.agentbelay.model.ToolType
 import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
 import kotlinx.serialization.json.Json
@@ -96,7 +96,7 @@ class OpenCodeAdapter {
                 rawRequestJson = rawJson,
             )
         } catch (e: Exception) {
-            com.mikepenz.agentbuddy.logging.ErrorReporter.report("Failed to parse OpenCode hook JSON", e)
+            com.mikepenz.agentbelay.logging.ErrorReporter.report("Failed to parse OpenCode hook JSON", e)
             null
         }
     }
