@@ -85,6 +85,10 @@ class PreToolUseRouteTest {
             stateManager = stateManager,
             protectionEngine = protectionEngine,
             capabilityEngine = capabilityEngine,
+            redactionEngine = com.mikepenz.agentbelay.redaction.RedactionEngine(
+                modules = emptyList(),
+                settingsProvider = { com.mikepenz.agentbelay.model.RedactionSettings(enabled = false) },
+            ),
             databaseStorage = null,
             onNewApproval = {},
         )
@@ -179,6 +183,10 @@ class PreToolUseRouteTest {
             stateManager = stateManager,
             protectionEngine = protectionEngine,
             capabilityEngine = capabilityEngine,
+            redactionEngine = com.mikepenz.agentbelay.redaction.RedactionEngine(
+                modules = emptyList(),
+                settingsProvider = { com.mikepenz.agentbelay.model.RedactionSettings(enabled = false) },
+            ),
             databaseStorage = null,
             onNewApproval = {},
         )
@@ -248,10 +256,15 @@ class PreToolUseRouteTest {
         )
         val protectionEngine = ProtectionEngine(listOf(logModule, blockModule)) { settings }
         val capabilityEngine = CapabilityEngine(emptyList()) { CapabilitySettings() }
+        val redactionEngine = com.mikepenz.agentbelay.redaction.RedactionEngine(
+            modules = emptyList(),
+            settingsProvider = { com.mikepenz.agentbelay.model.RedactionSettings(enabled = false) },
+        )
         server = ApprovalServer(
             stateManager = stateManager,
             protectionEngine = protectionEngine,
             capabilityEngine = capabilityEngine,
+            redactionEngine = redactionEngine,
             databaseStorage = null,
             onNewApproval = {},
         )

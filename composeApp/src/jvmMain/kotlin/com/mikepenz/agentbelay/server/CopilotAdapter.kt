@@ -1,8 +1,10 @@
 package com.mikepenz.agentbelay.server
 
 import co.touchlab.kermit.Logger
+import com.mikepenz.agentbelay.harness.HarnessAdapter
 import com.mikepenz.agentbelay.model.ApprovalRequest
 import com.mikepenz.agentbelay.model.HookInput
+import com.mikepenz.agentbelay.model.PermissionSuggestion
 import com.mikepenz.agentbelay.model.Source
 import com.mikepenz.agentbelay.model.ToolType
 import kotlinx.datetime.Clock
@@ -11,10 +13,12 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.longOrNull
+import kotlinx.serialization.json.put
 import java.util.UUID
 
 private val TOOL_NAME_MAP = mapOf(
@@ -67,10 +71,14 @@ private fun normalizeToolInput(toolName: String, input: Map<String, JsonElement>
  * known field names for each piece — this is more verbose than a typed
  * deserialiser but resilient to all three layouts simultaneously.
  */
-class CopilotAdapter {
+class CopilotAdapter : HarnessAdapter {
 
     private val logger = Logger.withTag("CopilotAdapter")
     private val json = Json { ignoreUnknownKeys = true }
+
+    override fun parsePermissionRequest(rawJson: String): ApprovalRequest? = parse(rawJson)
+
+    override fun parsePreToolUse(rawJson: String): ApprovalRequest? = parse(rawJson)
 
     fun parse(rawJson: String): ApprovalRequest? {
         return try {
@@ -170,4 +178,64 @@ class CopilotAdapter {
         }
         return Clock.System.now()
     }
+
+    // Response shape for Copilot CLI's permissionRequest hook (v1.0.16+).
+    //
+    // Per the bundled SDK type definition in @github/copilot npm package:
+    //
+    //     export declare interface PermissionRequestHookOutput {
+    //         behavior?: "allow" | "deny";
+    //         message?: string;
+    //         interrupt?: boolean;
+    //     }
+    //
+    // Flat object — `behavior: "allow"` (not "approve"), distinct from the
+    // preToolUse hook's `{permissionDecision, permissionDecisionReason}`
+    // format. `interrupt: true` on deny aborts the tool call entirely.
+
+    override fun buildPermissionAllowResponse(
+        request: ApprovalRequest,
+        updatedInput: Map<String, JsonElement>?,
+    ): String = buildJsonObject {
+        put("behavior", "allow")
+        // Copilot CLI v1.0.22+ honors `modifiedArgs` on permissionRequest
+        // allow responses — the parity with Claude's `updatedInput`.
+        if (updatedInput != null) put("modifiedArgs", JsonObject(updatedInput))
+    }.toString()
+
+    override fun buildPermissionAlwaysAllowResponse(
+        request: ApprovalRequest,
+        suggestions: List<PermissionSuggestion>,
+    ): String {
+        // Copilot CLI does not support write-through permission persistence
+        // via the hook envelope (no `updatedPermissions` analogue). Always-
+        // Allow on Copilot collapses to a plain allow; users manage trusted
+        // patterns via Copilot's own rules file.
+        return buildPermissionAllowResponse(request, updatedInput = null)
+    }
+
+    override fun buildPermissionDenyResponse(
+        request: ApprovalRequest,
+        message: String,
+    ): String = buildJsonObject {
+        put("behavior", "deny")
+        put("message", message)
+        put("interrupt", true)
+    }.toString()
+
+    override fun buildPreToolUseAllowResponse(): String = buildJsonObject {
+        put("permissionDecision", "allow")
+    }.toString()
+
+    override fun buildPreToolUseDenyResponse(reason: String): String = buildJsonObject {
+        put("permissionDecision", "deny")
+        put("permissionDecisionReason", reason)
+    }.toString()
+
+    /**
+     * Copilot CLI's `postToolUse` hook does not honor result modification
+     * (per the docs.github.com hooks-configuration reference). Returning
+     * null tells callers to pass-through the original output untouched.
+     */
+    override fun buildPostToolUseRedactedResponse(updatedOutput: JsonObject): String? = null
 }

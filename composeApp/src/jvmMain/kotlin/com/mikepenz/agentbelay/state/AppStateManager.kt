@@ -180,6 +180,39 @@ class AppStateManager(
         }
     }
 
+    /**
+     * Attaches PostToolUse [RedactionHit]s to the existing history entry
+     * matched by ([sessionId], [toolName], [toolInput]). Used when the
+     * post-tool redaction pass fires after the original PermissionRequest
+     * has already been persisted. Returns true if a row was found and
+     * updated, false otherwise (in which case the caller should not
+     * fail — redaction is best-effort observability when no history row
+     * exists, e.g. fully auto-allowed Copilot tools).
+     */
+    fun attachRedactionHits(
+        sessionId: String,
+        toolName: String,
+        toolInput: Map<String, JsonElement>,
+        hits: List<RedactionHit>,
+    ): Boolean {
+        if (hits.isEmpty()) return false
+        synchronized(persistLock) {
+            val match = _state.value.history.firstOrNull { result ->
+                result.request.hookInput.sessionId == sessionId &&
+                    result.request.hookInput.toolName == toolName &&
+                    result.request.hookInput.toolInput == toolInput
+            } ?: return false
+            databaseStorage?.updateRedactionHits(match.request.id, hits)
+            _state.update { current ->
+                val updatedHistory = current.history.map { result ->
+                    if (result.request.id == match.request.id) result.copy(redactionHits = hits) else result
+                }
+                current.copy(history = updatedHistory)
+            }
+            return true
+        }
+    }
+
     fun updateRiskResult(requestId: String, analysis: RiskAnalysis) {
         synchronized(persistLock) {
             // Drop late-arriving results for already-resolved requests to

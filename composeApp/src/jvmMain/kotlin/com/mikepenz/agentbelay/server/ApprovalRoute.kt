@@ -2,7 +2,6 @@ package com.mikepenz.agentbelay.server
 
 import co.touchlab.kermit.Logger
 import com.mikepenz.agentbelay.model.Decision
-import com.mikepenz.agentbelay.model.PermissionSuggestion
 import com.mikepenz.agentbelay.model.ToolType
 import com.mikepenz.agentbelay.state.AppStateManager
 import io.ktor.http.*
@@ -11,12 +10,6 @@ import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.withTimeoutOrNull
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.encodeToJsonElement
-import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.put
 import kotlin.coroutines.cancellation.CancellationException
 
 private val logger = Logger.withTag("ApprovalRoute")
@@ -28,7 +21,7 @@ fun Route.approvalRoute(
 ) {
     post("/approve") {
         val rawBody = call.receiveText()
-        val request = adapter.parse(rawBody)
+        val request = adapter.parsePermissionRequest(rawBody)
         if (request == null) {
             call.respondText("Invalid request", status = HttpStatusCode.BadRequest)
             return@post
@@ -54,7 +47,7 @@ fun Route.approvalRoute(
 
             if (result == null) {
                 // Timeout (only reachable for finite-timeout requests)
-                val responseJson = buildDenyResponse("Request timed out").toString()
+                val responseJson = adapter.buildPermissionDenyResponse(request, "Request timed out")
                 stateManager.resolve(
                     requestId = request.id,
                     decision = Decision.TIMEOUT,
@@ -69,19 +62,18 @@ fun Route.approvalRoute(
             val responseJson = when (result.decision) {
                 Decision.APPROVED, Decision.AUTO_APPROVED -> {
                     val updatedInput = stateManager.getAndClearUpdatedInput(request.id)
-                    buildAllowResponse(updatedInput).toString()
+                    adapter.buildPermissionAllowResponse(request, updatedInput)
                 }
-                Decision.ALWAYS_ALLOWED -> {
-                    buildAlwaysAllowResponse(request.hookInput.permissionSuggestions).toString()
-                }
+                Decision.ALWAYS_ALLOWED ->
+                    adapter.buildPermissionAlwaysAllowResponse(request, request.hookInput.permissionSuggestions)
                 Decision.DENIED, Decision.AUTO_DENIED, Decision.TIMEOUT ->
-                    buildDenyResponse(result.feedback ?: "Request denied").toString()
+                    adapter.buildPermissionDenyResponse(request, result.feedback ?: "Request denied")
                 Decision.CANCELLED_BY_CLIENT, Decision.RESOLVED_EXTERNALLY -> null
                 Decision.PROTECTION_BLOCKED ->
-                    buildDenyResponse(result.feedback ?: "Blocked by protection rule").toString()
+                    adapter.buildPermissionDenyResponse(request, result.feedback ?: "Blocked by protection rule")
                 Decision.PROTECTION_LOGGED, Decision.PROTECTION_OVERRIDDEN -> {
                     val updatedInput = stateManager.getAndClearUpdatedInput(request.id)
-                    buildAllowResponse(updatedInput).toString()
+                    adapter.buildPermissionAllowResponse(request, updatedInput)
                 }
             }
 
@@ -116,34 +108,3 @@ fun Route.approvalRoute(
     }
 }
 
-private fun buildAllowResponse(updatedInput: Map<String, JsonElement>? = null) = buildJsonObject {
-    put("hookSpecificOutput", buildJsonObject {
-        put("hookEventName", "PermissionRequest")
-        put("decision", buildJsonObject {
-            put("behavior", "allow")
-            if (updatedInput != null) {
-                put("updatedInput", JsonObject(updatedInput))
-            }
-        })
-    })
-}
-
-private fun buildAlwaysAllowResponse(suggestions: List<PermissionSuggestion>) = buildJsonObject {
-    put("hookSpecificOutput", buildJsonObject {
-        put("hookEventName", "PermissionRequest")
-        put("decision", buildJsonObject {
-            put("behavior", "allow")
-            put("updatedPermissions", Json.encodeToJsonElement(suggestions))
-        })
-    })
-}
-
-private fun buildDenyResponse(message: String) = buildJsonObject {
-    put("hookSpecificOutput", buildJsonObject {
-        put("hookEventName", "PermissionRequest")
-        put("decision", buildJsonObject {
-            put("behavior", "deny")
-            put("message", message)
-        })
-    })
-}

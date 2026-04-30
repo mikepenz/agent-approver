@@ -47,6 +47,10 @@ class DisconnectDetectionTest {
             stateManager = stateManager,
             protectionEngine = protectionEngine,
             capabilityEngine = capabilityEngine,
+            redactionEngine = com.mikepenz.agentbelay.redaction.RedactionEngine(
+                modules = emptyList(),
+                settingsProvider = { com.mikepenz.agentbelay.model.RedactionSettings(enabled = false) },
+            ),
             databaseStorage = null,
             onNewApproval = {},
         )

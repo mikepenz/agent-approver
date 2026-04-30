@@ -4,6 +4,7 @@ import co.touchlab.kermit.Logger
 import com.mikepenz.agentbelay.model.*
 import kotlinx.datetime.Instant
 import kotlinx.datetime.LocalDate
+import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.builtins.MapSerializer
 import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.json.Json
@@ -49,6 +50,7 @@ open class DatabaseStorage(
     }
 
     private val toolInputSerializer = MapSerializer(String.serializer(), JsonElement.serializer())
+    private val redactionHitsSerializer = ListSerializer(RedactionHit.serializer())
 
     // ---- Column encryption helpers ---------------------------------------
     // Each helper is a no-op when [cipher] is null, so test code that omits
@@ -110,6 +112,12 @@ open class DatabaseStorage(
         if (!hasColumn("history", "risk_raw_response")) {
             connection.createStatement().use { stmt ->
                 stmt.executeUpdate("ALTER TABLE history ADD COLUMN risk_raw_response TEXT")
+            }
+        }
+        // Migrate older databases that pre-date the redaction_hits_json column.
+        if (!hasColumn("history", "redaction_hits_json")) {
+            connection.createStatement().use { stmt ->
+                stmt.executeUpdate("ALTER TABLE history ADD COLUMN redaction_hits_json TEXT")
             }
         }
         backfillToolInputJson()
@@ -214,8 +222,8 @@ open class DatabaseStorage(
                 risk_level, risk_label, risk_message, risk_source,
                 protection_module, protection_rule, protection_detail,
                 raw_request_json, raw_response_json, risk_raw_response,
-                requested_at, decided_at, tool_input_json
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                requested_at, decided_at, tool_input_json, redaction_hits_json
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """.trimIndent()
 
         connection.prepareStatement(sql).use { ps ->
@@ -250,10 +258,32 @@ open class DatabaseStorage(
             ps.setString(20, result.request.timestamp.toString())
             ps.setString(21, result.decidedAt.toString())
             ps.setString(22, enc(json.encodeToString(toolInputSerializer, result.request.hookInput.toolInput)))
+            // Redaction hits are stored as a JSON array of {moduleId, ruleId,
+            // field, count} objects. Null when no redaction was scanned.
+            // Encrypted because field names + counts are mildly sensitive
+            // (e.g. "stderr / aws-access-key / count=3" reveals the row's
+            // tool exposed a secret) and the encryption invariant is per-row.
+            if (result.redactionHits.isEmpty()) {
+                ps.setNull(23, java.sql.Types.VARCHAR)
+            } else {
+                ps.setString(23, enc(json.encodeToString(redactionHitsSerializer, result.redactionHits)))
+            }
             ps.executeUpdate()
         }
 
         pruneOldEntries()
+    }
+
+    fun updateRedactionHits(requestId: String, hits: List<RedactionHit>): Unit = synchronized(connectionLock) {
+        connection.prepareStatement("UPDATE history SET redaction_hits_json = ? WHERE id = ?").use { ps ->
+            if (hits.isEmpty()) {
+                ps.setNull(1, java.sql.Types.VARCHAR)
+            } else {
+                ps.setString(1, enc(json.encodeToString(redactionHitsSerializer, hits)))
+            }
+            ps.setString(2, requestId)
+            ps.executeUpdate()
+        }
     }
 
     private fun pruneOldEntries() {
@@ -538,6 +568,18 @@ open class DatabaseStorage(
             rawRequestJson = dec(rs.getString("raw_request_json")),
         )
 
+        val redactionHits: List<RedactionHit> = decNullable(rs.getString("redaction_hits_json"))
+            ?.takeIf { it.isNotBlank() }
+            ?.let {
+                try {
+                    json.decodeFromString(redactionHitsSerializer, it)
+                } catch (e: Exception) {
+                    logger.w { "Failed to decode redaction_hits_json: ${e.message}" }
+                    emptyList()
+                }
+            }
+            ?: emptyList()
+
         return ApprovalResult(
             request = request,
             decision = Decision.valueOf(rs.getString("decision")),
@@ -548,6 +590,7 @@ open class DatabaseStorage(
             protectionModule = rs.getString("protection_module"),
             protectionRule = rs.getString("protection_rule"),
             protectionDetail = decNullable(rs.getString("protection_detail")),
+            redactionHits = redactionHits,
         )
     }
 }

@@ -88,6 +88,9 @@ internal fun ApprovalResult.toHistoryEntry(now: Instant): HistoryEntry {
         rawRequestJson = req.rawRequestJson.takeIf { it.isNotBlank() },
         rawResponseJson = rawResponseJson?.takeIf { it.isNotBlank() },
         rawValidationResponseJson = riskAnalysis?.rawResponse?.takeIf { it.isNotBlank() },
+        // Sum hit counts across all redaction modules so the pill shows the
+        // total number of spans replaced, not just the rule count.
+        redactionCount = redactionHits.sumOf { it.count },
     )
 }
 

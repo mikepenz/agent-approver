@@ -3,6 +3,7 @@ package com.mikepenz.agentbelay.app
 import com.mikepenz.agentbelay.capability.CapabilityEngine
 import com.mikepenz.agentbelay.di.AppScope
 import com.mikepenz.agentbelay.protection.ProtectionEngine
+import com.mikepenz.agentbelay.redaction.RedactionEngine
 import com.mikepenz.agentbelay.server.ApprovalServer
 import com.mikepenz.agentbelay.state.AppStateManager
 import com.mikepenz.agentbelay.storage.DatabaseStorage
@@ -27,6 +28,7 @@ class ApprovalServerRunner(
     private val stateManager: AppStateManager,
     private val protectionEngine: ProtectionEngine,
     private val capabilityEngine: CapabilityEngine,
+    private val redactionEngine: RedactionEngine,
     private val databaseStorage: DatabaseStorage,
 ) {
     private var server: ApprovalServer? = null
@@ -46,6 +48,7 @@ class ApprovalServerRunner(
             stateManager = stateManager,
             protectionEngine = protectionEngine,
             capabilityEngine = capabilityEngine,
+            redactionEngine = redactionEngine,
             databaseStorage = databaseStorage,
             onNewApproval = { onNewApproval() },
         )

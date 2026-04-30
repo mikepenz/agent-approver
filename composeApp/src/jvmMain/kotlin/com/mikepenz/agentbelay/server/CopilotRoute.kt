@@ -9,8 +9,6 @@ import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.withTimeoutOrNull
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.put
 import kotlin.coroutines.cancellation.CancellationException
 
 private val logger = Logger.withTag("CopilotRoute")
@@ -25,7 +23,7 @@ fun Route.copilotApprovalRoute(
 ) {
     post("/approve-copilot") {
         val rawBody = call.receiveText()
-        val request = adapter.parse(rawBody)
+        val request = adapter.parsePermissionRequest(rawBody)
         if (request == null) {
             call.respondText("Invalid request", status = HttpStatusCode.BadRequest)
             return@post
@@ -34,7 +32,7 @@ fun Route.copilotApprovalRoute(
         // Auto-allow non-actionable tools
         if (request.hookInput.toolName in COPILOT_AUTO_ALLOW_TOOLS) {
             call.respondText(
-                copilotAllowResponse().toString(),
+                adapter.buildPermissionAllowResponse(request, updatedInput = null),
                 contentType = ContentType.Application.Json,
             )
             return@post
@@ -56,7 +54,7 @@ fun Route.copilotApprovalRoute(
             }
 
             if (result == null) {
-                val responseJson = copilotDenyResponse("Request timed out").toString()
+                val responseJson = adapter.buildPermissionDenyResponse(request, "Request timed out")
                 stateManager.resolve(
                     requestId = request.id,
                     decision = Decision.TIMEOUT,
@@ -70,14 +68,14 @@ fun Route.copilotApprovalRoute(
 
             val responseJson = when (result.decision) {
                 Decision.APPROVED, Decision.AUTO_APPROVED, Decision.ALWAYS_ALLOWED ->
-                    copilotAllowResponse().toString()
+                    adapter.buildPermissionAllowResponse(request, updatedInput = null)
                 Decision.DENIED, Decision.AUTO_DENIED, Decision.TIMEOUT ->
-                    copilotDenyResponse(result.feedback ?: "Request denied").toString()
+                    adapter.buildPermissionDenyResponse(request, result.feedback ?: "Request denied")
                 Decision.CANCELLED_BY_CLIENT, Decision.RESOLVED_EXTERNALLY -> null
                 Decision.PROTECTION_BLOCKED ->
-                    copilotDenyResponse(result.feedback ?: "Blocked by protection rule").toString()
+                    adapter.buildPermissionDenyResponse(request, result.feedback ?: "Blocked by protection rule")
                 Decision.PROTECTION_LOGGED, Decision.PROTECTION_OVERRIDDEN ->
-                    copilotAllowResponse().toString()
+                    adapter.buildPermissionAllowResponse(request, updatedInput = null)
             }
 
             if (responseJson != null) {
@@ -111,34 +109,3 @@ fun Route.copilotApprovalRoute(
     }
 }
 
-// Response shape for Copilot CLI's permissionRequest hook (v1.0.16+).
-//
-// The canonical shape is taken from the bundled SDK type definition in the
-// @github/copilot npm package (sdk/index.d.ts):
-//
-//     export declare interface PermissionRequestHookOutput {
-//         behavior?: "allow" | "deny";
-//         message?: string;
-//         interrupt?: boolean;
-//     }
-//
-// It's a **flat** object with `behavior: "allow"` (not `"approve"`!) — the
-// `"approve"` value seen in some third-party bridges (e.g. openpoet's) is the
-// preToolUse hook's protocol with a separate translation layer, not the
-// permissionRequest one. This shape is also distinct from the preToolUse
-// hook's documented `{permissionDecision: ..., permissionDecisionReason: ...}`
-// format, which CopilotPreToolUseRoute uses.
-//
-// `interrupt: true` on deny tells Copilot to abort the tool call entirely
-// (rather than just blocking this specific permission check), which is what
-// we want when the user clicks Deny in the approval card.
-
-private fun copilotAllowResponse() = buildJsonObject {
-    put("behavior", "allow")
-}
-
-private fun copilotDenyResponse(reason: String) = buildJsonObject {
-    put("behavior", "deny")
-    put("message", reason)
-    put("interrupt", true)
-}

@@ -11,8 +11,6 @@ import io.ktor.server.routing.*
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.datetime.Clock
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.put
 import kotlin.coroutines.cancellation.CancellationException
 
 private val logger = Logger.withTag("CopilotPreToolUseRoute")
@@ -25,7 +23,7 @@ fun Route.copilotPreToolUseRoute(
 ) {
     post("/pre-tool-use-copilot") {
         val rawBody = call.receiveText()
-        val request = adapter.parse(rawBody)
+        val request = adapter.parsePreToolUse(rawBody)
         if (request == null) {
             // Don't block on parse errors — allow
             call.respondText("{}", contentType = ContentType.Application.Json)
@@ -45,7 +43,7 @@ fun Route.copilotPreToolUseRoute(
 
         when (severity) {
             ProtectionMode.AUTO_BLOCK -> {
-                val responseJson = buildCopilotDenyResponse(combinedMessage)
+                val responseJson = adapter.buildPreToolUseDenyResponse(combinedMessage)
                 logCopilotProtectionHit(stateManager, request, Decision.PROTECTION_BLOCKED, primaryHit, combinedMessage, responseJson)
                 call.respondText(responseJson, contentType = ContentType.Application.Json)
             }
@@ -53,6 +51,7 @@ fun Route.copilotPreToolUseRoute(
             ProtectionMode.ASK_AUTO_BLOCK -> {
                 handleCopilotAskMode(
                     stateManager = stateManager,
+                    adapter = adapter,
                     request = request,
                     combinedMessage = combinedMessage,
                     timeoutMs = stateManager.state.value.settings.defaultTimeoutSeconds * 1000L,
@@ -64,6 +63,7 @@ fun Route.copilotPreToolUseRoute(
             ProtectionMode.ASK -> {
                 handleCopilotAskMode(
                     stateManager = stateManager,
+                    adapter = adapter,
                     request = request,
                     combinedMessage = combinedMessage,
                     timeoutMs = Long.MAX_VALUE,
@@ -73,7 +73,7 @@ fun Route.copilotPreToolUseRoute(
             }
 
             ProtectionMode.LOG_ONLY -> {
-                val responseJson = buildCopilotAllowResponse()
+                val responseJson = adapter.buildPreToolUseAllowResponse()
                 logCopilotProtectionHit(stateManager, request, Decision.PROTECTION_LOGGED, primaryHit, combinedMessage, responseJson)
                 call.respondText(responseJson, contentType = ContentType.Application.Json)
             }
@@ -87,6 +87,7 @@ fun Route.copilotPreToolUseRoute(
 
 private suspend fun handleCopilotAskMode(
     stateManager: AppStateManager,
+    adapter: CopilotAdapter,
     request: ApprovalRequest,
     combinedMessage: String,
     timeoutMs: Long,
@@ -105,7 +106,7 @@ private suspend fun handleCopilotAskMode(
         }
 
         if (result == null) {
-            val responseJson = buildCopilotDenyResponse(combinedMessage)
+            val responseJson = adapter.buildPreToolUseDenyResponse(combinedMessage)
             stateManager.resolve(
                 requestId = request.id,
                 decision = Decision.PROTECTION_BLOCKED,
@@ -120,7 +121,7 @@ private suspend fun handleCopilotAskMode(
         when (result.decision) {
             Decision.APPROVED, Decision.AUTO_APPROVED, Decision.ALWAYS_ALLOWED,
             Decision.PROTECTION_OVERRIDDEN -> {
-                val responseJson = buildCopilotAllowResponse()
+                val responseJson = adapter.buildPreToolUseAllowResponse()
                 stateManager.updateHistoryRawResponse(request.id, responseJson)
                 try {
                     call.respondText(responseJson, contentType = ContentType.Application.Json)
@@ -131,7 +132,7 @@ private suspend fun handleCopilotAskMode(
 
             Decision.DENIED, Decision.AUTO_DENIED, Decision.TIMEOUT,
             Decision.PROTECTION_BLOCKED -> {
-                val responseJson = buildCopilotDenyResponse(result.feedback?.takeIf { it.isNotBlank() } ?: combinedMessage)
+                val responseJson = adapter.buildPreToolUseDenyResponse(result.feedback?.takeIf { it.isNotBlank() } ?: combinedMessage)
                 stateManager.updateHistoryRawResponse(request.id, responseJson)
                 try {
                     call.respondText(responseJson, contentType = ContentType.Application.Json)
@@ -145,7 +146,7 @@ private suspend fun handleCopilotAskMode(
             }
 
             Decision.PROTECTION_LOGGED -> {
-                val responseJson = buildCopilotAllowResponse()
+                val responseJson = adapter.buildPreToolUseAllowResponse()
                 stateManager.updateHistoryRawResponse(request.id, responseJson)
                 try {
                     call.respondText(responseJson, contentType = ContentType.Application.Json)
@@ -175,31 +176,6 @@ private suspend fun handleCopilotAskMode(
         )
     }
 }
-
-// Response shape for Copilot CLI's preToolUse hook, per the official
-// docs.github.com "Hooks configuration" reference page:
-//
-//     {"permissionDecision": "allow|deny|ask",
-//      "permissionDecisionReason": "..."}
-//
-// This is **distinct** from the permissionRequest hook output schema
-// (`{behavior, message, interrupt}` — see CopilotRoute.kt). The two hook
-// events share the same protocol family but use different field names.
-//
-// The docs note "(only 'deny' is currently processed)" for preToolUse — so
-// returning "allow" is a no-op and the user will still be prompted at the
-// permissionRequest stage. That's fine for the protection-engine route: we
-// only need it to block (deny) for hits and pass through (allow) otherwise,
-// and the actual user-facing approval is handled by CopilotRoute.
-
-private fun buildCopilotAllowResponse(): String = buildJsonObject {
-    put("permissionDecision", "allow")
-}.toString()
-
-private fun buildCopilotDenyResponse(reason: String): String = buildJsonObject {
-    put("permissionDecision", "deny")
-    put("permissionDecisionReason", reason)
-}.toString()
 
 private fun logCopilotProtectionHit(
     stateManager: AppStateManager,

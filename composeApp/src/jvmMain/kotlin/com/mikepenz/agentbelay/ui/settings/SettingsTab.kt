@@ -45,13 +45,17 @@ import com.mikepenz.agentbelay.capability.CapabilityModule
 import com.mikepenz.agentbelay.model.AppSettings
 import com.mikepenz.agentbelay.model.CapabilitySettings
 import com.mikepenz.agentbelay.model.ProtectionSettings
+import com.mikepenz.agentbelay.model.RedactionSettings
 import com.mikepenz.agentbelay.protection.ProtectionModule
+import com.mikepenz.agentbelay.redaction.RedactionModule
+import com.mikepenz.agentbelay.redaction.builtInRedactionModules
 import com.mikepenz.agentbelay.risk.CopilotInitState
 import com.mikepenz.agentbelay.risk.OllamaInitState
 import com.mikepenz.agentbelay.risk.OllamaMetrics
 import com.mikepenz.agentbelay.ui.components.LocalPreviewHoverOverride
 import com.mikepenz.agentbelay.ui.components.SectionLabel
 import com.mikepenz.agentbelay.ui.icons.LucideBrain
+import com.mikepenz.agentbelay.ui.icons.LucideEyeOff
 import com.mikepenz.agentbelay.ui.icons.LucidePlug
 import com.mikepenz.agentbelay.ui.icons.LucideShield
 import com.mikepenz.agentbelay.ui.icons.LucideSliders
@@ -66,6 +70,7 @@ private enum class SettingsSubTab(val label: String, val icon: ImageVector) {
     Integrations("Integrations", LucidePlug),
     Risk("Risk Analysis", LucideBrain),
     Protections("Protections", LucideShield),
+    Redaction("Redaction", LucideEyeOff),
     Capabilities("Capabilities", LucideZap),
 }
 
@@ -96,6 +101,8 @@ fun SettingsTab(
     onProtectionSettingsChange: (ProtectionSettings) -> Unit = {},
     capabilityModules: List<CapabilityModule> = emptyList(),
     onCapabilitySettingsChange: (CapabilitySettings) -> Unit = {},
+    redactionModules: List<RedactionModule> = builtInRedactionModules,
+    onRedactionSettingsChange: (RedactionSettings) -> Unit = {},
     updateState: UpdateUiState = UpdateUiState.Idle,
     isUpdateSupported: Boolean = false,
     onCheckForUpdates: () -> Unit = {},
@@ -182,6 +189,11 @@ fun SettingsTab(
                     modules = protectionModules,
                     settings = settings.protectionSettings,
                     onSettingsChange = onProtectionSettingsChange,
+                )
+                SettingsSubTab.Redaction -> RedactionSettingsContent(
+                    modules = redactionModules,
+                    settings = settings.redactionSettings,
+                    onSettingsChange = onRedactionSettingsChange,
                 )
                 SettingsSubTab.Capabilities -> CapabilitiesSettingsContent(
                     modules = capabilityModules,

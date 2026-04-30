@@ -70,6 +70,7 @@ data class AppSettings(
     val windowHeight: Int? = null,
     val protectionSettings: ProtectionSettings = ProtectionSettings(),
     val capabilitySettings: CapabilitySettings = CapabilitySettings(),
+    val redactionSettings: RedactionSettings = RedactionSettings(),
     val maxHistoryEntries: Int = 2500,
     /**
      * When true, sensitive content (commands, file paths, request/response

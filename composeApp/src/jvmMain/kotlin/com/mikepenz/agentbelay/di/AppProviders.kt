@@ -106,6 +106,14 @@ interface AppProviders {
 
     @Provides
     @SingleIn(AppScope::class)
+    fun provideRedactionEngine(stateManager: AppStateManager): com.mikepenz.agentbelay.redaction.RedactionEngine =
+        com.mikepenz.agentbelay.redaction.RedactionEngine(
+            modules = com.mikepenz.agentbelay.redaction.builtInRedactionModules,
+            settingsProvider = { stateManager.state.value.settings.redactionSettings },
+        )
+
+    @Provides
+    @SingleIn(AppScope::class)
     fun provideCopilotBridge(): CopilotBridge = DefaultCopilotBridge
 
     @Provides

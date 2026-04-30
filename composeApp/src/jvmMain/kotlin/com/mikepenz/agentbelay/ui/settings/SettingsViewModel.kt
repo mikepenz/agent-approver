@@ -12,6 +12,7 @@ import com.mikepenz.agentbelay.hook.RegistrationEvents
 import com.mikepenz.agentbelay.model.AppSettings
 import com.mikepenz.agentbelay.model.CapabilitySettings
 import com.mikepenz.agentbelay.model.ProtectionSettings
+import com.mikepenz.agentbelay.model.RedactionSettings
 import com.mikepenz.agentbelay.app.GlobalHotkeyManager
 import com.mikepenz.agentbelay.app.RiskAnalyzerLifecycle
 import com.mikepenz.agentbelay.protection.ProtectionEngine
@@ -239,6 +240,13 @@ class SettingsViewModel(
         viewModelScope.launch(writeDispatcher) {
             val current = stateManager.state.value.settings
             stateManager.updateSettings(current.copy(protectionSettings = protectionSettings))
+        }
+    }
+
+    fun updateRedactionSettings(redactionSettings: RedactionSettings) {
+        viewModelScope.launch(writeDispatcher) {
+            val current = stateManager.state.value.settings
+            stateManager.updateSettings(current.copy(redactionSettings = redactionSettings))
         }
     }
 

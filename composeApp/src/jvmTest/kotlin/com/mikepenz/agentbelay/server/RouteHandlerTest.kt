@@ -42,10 +42,15 @@ class RouteHandlerTest {
             modules = emptyList(),
             settingsProvider = { CapabilitySettings() },
         )
+        val redactionEngine = com.mikepenz.agentbelay.redaction.RedactionEngine(
+            modules = emptyList(),
+            settingsProvider = { com.mikepenz.agentbelay.model.RedactionSettings(enabled = false) },
+        )
         server = ApprovalServer(
             stateManager = stateManager,
             protectionEngine = protectionEngine,
             capabilityEngine = capabilityEngine,
+            redactionEngine = redactionEngine,
             databaseStorage = null,
             onNewApproval = { newApprovalCount++ },
         )

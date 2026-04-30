@@ -11,8 +11,6 @@ import io.ktor.server.routing.*
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.datetime.Clock
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.put
 import kotlin.coroutines.cancellation.CancellationException
 
 private val logger = Logger.withTag("PreToolUseRoute")
@@ -25,7 +23,7 @@ fun Route.preToolUseRoute(
 ) {
     post("/pre-tool-use") {
         val rawBody = call.receiveText()
-        val request = adapter.parse(rawBody)
+        val request = adapter.parsePreToolUse(rawBody)
         if (request == null) {
             // Don't block on parse errors — allow
             call.respondText("{}", contentType = ContentType.Application.Json)
@@ -45,7 +43,7 @@ fun Route.preToolUseRoute(
 
         when (severity) {
             ProtectionMode.AUTO_BLOCK -> {
-                val responseJson = buildDenyResponse(combinedMessage)
+                val responseJson = adapter.buildPreToolUseDenyResponse(combinedMessage)
                 logProtectionHit(stateManager, request, Decision.PROTECTION_BLOCKED, primaryHit, combinedMessage, responseJson)
                 call.respondText(responseJson, contentType = ContentType.Application.Json)
             }
@@ -53,6 +51,7 @@ fun Route.preToolUseRoute(
             ProtectionMode.ASK_AUTO_BLOCK -> {
                 handleAskMode(
                     stateManager = stateManager,
+                    adapter = adapter,
                     request = request,
                     combinedMessage = combinedMessage,
                     timeoutMs = stateManager.state.value.settings.defaultTimeoutSeconds * 1000L,
@@ -64,6 +63,7 @@ fun Route.preToolUseRoute(
             ProtectionMode.ASK -> {
                 handleAskMode(
                     stateManager = stateManager,
+                    adapter = adapter,
                     request = request,
                     combinedMessage = combinedMessage,
                     timeoutMs = Long.MAX_VALUE,
@@ -73,7 +73,7 @@ fun Route.preToolUseRoute(
             }
 
             ProtectionMode.LOG_ONLY -> {
-                val responseJson = buildAllowResponse()
+                val responseJson = adapter.buildPreToolUseAllowResponse()
                 logProtectionHit(stateManager, request, Decision.PROTECTION_LOGGED, primaryHit, combinedMessage, responseJson)
                 call.respondText(responseJson, contentType = ContentType.Application.Json)
             }
@@ -88,6 +88,7 @@ fun Route.preToolUseRoute(
 
 private suspend fun handleAskMode(
     stateManager: AppStateManager,
+    adapter: ClaudeCodeAdapter,
     request: ApprovalRequest,
     combinedMessage: String,
     timeoutMs: Long,
@@ -107,7 +108,7 @@ private suspend fun handleAskMode(
 
         if (result == null) {
             // Timeout — auto-deny; resolve() handles DB + state
-            val responseJson = buildDenyResponse(combinedMessage)
+            val responseJson = adapter.buildPreToolUseDenyResponse(combinedMessage)
             stateManager.resolve(
                 requestId = request.id,
                 decision = Decision.PROTECTION_BLOCKED,
@@ -123,7 +124,7 @@ private suspend fun handleAskMode(
             Decision.APPROVED, Decision.AUTO_APPROVED, Decision.ALWAYS_ALLOWED,
             Decision.PROTECTION_OVERRIDDEN -> {
                 // resolve() already wrote to DB + state; just update raw response
-                val responseJson = buildAllowResponse()
+                val responseJson = adapter.buildPreToolUseAllowResponse()
                 stateManager.updateHistoryRawResponse(request.id, responseJson)
                 try {
                     call.respondText(responseJson, contentType = ContentType.Application.Json)
@@ -135,7 +136,7 @@ private suspend fun handleAskMode(
             Decision.DENIED, Decision.AUTO_DENIED, Decision.TIMEOUT,
             Decision.PROTECTION_BLOCKED -> {
                 // resolve() already wrote to DB + state; just update raw response
-                val responseJson = buildDenyResponse(result.feedback?.takeIf { it.isNotBlank() } ?: combinedMessage)
+                val responseJson = adapter.buildPreToolUseDenyResponse(result.feedback?.takeIf { it.isNotBlank() } ?: combinedMessage)
                 stateManager.updateHistoryRawResponse(request.id, responseJson)
                 try {
                     call.respondText(responseJson, contentType = ContentType.Application.Json)
@@ -150,7 +151,7 @@ private suspend fun handleAskMode(
 
             Decision.PROTECTION_LOGGED -> {
                 // resolve() already wrote to DB + state; just update raw response
-                val responseJson = buildAllowResponse()
+                val responseJson = adapter.buildPreToolUseAllowResponse()
                 stateManager.updateHistoryRawResponse(request.id, responseJson)
                 try {
                     call.respondText(responseJson, contentType = ContentType.Application.Json)
@@ -180,21 +181,6 @@ private suspend fun handleAskMode(
         )
     }
 }
-
-private fun buildDenyResponse(reason: String): String = buildJsonObject {
-    put("hookSpecificOutput", buildJsonObject {
-        put("hookEventName", "PreToolUse")
-        put("permissionDecision", "deny")
-        put("permissionDecisionReason", reason)
-    })
-}.toString()
-
-private fun buildAllowResponse(): String = buildJsonObject {
-    put("hookSpecificOutput", buildJsonObject {
-        put("hookEventName", "PreToolUse")
-        put("permissionDecision", "allow")
-    })
-}.toString()
 
 private fun logProtectionHit(
     stateManager: AppStateManager,

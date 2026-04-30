@@ -14,6 +14,13 @@ data class ApprovalResult(
     val protectionModule: String? = null,
     val protectionRule: String? = null,
     val protectionDetail: String? = null,
+    /**
+     * Redaction hits recorded by the post-tool-use [com.mikepenz.agentbelay.redaction.RedactionEngine]
+     * scan, if any. Empty list (the default) means no redaction was applied
+     * — preserves serialized-history compatibility for entries written
+     * before the engine landed.
+     */
+    val redactionHits: List<RedactionHit> = emptyList(),
 )
 
 @Serializable

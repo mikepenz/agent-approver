@@ -2,7 +2,10 @@ package com.mikepenz.agentbelay.server
 
 import co.touchlab.kermit.Logger
 import com.mikepenz.agentbelay.capability.CapabilityEngine
+import com.mikepenz.agentbelay.harness.claudecode.ClaudeCodeHarness
+import com.mikepenz.agentbelay.harness.copilot.CopilotHarness
 import com.mikepenz.agentbelay.protection.ProtectionEngine
+import com.mikepenz.agentbelay.redaction.RedactionEngine
 import com.mikepenz.agentbelay.state.AppStateManager
 import com.mikepenz.agentbelay.storage.DatabaseStorage
 import io.ktor.serialization.kotlinx.json.*
@@ -18,12 +21,22 @@ class ApprovalServer(
     private val stateManager: AppStateManager,
     private val protectionEngine: ProtectionEngine,
     private val capabilityEngine: CapabilityEngine,
+    private val redactionEngine: RedactionEngine,
     private val databaseStorage: DatabaseStorage?,
     private val onNewApproval: () -> Unit,
 ) {
     private val logger = Logger.withTag("ApprovalServer")
-    private val adapter = ClaudeCodeAdapter()
-    private val copilotAdapter = CopilotAdapter()
+
+    // Harness composition: each harness owns its own adapter, registrar,
+    // transport, and capability flags. The route handlers below pull
+    // adapters and capability bits straight off these descriptors so
+    // adding a new harness in Phase 2 does not require route surgery.
+    private val claudeCode = ClaudeCodeHarness()
+    private val copilot = CopilotHarness()
+
+    private val adapter = claudeCode.adapter as ClaudeCodeAdapter
+    private val copilotAdapter = copilot.adapter as CopilotAdapter
+
     private var server: EmbeddedServer<NettyApplicationEngine, NettyApplicationEngine.Configuration>? = null
 
     fun start(port: Int, host: String) {
@@ -58,7 +71,12 @@ class ApprovalServer(
                     copilotApprovalRoute(stateManager, copilotAdapter, onNewApproval)
                     copilotPreToolUseRoute(stateManager, copilotAdapter, protectionEngine, onNewApproval)
                     preToolUseRoute(stateManager, adapter, protectionEngine, onNewApproval)
-                    postToolUseRoute(stateManager)
+                    postToolUseRoute(
+                        stateManager = stateManager,
+                        adapter = adapter,
+                        redactionEngine = redactionEngine,
+                        supportsOutputRedaction = claudeCode.capabilities.supportsOutputRedaction,
+                    )
                     capabilityRoute(capabilityEngine)
                 }
             },

@@ -46,6 +46,7 @@ interface AppGraph : ViewModelGraph {
     val trayManager: TrayManager
     val trayNotificationsManager: TrayNotificationsManager
     val capabilityEngine: CapabilityEngine
+    val redactionEngine: com.mikepenz.agentbelay.redaction.RedactionEngine
     val riskAnalyzerLifecycle: RiskAnalyzerLifecycle
     val globalHotkeyManager: GlobalHotkeyManager
     val approvalServerRunner: ApprovalServerRunner

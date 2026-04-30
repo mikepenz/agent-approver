@@ -13,61 +13,117 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.mikepenz.agentbelay.model.ModuleSettings
-import com.mikepenz.agentbelay.model.ProtectionMode
-import com.mikepenz.agentbelay.model.ProtectionSettings
-import com.mikepenz.agentbelay.protection.ProtectionModule
+import com.mikepenz.agentbelay.model.RedactionMode
+import com.mikepenz.agentbelay.model.RedactionModuleSettings
+import com.mikepenz.agentbelay.model.RedactionSettings
+import com.mikepenz.agentbelay.redaction.RedactionModule
+import com.mikepenz.agentbelay.redaction.builtInRedactionModules
 import com.mikepenz.agentbelay.ui.components.AgentBelayCard
 import com.mikepenz.agentbelay.ui.components.ColoredIconTile
 import com.mikepenz.agentbelay.ui.components.ColoredModeOption
 import com.mikepenz.agentbelay.ui.components.ColoredModePicker
 import com.mikepenz.agentbelay.ui.components.DesignToggle
 import com.mikepenz.agentbelay.ui.components.HorizontalHairline
-import com.mikepenz.agentbelay.ui.icons.LucideShield
+import com.mikepenz.agentbelay.ui.icons.LucideEyeOff
 import com.mikepenz.agentbelay.ui.theme.AccentEmerald
-import com.mikepenz.agentbelay.ui.theme.DangerRed
 import com.mikepenz.agentbelay.ui.theme.AgentBelayColors
 import com.mikepenz.agentbelay.ui.theme.InfoBlue
 import com.mikepenz.agentbelay.ui.theme.InkMuted
 import com.mikepenz.agentbelay.ui.theme.PreviewScaffold
-import com.mikepenz.agentbelay.ui.theme.WarnYellow
-import com.mikepenz.agentbelay.protection.modules.DestructiveCommandsModule
-import com.mikepenz.agentbelay.protection.modules.SensitiveFilesModule
-import com.mikepenz.agentbelay.protection.modules.SupplyChainRceModule
-import com.mikepenz.agentbelay.protection.modules.ToolBypassModule
-import androidx.compose.ui.tooling.preview.Preview
 
-private fun protectionModeOptions(corrective: Boolean): List<ColoredModeOption<ProtectionMode>> = listOf(
-    ColoredModeOption(ProtectionMode.DISABLED, "Off", InkMuted),
-    ColoredModeOption(ProtectionMode.ASK, "Ask", WarnYellow),
-    ColoredModeOption(ProtectionMode.ASK_AUTO_BLOCK, "Ask + Block", WarnYellow),
-    ColoredModeOption(
-        ProtectionMode.AUTO_BLOCK,
-        if (corrective) "Auto-correct" else "Auto-block",
-        if (corrective) AccentEmerald else DangerRed,
-    ),
-    ColoredModeOption(ProtectionMode.LOG_ONLY, "Log only", InfoBlue),
+private val redactionModeOptions: List<ColoredModeOption<RedactionMode>> = listOf(
+    ColoredModeOption(RedactionMode.DISABLED, "Off", InkMuted),
+    ColoredModeOption(RedactionMode.LOG_ONLY, "Log only", InfoBlue),
+    ColoredModeOption(RedactionMode.ENABLED, "Redact", AccentEmerald),
 )
 
+/**
+ * Settings page for the post-tool-use redaction engine. Visually mirrors
+ * [ProtectionsSettingsContent] (same Card shell, same icon-tile + name +
+ * description + mode-picker row layout) so the two engines feel like
+ * siblings under the Settings sidebar. The mode set is intentionally
+ * smaller — output redaction is non-interactive, so there is no `ASK`
+ * variant.
+ *
+ * The header carries an extra master switch ([RedactionSettings.enabled])
+ * — when off, the engine short-circuits regardless of per-module mode.
+ */
 @Composable
-fun ProtectionsSettingsContent(
-    modules: List<ProtectionModule>,
-    settings: ProtectionSettings,
-    onSettingsChange: (ProtectionSettings) -> Unit,
+fun RedactionSettingsContent(
+    modules: List<RedactionModule>,
+    settings: RedactionSettings,
+    onSettingsChange: (RedactionSettings) -> Unit,
 ) {
     Column(modifier = Modifier.fillMaxWidth().widthIn(max = 860.dp)) {
+        // --- Header: title + description + master switch ----------------
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Column(modifier = Modifier.fillMaxWidth().widthIn(max = 720.dp)) {
+                Text(
+                    text = "Output redaction",
+                    color = AgentBelayColors.inkPrimary,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    letterSpacing = (-0.1).sp,
+                )
+                Spacer(Modifier.height(3.dp))
+                Text(
+                    text = "Scans tool output for secrets and rewrites the response before the agent reads it. Claude Code only — Copilot's PostToolUse cannot modify results.",
+                    color = AgentBelayColors.inkTertiary,
+                    fontSize = 12.5.sp,
+                    lineHeight = 18.sp,
+                )
+            }
+        }
+        Spacer(Modifier.height(12.dp))
+        AgentBelayCard(modifier = Modifier.fillMaxWidth()) {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(14.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(14.dp),
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "Master switch",
+                        color = AgentBelayColors.inkPrimary,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                    Spacer(Modifier.height(2.dp))
+                    Text(
+                        text = if (settings.enabled) {
+                            "Engine runs after every supported tool call."
+                        } else {
+                            "Engine is paused — no rewrites or detections."
+                        },
+                        color = AgentBelayColors.inkTertiary,
+                        fontSize = 12.sp,
+                        lineHeight = 18.sp,
+                    )
+                }
+                DesignToggle(
+                    checked = settings.enabled,
+                    onCheckedChange = { onSettingsChange(settings.copy(enabled = it)) },
+                )
+            }
+        }
+        Spacer(Modifier.height(18.dp))
         Text(
-            text = "Guardrails",
+            text = "Modules",
             color = AgentBelayColors.inkPrimary,
             fontSize = 14.sp,
             fontWeight = FontWeight.SemiBold,
@@ -75,15 +131,15 @@ fun ProtectionsSettingsContent(
         )
         Spacer(Modifier.height(3.dp))
         Text(
-            text = "Pattern-matched rules that run before risk analysis. Choose how each responds.",
+            text = "Pattern groups that detect secrets in tool output. Tap a row to inspect or disable individual rules.",
             color = AgentBelayColors.inkTertiary,
             fontSize = 12.5.sp,
             lineHeight = 18.sp,
         )
-        Spacer(Modifier.height(18.dp))
+        Spacer(Modifier.height(12.dp))
         if (modules.isEmpty()) {
             Text(
-                text = "No protection modules available.",
+                text = "No redaction modules available.",
                 color = AgentBelayColors.inkTertiary,
                 fontSize = 12.sp,
             )
@@ -92,13 +148,14 @@ fun ProtectionsSettingsContent(
         AgentBelayCard(modifier = Modifier.fillMaxWidth()) {
             Column {
                 modules.forEachIndexed { idx, module ->
-                    val moduleSettings = settings.modules[module.id] ?: ModuleSettings()
+                    val moduleSettings = settings.modules[module.id] ?: RedactionModuleSettings()
                     val effectiveMode = moduleSettings.mode ?: module.defaultMode
-                    ProtectionRow(
+                    RedactionRow(
                         module = module,
                         moduleSettings = moduleSettings,
                         effectiveMode = effectiveMode,
                         first = idx == 0,
+                        masterEnabled = settings.enabled,
                         onModeChange = { newMode ->
                             onSettingsChange(
                                 settings.copy(
@@ -128,17 +185,20 @@ fun ProtectionsSettingsContent(
 }
 
 @Composable
-private fun ProtectionRow(
-    module: ProtectionModule,
-    moduleSettings: ModuleSettings,
-    effectiveMode: ProtectionMode,
+private fun RedactionRow(
+    module: RedactionModule,
+    moduleSettings: RedactionModuleSettings,
+    effectiveMode: RedactionMode,
     first: Boolean,
-    onModeChange: (ProtectionMode) -> Unit,
+    masterEnabled: Boolean,
+    onModeChange: (RedactionMode) -> Unit,
     onRuleToggle: (ruleId: String, enabled: Boolean) -> Unit,
 ) {
     var expanded by remember(module.id) { mutableStateOf(false) }
-    val options = protectionModeOptions(module.corrective)
-    val activeOption = options.find { it.value == effectiveMode } ?: options[0]
+    val activeOption = redactionModeOptions.find { it.value == effectiveMode } ?: redactionModeOptions[0]
+    // When the master switch is off, dim the row's icon tile + mode pill
+    // so the user can see modes are configured but currently inert.
+    val rowAlpha = if (masterEnabled) 1f else 0.55f
 
     Column(modifier = Modifier.fillMaxWidth()) {
         if (!first) {
@@ -150,33 +210,35 @@ private fun ProtectionRow(
                 .clickable { expanded = !expanded }
                 .padding(14.dp),
         ) {
-            // Header: icon + module name + mode picker. The picker sits in the
-            // title row so the description below can use the full card width
-            // and avoid wrapping awkwardly in narrow layouts.
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(14.dp),
             ) {
-                ColoredIconTile(icon = LucideShield, color = activeOption.color)
+                ColoredIconTile(
+                    icon = LucideEyeOff,
+                    color = activeOption.color,
+                    alpha = rowAlpha,
+                )
                 Text(
                     modifier = Modifier.weight(1f),
                     text = module.name,
-                    color = AgentBelayColors.inkPrimary,
+                    color = AgentBelayColors.inkPrimary.copy(alpha = rowAlpha),
                     fontSize = 13.sp,
                     fontWeight = FontWeight.SemiBold,
                     fontFamily = FontFamily.Monospace,
                 )
                 ColoredModePicker(
-                    options = options,
+                    options = redactionModeOptions,
                     active = activeOption,
                     onSelect = onModeChange,
+                    alpha = rowAlpha,
                 )
             }
             Spacer(Modifier.height(8.dp))
             Text(
                 modifier = Modifier.fillMaxWidth(),
                 text = module.description,
-                color = AgentBelayColors.inkTertiary,
+                color = AgentBelayColors.inkTertiary.copy(alpha = rowAlpha),
                 fontSize = 12.sp,
                 lineHeight = 18.sp,
             )
@@ -218,38 +280,42 @@ private fun ProtectionRow(
     }
 }
 
-@Preview(widthDp = 380, heightDp = 900)
+@Preview(widthDp = 380, heightDp = 720)
 @Composable
-private fun PreviewGuardrailsSlim() {
+private fun PreviewRedactionSlim() {
     PreviewScaffold {
         Box(Modifier.padding(16.dp)) {
-            ProtectionsSettingsContent(
-                modules = listOf(
-                    DestructiveCommandsModule,
-                    SensitiveFilesModule,
-                    SupplyChainRceModule,
-                    ToolBypassModule,
-                ),
-                settings = ProtectionSettings(),
+            RedactionSettingsContent(
+                modules = builtInRedactionModules,
+                settings = RedactionSettings(),
                 onSettingsChange = {},
             )
         }
     }
 }
 
-@Preview(widthDp = 720, heightDp = 900)
+@Preview(widthDp = 720, heightDp = 720)
 @Composable
-private fun PreviewGuardrailsWide() {
+private fun PreviewRedactionWide() {
     PreviewScaffold {
         Box(Modifier.padding(24.dp)) {
-            ProtectionsSettingsContent(
-                modules = listOf(
-                    DestructiveCommandsModule,
-                    SensitiveFilesModule,
-                    SupplyChainRceModule,
-                    ToolBypassModule,
-                ),
-                settings = ProtectionSettings(),
+            RedactionSettingsContent(
+                modules = builtInRedactionModules,
+                settings = RedactionSettings(),
+                onSettingsChange = {},
+            )
+        }
+    }
+}
+
+@Preview(widthDp = 720, heightDp = 720)
+@Composable
+private fun PreviewRedactionMasterOff() {
+    PreviewScaffold {
+        Box(Modifier.padding(24.dp)) {
+            RedactionSettingsContent(
+                modules = builtInRedactionModules,
+                settings = RedactionSettings(enabled = false),
                 onSettingsChange = {},
             )
         }

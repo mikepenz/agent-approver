@@ -57,6 +57,7 @@ import kotlinx.serialization.json.JsonElement
 import com.mikepenz.agentbelay.ui.components.LocalPreviewHoverOverride
 import com.mikepenz.agentbelay.ui.components.PillSegmented
 import com.mikepenz.agentbelay.ui.components.PillSegmentedSize
+import com.mikepenz.agentbelay.ui.components.RedactionPill
 import com.mikepenz.agentbelay.ui.components.RiskPill
 import com.mikepenz.agentbelay.ui.components.SourceTag
 import com.mikepenz.agentbelay.ui.components.StatusPill
@@ -90,6 +91,12 @@ data class HistoryEntry(
     val rawResponseJson: String? = null,
     /** Raw validation LLM output (Ollama JSON / Claude CLI stdout / Copilot stdout). */
     val rawValidationResponseJson: String? = null,
+    /**
+     * Number of redaction spans replaced by the post-tool-use engine for
+     * this entry, or 0 when nothing was redacted. Drives the [RedactionPill]
+     * shown alongside the [RiskPill] in both row variants.
+     */
+    val redactionCount: Int = 0,
 )
 
 /**
@@ -663,6 +670,7 @@ private fun HistoryRow(
                 if (entry.risk != null && entry.via != null) {
                     RiskPill(level = entry.risk, via = entry.via)
                 }
+                RedactionPill(count = entry.redactionCount)
             }
             Text(
                 text = entry.time,
@@ -765,6 +773,7 @@ private fun HistoryRowCompact(
                 if (entry.risk != null && entry.via != null) {
                     RiskPill(level = entry.risk, via = entry.via)
                 }
+                RedactionPill(count = entry.redactionCount)
                 if (entry.tag != null) {
                     BadgeChip(
                         text = entry.tag,

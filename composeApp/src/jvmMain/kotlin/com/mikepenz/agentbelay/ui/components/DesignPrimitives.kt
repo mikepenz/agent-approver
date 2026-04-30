@@ -289,6 +289,51 @@ fun RiskPill(
     }
 }
 
+// ── RedactionPill ───────────────────────────────────────────────────────────
+// Eye-off icon + redaction count. Shown in history rows when the
+// post-tool-use redaction engine replaced one or more secret spans.
+
+@Composable
+fun RedactionPill(
+    count: Int,
+    modifier: Modifier = Modifier,
+) {
+    if (count <= 0) return
+    val tint = AccentEmerald
+    Row(
+        modifier = modifier
+            .height(20.dp)
+            .clip(RoundedCornerShape(10.dp))
+            .background(tint.copy(alpha = 0.12f))
+            .border(1.dp, tint.copy(alpha = 0.28f), RoundedCornerShape(10.dp))
+            .padding(start = 6.dp, end = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(5.dp),
+    ) {
+        Icon(
+            imageVector = com.mikepenz.agentbelay.ui.icons.LucideEyeOff,
+            contentDescription = "Redaction applied",
+            tint = tint,
+            modifier = Modifier.size(11.dp),
+        )
+        Text(
+            text = if (count == 1) "1 redacted" else "$count redacted",
+            color = tint,
+            fontSize = 10.sp,
+            lineHeight = 10.sp,
+            fontWeight = FontWeight.Medium,
+            letterSpacing = (-0.05).sp,
+            maxLines = 1,
+            style = androidx.compose.ui.text.TextStyle(
+                lineHeightStyle = androidx.compose.ui.text.style.LineHeightStyle(
+                    alignment = androidx.compose.ui.text.style.LineHeightStyle.Alignment.Center,
+                    trim = androidx.compose.ui.text.style.LineHeightStyle.Trim.Both,
+                ),
+            ),
+        )
+    }
+}
+
 // ── SourceTag ───────────────────────────────────────────────────────────────
 // Dot + label for source
 
@@ -726,6 +771,23 @@ private fun PreviewRiskPills() {
                 RiskPill(level = 2, via = "copilot")
                 RiskPill(level = 4, via = "ollama")
             }
+        }
+    }
+}
+
+@Preview(widthDp = 480, heightDp = 80)
+@Composable
+private fun PreviewRedactionPills() {
+    PreviewScaffold {
+        Row(
+            modifier = Modifier.padding(16.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            RedactionPill(count = 1)
+            RedactionPill(count = 3)
+            RedactionPill(count = 12)
+            // Zero-count case is the no-op path; rendered for sanity:
+            RedactionPill(count = 0)
         }
     }
 }
