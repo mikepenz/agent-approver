@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Agent Belay is a Kotlin Multiplatform (JVM-only) desktop application built with Compose Multiplatform. It acts as a Claude Code hook server — receiving `PermissionRequest` hook events via HTTP, displaying them in a UI for human review, and responding with allow/deny decisions.
+Agent Belay is a Kotlin Multiplatform (JVM-only) desktop application built with Compose Multiplatform. It acts as a hook server for AI coding agents (Claude Code, GitHub Copilot CLI, OpenCode, with Codex / Cline / Cursor / Gemini coming via the `harness/` abstraction) — receiving permission-request and pre-tool-use hook events over HTTP, displaying them in a UI for human review, and responding with allow/deny decisions. PostToolUse output redaction (Claude Code) scrubs secrets from tool responses before the agent reads them.
 
 ## Build & Test Commands
 
@@ -27,12 +27,15 @@ Single module project: `:composeApp` with `commonMain` (shared models) and `jvmM
 
 ### Core Flow
 
-1. **HTTP Server** (`server/ApprovalServer.kt`) — Ktor/Netty on port 19532 (configurable). Receives `POST /approve` (Claude Code), `POST /approve-copilot` (Copilot CLI `permissionRequest`), and `POST /pre-tool-use[-copilot]` (Protection Engine pre-checks). The Copilot integration is **user-scoped** (mirroring Claude Code) — `register(port)` writes two bridge scripts under `~/.agent-belay/` plus a single `~/.copilot/hooks/agent-belay.json` containing both `permissionRequest` and `preToolUse` entries.
-2. **Adapter** (`server/ClaudeCodeAdapter.kt`) — Parses incoming JSON into `ApprovalRequest` model.
-3. **State** (`state/AppStateManager.kt`) — Single `MutableStateFlow<AppState>` is the source of truth. Pending approvals are added to state and a `CompletableDeferred<ApprovalResult>` suspends the HTTP handler coroutine until the user acts or timeout fires.
-4. **UI** (`ui/`) — Compose Material3 with three tabs: Approvals, History, Settings. Tool-specific card components render different tool types (Bash, FileOperation, WebFetch, Plan, AskUserQuestion).
-5. **Persistence** (`storage/`) — `HistoryStorage` writes up to 250 approval results to JSON with 10-second debounce. `SettingsStorage` persists app configuration.
-6. **Risk Analysis** (`risk/RiskAnalyzer.kt`) — Optional feature that shells out to the `claude` CLI to score approval risk (1-5). Results can auto-approve (risk 1) or auto-deny (risk 5).
+1. **HTTP Server** (`server/ApprovalServer.kt`) — Ktor/Netty on port 19532 (configurable). Iterates a `List<Harness>` and mounts permission-request + pre-tool-use routes per harness via the generic handlers in `server/HarnessRoutes.kt`. Endpoint paths come from `harness.transport.endpoints()` (e.g. `/approve` for Claude, `/approve-copilot` for Copilot, `/approve-opencode` for OpenCode). PostToolUse is Claude-only today (the only harness whose post-tool hook can return `updatedToolOutput`).
+2. **Harness composition** (`harness/`) — Each integration implements four pluggable axes: `HarnessAdapter` (parses incoming JSON + builds outgoing envelope), `HarnessRegistrar` (writes config files / shim scripts to install the integration on the user's machine), `HarnessTransport` (declares HTTP route paths per `HookEvent`), and `HarnessCapabilities` (feature flags driving runtime branching + UI gating). See "Adding a new harness" below.
+3. **Adapters** (`server/{ClaudeCode,Copilot,OpenCode}Adapter.kt`) — Each implements `HarnessAdapter`. Per-harness envelope variation (Claude wraps under `hookSpecificOutput.decision`; Copilot uses flat `{permissionDecision, ...}`; future harnesses do their own thing) lives entirely in the adapter; the route handlers stay generic.
+4. **State** (`state/AppStateManager.kt`) — Single `MutableStateFlow<AppState>` is the source of truth. Pending approvals are added to state and a `CompletableDeferred<ApprovalResult>` suspends the HTTP handler coroutine until the user acts or timeout fires. `attachRedactionHits` updates an existing history row when PostToolUse redaction fires after the original PermissionRequest already persisted.
+5. **Protection Engine** (`protection/ProtectionEngine.kt`) — 13 modules of pattern-matched rules that run on PreToolUse. Modes: `AUTO_BLOCK`, `ASK_AUTO_BLOCK`, `ASK`, `LOG_ONLY`, `DISABLED`.
+6. **Redaction Engine** (`redaction/RedactionEngine.kt`) — Mirrors `ProtectionEngine` but operates on PostToolUse output. Built-ins: API keys, env vars, private keys, JWTs. `ToolOutputShape` preserves Bash / Read / WebFetch response schemas.
+7. **UI** (`ui/`) — Compose Material3 with Approvals / History / Settings tabs. Tool-specific card components render different tool types (Bash, FileOperation, WebFetch, Plan, AskUserQuestion). Shared settings primitives `ColoredModePicker<T>` + `ColoredIconTile` are reused by both Protections and Redaction tabs.
+8. **Persistence** (`storage/`) — `DatabaseStorage` (SQLite) for history (capped at `AppSettings.maxHistoryEntries`, default 2500). `SettingsStorage` for app configuration. Add new fields with defaults; never remove/rename — see `AGENTS.md`.
+9. **Risk Analysis** (`risk/RiskAnalyzer.kt`) — Optional. Backends: Claude CLI, GitHub Copilot API, Ollama. Scores 1–5; can auto-approve risk 1 / auto-deny risk 5.
 
 ### Platform Integration
 
@@ -45,15 +48,60 @@ Single module project: `:composeApp` with `commonMain` (shared models) and `jvmM
 | Package | Purpose |
 |---------|---------|
 | `model/` | Serializable data models (shared in `commonMain`) |
-| `server/` | Ktor HTTP server and request parsing |
+| `harness/` | Per-agent integration composition: `Harness` + `HarnessAdapter` + `HarnessRegistrar` + `HarnessTransport` + `HarnessCapabilities`. Sub-packages per agent (`claudecode/`, `copilot/`, `opencode/`, …). |
+| `server/` | Ktor HTTP server (`ApprovalServer`), generic harness route handlers (`HarnessRoutes.kt`), per-harness adapters (`*Adapter.kt`), `PostToolUseRoute` (Claude-only redaction), `CapabilityRoute`. |
 | `state/` | Reactive state management via StateFlow |
-| `storage/` | JSON file persistence (history + settings) |
+| `storage/` | SQLite persistence (history) + JSON file persistence (settings) |
+| `protection/` | 13 pattern-matched protection modules + `ProtectionEngine` (PreToolUse) |
+| `redaction/` | Output redaction engine + 4 modules (api-keys, env-vars, private-keys, jwt) + `ToolOutputShape` (PostToolUse) |
 | `risk/` | AI-powered risk analysis via CLI subprocess |
-| `hook/` | Claude Code hook registration in `~/.claude/settings.json` |
+| `hook/` | Lower-level hook-installation helpers wrapped by harness `Registrar` implementations (`HookRegistrar` for Claude, `CopilotBridgeInstaller` for Copilot) |
+| `capability/` | Optional context-injection features (response compression, Socratic thinking) |
 | `platform/` | OS-specific features (tray, startup, icons) |
 | `ui/` | Compose UI components organized by tab |
 | `ui/theme/` | Theme tokens — `AgentBelayColors` semantic palette (dark/light), `AgentBelayDimens` iconography + density, `PreviewScaffold` (accepts `ThemeMode`) |
-| `ui/components/` | Shared primitives — `PillSegmented`, `AgentBelayCard`, `StatusPill`/`RiskPill`/`ToolTag`/`SourceTag`, `DesignToggle`, `ScreenLoadingState` / `ScreenErrorState`, `Kbd` |
+| `ui/components/` | Shared primitives — `PillSegmented`, `AgentBelayCard`, `StatusPill`/`RiskPill`/`RedactionPill`/`ToolTag`/`SourceTag`, `DesignToggle`, `ColoredModePicker`/`ColoredIconTile`, `ScreenLoadingState` / `ScreenErrorState`, `Kbd` |
+
+### Adding a new harness
+
+The `harness/` abstraction is designed so that supporting a new AI agent is
+a small, mechanical PR. **You should not need to write a new route file.**
+
+#### Skeleton
+
+```
+composeApp/src/jvmMain/kotlin/com/mikepenz/agentbelay/
+├── harness/<name>/
+│   ├── <Name>Harness.kt        # composes the four pieces below
+│   ├── <Name>Registrar.kt      # writes the agent's config file(s) + bridge artifacts
+│   └── <Name>Transport.kt      # endpoints() per HookEvent
+├── server/
+│   └── <Name>Adapter.kt        # parsePermissionRequest / parsePreToolUse / build*Response
+└── (optional) hook/<Name>Bridge.kt   # if the registrar needs an OS-level installer wrapper
+```
+
+#### What each piece owns
+
+- **`<Name>Adapter`** (implements `HarnessAdapter`) — the agent's **wire envelope**. Parses incoming request JSON into the canonical `ApprovalRequest`. Builds outgoing response JSON in the agent's native shape (Claude wraps under `hookSpecificOutput.decision`, Copilot is flat, etc.). When a capability isn't supported (e.g. Copilot's PostToolUse can't modify output), return `null` from the corresponding builder so callers pass-through.
+- **`<Name>Registrar`** (implements `HarnessRegistrar`) — knows where the agent's config file lives (`~/.claude/settings.json` / `~/.copilot/hooks/agent-belay.json` / `~/.codex/config.toml` / …), how to atomically read-modify-write it, and what `OutboardArtifact`s need to be installed alongside (shim shell scripts for non-HTTP agents, npm plugins for OpenCode-style integrations). Wrap the existing `HookRegistrar` / `CopilotBridgeInstaller` rather than reimplementing file-locking and atomic-write logic.
+- **`<Name>Transport`** (implements `HarnessTransport`) — declares the HTTP route paths the agent's hooks (or shim scripts) call. Just a `Map<HookEvent, String>`. Endpoints are namespaced per-agent (`/approve`, `/approve-copilot`, `/approve-opencode`) so multiple agents coexist on one Ktor server.
+- **`<Name>Harness`** (implements `Harness`) — composes the three pieces above and declares `HarnessCapabilities` flags (arg-rewriting / always-allow write-through / output-redaction / defer / interrupt-on-deny / additional-context). Override `autoAllowTools` for non-actionable status tools (Copilot's `report_intent`) and `shouldWaitIndefinitely` for tools the agent is paused on (Claude's `Plan` / `AskUserQuestion`).
+
+#### Wire-up edits
+
+1. `server/ApprovalServer.kt` — add `<Name>Harness()` to the `harnesses: List<Harness>` field. The generic `harnessApprovalRoute` and `harnessPreToolUseRoute` handlers in `server/HarnessRoutes.kt` will mount the routes automatically based on `transport.endpoints()`.
+2. `di/AppGraph.kt` + `di/AppProviders.kt` — add a `<Name>Bridge` provider if the registrar needs an injectable singleton (mirror `DefaultCopilotBridge` / `DefaultHookRegistry`).
+3. `ui/settings/SettingsViewModel.kt` — add `register<Name>` / `unregister<Name>` methods that call the registrar through the bridge.
+4. `ui/settings/IntegrationsSettingsContent.kt` — add a new `IntegrationRow` for the agent.
+
+#### Tests to clone
+
+- `composeApp/src/jvmTest/kotlin/com/mikepenz/agentbelay/server/<Name>AdapterTest.kt` — parse fixtures (one per known payload shape) + envelope round-trips for each `build*Response` method.
+- Add to `harness/HarnessCapabilitiesTest.kt`: a test verifying capability flags map to actual response shapes for the new harness.
+
+#### Rule of thumb
+
+If you find yourself writing a new `*Route.kt` file, stop — you're probably duplicating logic that already lives in `server/HarnessRoutes.kt`. Add a method to `HarnessAdapter` or a new flag on `Harness` instead.
 
 ### Design System & Previews
 

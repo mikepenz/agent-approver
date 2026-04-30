@@ -5,7 +5,9 @@ import com.mikepenz.agentbelay.harness.HarnessAdapter
 import com.mikepenz.agentbelay.harness.HarnessCapabilities
 import com.mikepenz.agentbelay.harness.HarnessRegistrar
 import com.mikepenz.agentbelay.harness.HarnessTransport
+import com.mikepenz.agentbelay.model.ApprovalRequest
 import com.mikepenz.agentbelay.model.Source
+import com.mikepenz.agentbelay.model.ToolType
 import com.mikepenz.agentbelay.server.ClaudeCodeAdapter
 
 /**
@@ -34,4 +36,16 @@ class ClaudeCodeHarness(
         // SessionStart / UserPromptSubmit additionalContext (already used by CapabilityEngine)
         supportsAdditionalContextInjection = true,
     )
+
+    /**
+     * Plan and AskUserQuestion are agent-paused tools — Claude is
+     * waiting for the user to make a structured choice, not just to
+     * approve the call. Timing them out resolves the wrong way (denies
+     * the agent's plan submission), so we wait forever even when Away
+     * Mode is off.
+     */
+    override fun shouldWaitIndefinitely(request: ApprovalRequest, awayMode: Boolean): Boolean =
+        awayMode ||
+            request.toolType == ToolType.PLAN ||
+            request.toolType == ToolType.ASK_USER_QUESTION
 }

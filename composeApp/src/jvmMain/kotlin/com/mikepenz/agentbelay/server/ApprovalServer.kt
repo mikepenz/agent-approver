@@ -2,6 +2,7 @@ package com.mikepenz.agentbelay.server
 
 import co.touchlab.kermit.Logger
 import com.mikepenz.agentbelay.capability.CapabilityEngine
+import com.mikepenz.agentbelay.harness.Harness
 import com.mikepenz.agentbelay.harness.claudecode.ClaudeCodeHarness
 import com.mikepenz.agentbelay.harness.copilot.CopilotHarness
 import com.mikepenz.agentbelay.harness.opencode.OpenCodeHarness
@@ -28,17 +29,20 @@ class ApprovalServer(
 ) {
     private val logger = Logger.withTag("ApprovalServer")
 
-    // Harness composition: each harness owns its own adapter, registrar,
-    // transport, and capability flags. The route handlers below pull
-    // adapters and capability bits straight off these descriptors so
-    // adding a new harness in Phase 2 does not require route surgery.
-    private val claudeCode = ClaudeCodeHarness()
-    private val copilot = CopilotHarness()
-    private val openCode = OpenCodeHarness()
+    /**
+     * Live harness list. Adding a new harness is exactly one entry here
+     * — the [harnessApprovalRoute] / [harnessPreToolUseRoute] generic
+     * handlers in [HarnessRoutes] consume the [Harness] interface
+     * directly, so no per-harness route files are needed.
+     */
+    private val harnesses: List<Harness> = listOf(
+        ClaudeCodeHarness(),
+        CopilotHarness(),
+        OpenCodeHarness(),
+    )
 
-    private val adapter = claudeCode.adapter as ClaudeCodeAdapter
-    private val copilotAdapter = copilot.adapter as CopilotAdapter
-    private val openCodeAdapter = openCode.adapter as OpenCodeAdapter
+    private val claudeCode = harnesses.first { it is ClaudeCodeHarness }
+    private val claudeAdapter = claudeCode.adapter as ClaudeCodeAdapter
 
     private var server: EmbeddedServer<NettyApplicationEngine, NettyApplicationEngine.Configuration>? = null
 
@@ -66,19 +70,27 @@ class ApprovalServer(
                     // handlers (waiting on CompletableDeferred) get a
                     // CancellationException when the harness drops the
                     // connection — e.g. user approved/denied directly inside
-                    // Claude Code or Copilot CLI's TUI. Available since Ktor 3.4.0.
+                    // the agent's TUI. Available since Ktor 3.4.0.
                     install(HttpRequestLifecycle) {
                         cancelCallOnClose = true
                     }
-                    approvalRoute(stateManager, adapter, onNewApproval)
-                    copilotApprovalRoute(stateManager, copilotAdapter, onNewApproval)
-                    copilotPreToolUseRoute(stateManager, copilotAdapter, protectionEngine, onNewApproval)
-                    openCodeApprovalRoute(stateManager, openCodeAdapter, onNewApproval)
-                    openCodePreToolUseRoute(stateManager, openCodeAdapter, protectionEngine, onNewApproval)
-                    preToolUseRoute(stateManager, adapter, protectionEngine, onNewApproval)
+
+                    // Per-harness routes, mounted via the generic handlers.
+                    // Each handler is a no-op when the harness's transport
+                    // doesn't declare the corresponding endpoint.
+                    for (harness in harnesses) {
+                        harnessApprovalRoute(harness, stateManager, onNewApproval)
+                        harnessPreToolUseRoute(harness, stateManager, protectionEngine, onNewApproval)
+                    }
+
+                    // PostToolUse is Claude Code-only today (Copilot's
+                    // postToolUse cannot modify output and OpenCode has
+                    // no equivalent event). Wire the Claude harness
+                    // directly until/unless another harness gains the
+                    // capability.
                     postToolUseRoute(
                         stateManager = stateManager,
-                        adapter = adapter,
+                        adapter = claudeAdapter,
                         redactionEngine = redactionEngine,
                         supportsOutputRedaction = claudeCode.capabilities.supportsOutputRedaction,
                     )

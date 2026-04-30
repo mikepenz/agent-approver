@@ -30,4 +30,11 @@ class CopilotHarness(
         // sessionStart `additionalContext` is supported (used by CapabilityEngine).
         supportsAdditionalContextInjection = true,
     )
+
+    /**
+     * `report_intent` is Copilot's status-tool: the agent fires it
+     * purely to declare what it intends to do next. Auto-allowing
+     * spares the user a UI prompt for a non-actionable call.
+     */
+    override val autoAllowTools: Set<String> = setOf("report_intent")
 }
