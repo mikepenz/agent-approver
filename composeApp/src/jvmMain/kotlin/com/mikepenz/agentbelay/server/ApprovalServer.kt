@@ -4,6 +4,7 @@ import co.touchlab.kermit.Logger
 import com.mikepenz.agentbelay.capability.CapabilityEngine
 import com.mikepenz.agentbelay.harness.claudecode.ClaudeCodeHarness
 import com.mikepenz.agentbelay.harness.copilot.CopilotHarness
+import com.mikepenz.agentbelay.harness.opencode.OpenCodeHarness
 import com.mikepenz.agentbelay.protection.ProtectionEngine
 import com.mikepenz.agentbelay.redaction.RedactionEngine
 import com.mikepenz.agentbelay.state.AppStateManager
@@ -33,9 +34,11 @@ class ApprovalServer(
     // adding a new harness in Phase 2 does not require route surgery.
     private val claudeCode = ClaudeCodeHarness()
     private val copilot = CopilotHarness()
+    private val openCode = OpenCodeHarness()
 
     private val adapter = claudeCode.adapter as ClaudeCodeAdapter
     private val copilotAdapter = copilot.adapter as CopilotAdapter
+    private val openCodeAdapter = openCode.adapter as OpenCodeAdapter
 
     private var server: EmbeddedServer<NettyApplicationEngine, NettyApplicationEngine.Configuration>? = null
 
@@ -70,6 +73,8 @@ class ApprovalServer(
                     approvalRoute(stateManager, adapter, onNewApproval)
                     copilotApprovalRoute(stateManager, copilotAdapter, onNewApproval)
                     copilotPreToolUseRoute(stateManager, copilotAdapter, protectionEngine, onNewApproval)
+                    openCodeApprovalRoute(stateManager, openCodeAdapter, onNewApproval)
+                    openCodePreToolUseRoute(stateManager, openCodeAdapter, protectionEngine, onNewApproval)
                     preToolUseRoute(stateManager, adapter, protectionEngine, onNewApproval)
                     postToolUseRoute(
                         stateManager = stateManager,

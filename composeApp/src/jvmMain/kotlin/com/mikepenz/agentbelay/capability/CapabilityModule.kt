@@ -17,7 +17,7 @@ enum class HookEvent {
 }
 
 /** Agent targets a capability can be installed into. */
-enum class AgentTarget { CLAUDE_CODE, COPILOT_CLI }
+enum class AgentTarget { CLAUDE_CODE, COPILOT_CLI, OPENCODE }
 
 /**
  * A pluggable built-in enhancement that delivers its behaviour by injecting

@@ -6,7 +6,9 @@ import com.mikepenz.agentbelay.capability.modules.SocraticThinkingCapability
 import com.mikepenz.agentbelay.hook.CopilotBridge
 import com.mikepenz.agentbelay.hook.DefaultCopilotBridge
 import com.mikepenz.agentbelay.hook.DefaultHookRegistry
+import com.mikepenz.agentbelay.hook.DefaultOpenCodeBridge
 import com.mikepenz.agentbelay.hook.HookRegistry
+import com.mikepenz.agentbelay.hook.OpenCodeBridge
 import com.mikepenz.agentbelay.protection.ProtectionEngine
 import com.mikepenz.agentbelay.protection.modules.AbsolutePathsModule
 import com.mikepenz.agentbelay.protection.modules.DestructiveCommandsModule
@@ -115,6 +117,10 @@ interface AppProviders {
     @Provides
     @SingleIn(AppScope::class)
     fun provideCopilotBridge(): CopilotBridge = DefaultCopilotBridge
+
+    @Provides
+    @SingleIn(AppScope::class)
+    fun provideOpenCodeBridge(): OpenCodeBridge = DefaultOpenCodeBridge
 
     @Provides
     @SingleIn(AppScope::class)

@@ -94,4 +94,25 @@ fun Route.capabilityRoute(engine: CapabilityEngine) {
         call.respondText(body, contentType = ContentType.Application.Json)
         logger.v { "Served capability injection (${text.length} chars) to Copilot CLI" }
     }
+
+    post("/capability/inject-opencode") {
+        runCatching { call.receiveText() }
+
+        val parts = listOf(
+            engine.injectionFor(HookEvent.USER_PROMPT_SUBMIT, AgentTarget.OPENCODE),
+            engine.injectionFor(HookEvent.SESSION_START, AgentTarget.OPENCODE),
+        ).filter { it.isNotBlank() }
+        val text = parts.joinToString("\n\n")
+        if (text.isBlank()) {
+            call.respondText("{}", contentType = ContentType.Application.Json)
+            return@post
+        }
+        // OpenCode's plugin event handler fetches this once at session start
+        // and injects it as context. Same flat shape as Copilot.
+        val body = buildJsonObject {
+            put("additionalContext", text)
+        }.toString()
+        call.respondText(body, contentType = ContentType.Application.Json)
+        logger.v { "Served capability injection (${text.length} chars) to OpenCode" }
+    }
 }
