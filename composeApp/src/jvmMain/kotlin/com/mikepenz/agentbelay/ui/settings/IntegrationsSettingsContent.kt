@@ -32,6 +32,9 @@ import com.mikepenz.agentbelay.ui.components.StatusPill
 import com.mikepenz.agentbelay.ui.components.TagSize
 import com.mikepenz.agentbelay.ui.icons.LucidePlug
 import com.mikepenz.agentbelay.ui.theme.AgentBelayColors
+import com.mikepenz.agentbelay.ui.theme.SourceClaudeColor
+import com.mikepenz.agentbelay.ui.theme.SourceOpenCodeColor
+import com.mikepenz.agentbelay.ui.theme.SourcePiColor
 import com.mikepenz.agentbelay.ui.theme.VioletPurple
 
 @Composable
@@ -60,7 +63,7 @@ fun IntegrationsSettingsContent(
                 id = "claude",
                 name = "Claude Code",
                 desc = "Hook in ~/.claude/settings.json",
-                color = Color(0xFFD97757),
+                color = SourceClaudeColor,
                 registered = isHookRegistered,
                 onRegister = onRegisterHook,
                 onUnregister = onUnregisterHook,
@@ -86,7 +89,7 @@ fun IntegrationsSettingsContent(
                 name = "OpenCode",
                 desc = "Plugin in ~/.config/opencode/plugin/agent-belay.ts " +
                     "(tool.execute.before gate, fail-open)",
-                color = Color(0xFF10B981),
+                color = SourceOpenCodeColor,
                 registered = isOpenCodeRegistered,
                 onRegister = onRegisterOpenCode,
                 onUnregister = onUnregisterOpenCode,
@@ -96,7 +99,7 @@ fun IntegrationsSettingsContent(
                 name = "Pi",
                 desc = "Extension in ~/.pi/agent/extensions/agent-belay.ts " +
                     "(tool_call gate, fail-open)",
-                color = Color(0xFFF59E0B),
+                color = SourcePiColor,
                 registered = isPiRegistered,
                 onRegister = onRegisterPi,
                 onUnregister = onUnregisterPi,
