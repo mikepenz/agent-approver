@@ -265,9 +265,11 @@ private fun SessionList(
  * dead options.
  */
 /**
- * Sort + filter toolbar above the session list. Stacked vertically so the
- * 280dp rail can fit the segmented control without wrapping the "Turns"
- * label across multiple lines.
+ * Sort + filter toolbar above the session list. Delegates to
+ * [com.mikepenz.agentbelay.ui.components.SortAndFilterRow] so it stays
+ * visually identical to the History screen's filter row. FlowRow inside
+ * the shared component handles wrapping when the rail is too narrow to
+ * fit both controls on one line.
  */
 @Composable
 private fun SessionsToolbar(
@@ -277,25 +279,15 @@ private fun SessionsToolbar(
     availableHarnesses: List<Source>,
     onHarnessFilterChange: (Set<Source>?) -> Unit,
 ) {
-    Column(
-        modifier = Modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        com.mikepenz.agentbelay.ui.components.PillSegmented(
-            options = SessionSort.entries.map { it to it.label },
-            selected = sortBy,
-            onSelect = onSortChange,
-            modifier = Modifier.fillMaxWidth(),
-        )
-        com.mikepenz.agentbelay.ui.components.MultiSelectDropdown(
-            options = availableHarnesses.map { it to displayNameForSource(it) },
-            selected = harnessFilter,
-            onChange = onHarnessFilterChange,
-            allLabel = "All harnesses",
-            leadingDot = ::colorForSource,
-            modifier = Modifier.fillMaxWidth(),
-        )
-    }
+    com.mikepenz.agentbelay.ui.components.SortAndFilterRow(
+        sortOptions = SessionSort.entries.map { it to it.label },
+        sortSelected = sortBy,
+        onSortChange = onSortChange,
+        harnessOptions = availableHarnesses.map { it to displayNameForSource(it) },
+        harnessSelected = harnessFilter,
+        onHarnessChange = onHarnessFilterChange,
+        harnessLeadingDot = ::colorForSource,
+    )
 }
 
 @Composable

@@ -121,12 +121,12 @@ private fun Trigger(label: String, onClick: () -> Unit, enabled: Boolean) {
     Row(
         modifier = Modifier
             .height(34.dp)
-            .clip(RoundedCornerShape(7.dp))
+            .clip(RoundedCornerShape(8.dp))
             .background(if (isHovered && enabled) AgentBelayColors.surface2 else AgentBelayColors.surface)
             .border(
                 1.dp,
                 if (isHovered && enabled) AgentBelayColors.line2 else AgentBelayColors.line1,
-                RoundedCornerShape(7.dp),
+                RoundedCornerShape(8.dp),
             )
             .hoverable(interactionSource, enabled = enabled)
             .clickable(
@@ -168,9 +168,9 @@ private fun <T> MultiSelectPopup(
     Column(
         modifier = Modifier
             .widthIn(min = 200.dp, max = 320.dp)
-            .clip(RoundedCornerShape(7.dp))
+            .clip(RoundedCornerShape(8.dp))
             .background(AgentBelayColors.surface)
-            .border(1.dp, AgentBelayColors.line2, RoundedCornerShape(7.dp))
+            .border(1.dp, AgentBelayColors.line2, RoundedCornerShape(8.dp))
             .padding(4.dp),
         verticalArrangement = Arrangement.spacedBy(1.dp),
     ) {

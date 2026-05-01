@@ -475,30 +475,18 @@ private fun HistoryHeader(
             onSelect = onScopeChange,
         )
         HorizontalHairline()
-        // Sort + harness filter row — applies to both compact and wide
-        // layouts so the new multi-select replaces the old All/Claude/Copilot
-        // chip strip everywhere. Both controls forced to 34.dp so the pill
-        // and the dropdown share the same baseline.
+        // Sort + harness filter row — same layout used in the Insights tab
+        // via [SortAndFilterRow], so the two screens share styling.
         Spacer(Modifier.height(12.dp))
-        androidx.compose.foundation.layout.FlowRow(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            PillSegmented(
-                options = HistorySort.entries.map { it to it.label },
-                selected = sort,
-                onSelect = onSortChange,
-                modifier = Modifier.height(34.dp),
-            )
-            com.mikepenz.agentbelay.ui.components.MultiSelectDropdown(
-                options = availableHarnesses.map { it to historySourceLabel(it) },
-                selected = harnessFilter,
-                onChange = onHarnessFilterChange,
-                allLabel = "All harnesses",
-                leadingDot = ::historySourceColor,
-            )
-        }
+        com.mikepenz.agentbelay.ui.components.SortAndFilterRow(
+            sortOptions = HistorySort.entries.map { it to it.label },
+            sortSelected = sort,
+            onSortChange = onSortChange,
+            harnessOptions = availableHarnesses.map { it to historySourceLabel(it) },
+            harnessSelected = harnessFilter,
+            onHarnessChange = onHarnessFilterChange,
+            harnessLeadingDot = ::historySourceColor,
+        )
         // Breathing room between the filter row and the table headers below.
         Spacer(Modifier.height(14.dp))
     }
