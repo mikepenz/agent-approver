@@ -4,6 +4,7 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
@@ -11,6 +12,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.requiredWidth
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
@@ -219,64 +221,92 @@ private fun IntegrationRow(item: IntegrationItemData, first: Boolean) {
         if (!first) {
             HorizontalHairline()
         }
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clickable { expanded = !expanded }
-                .padding(16.dp),
-        ) {
-            // Header row: icon + title/status pill + action button.
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(14.dp),
+        BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+            val narrowLayout = maxWidth < 520.dp
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { expanded = !expanded }
+                    .padding(16.dp),
             ) {
-                ColoredIconTile(
-                    icon = LucidePlug,
-                    tint = item.color,
-                    contentDescription = null,
-                )
+                // Header row: icon + title (+ inline badges in wide layout) + action button.
                 Row(
-                    modifier = Modifier.weight(1f),
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(14.dp),
                 ) {
-                    Text(
-                        text = item.name,
-                        color = AgentBelayColors.inkPrimary,
-                        fontSize = 13.5.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        maxLines = 1,
-                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
-                        modifier = Modifier.weight(1f, fill = false),
+                    ColoredIconTile(
+                        icon = LucidePlug,
+                        tint = item.color,
+                        contentDescription = null,
                     )
-                    StatusPill(
-                        status = if (item.registered) DecisionStatus.APPROVED
-                        else DecisionStatus.TIMEOUT,
-                        size = TagSize.SMALL,
-                        text = if (item.registered) "Registered" else DecisionStatus.TIMEOUT.label,
-                    )
-                    if (item.experimental) {
-                        StatusPill(
-                            status = DecisionStatus.PENDING,
-                            size = TagSize.SMALL,
-                            text = "Experimental",
+                    Row(
+                        modifier = Modifier.weight(1f),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        Text(
+                            text = item.name,
+                            color = AgentBelayColors.inkPrimary,
+                            fontSize = 13.5.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            maxLines = 1,
+                            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f, fill = false),
                         )
+                        if (!narrowLayout) {
+                            if (item.registered) {
+                                StatusPill(
+                                    status = DecisionStatus.APPROVED,
+                                    size = TagSize.SMALL,
+                                    text = "Registered",
+                                )
+                            }
+                            if (item.experimental) {
+                                StatusPill(
+                                    status = DecisionStatus.PENDING,
+                                    size = TagSize.SMALL,
+                                    text = "Experimental",
+                                )
+                            }
+                        }
+                    }
+                    if (item.registered) {
+                        OutlineButton(text = "Unregister", onClick = item.onUnregister)
+                    } else {
+                        PrimaryButton(text = "Register", onClick = item.onRegister)
+                    }
+                    Icon(
+                        imageVector = LucideChevronDown,
+                        contentDescription = if (expanded) "Collapse" else "Expand",
+                        tint = AgentBelayColors.inkTertiary,
+                        modifier = Modifier
+                            .size(16.dp)
+                            .rotate(if (expanded) 180f else 0f),
+                    )
+                }
+                // In narrow layout, show badges below the title row.
+                if (narrowLayout && (item.registered || item.experimental)) {
+                    Spacer(Modifier.height(6.dp))
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        if (item.registered) {
+                            StatusPill(
+                                status = DecisionStatus.APPROVED,
+                                size = TagSize.SMALL,
+                                text = "Registered",
+                            )
+                        }
+                        if (item.experimental) {
+                            StatusPill(
+                                status = DecisionStatus.PENDING,
+                                size = TagSize.SMALL,
+                                text = "Experimental",
+                            )
+                        }
                     }
                 }
-                if (item.registered) {
-                    OutlineButton(text = "Unregister", onClick = item.onUnregister)
-                } else {
-                    PrimaryButton(text = "Register", onClick = item.onRegister)
-                }
-                Icon(
-                    imageVector = LucideChevronDown,
-                    contentDescription = if (expanded) "Collapse" else "Expand",
-                    tint = AgentBelayColors.inkTertiary,
-                    modifier = Modifier
-                        .size(16.dp)
-                        .rotate(if (expanded) 180f else 0f),
-                )
-            }
             Spacer(Modifier.height(8.dp))
             Text(
                 modifier = Modifier.fillMaxWidth(),
@@ -292,6 +322,7 @@ private fun IntegrationRow(item: IntegrationItemData, first: Boolean) {
                 Spacer(Modifier.height(12.dp))
                 item.extra.invoke()
             }
+        }
         }
         AnimatedVisibility(visible = expanded) {
             Column(modifier = Modifier.fillMaxWidth()) {
@@ -345,15 +376,22 @@ private fun CopilotFailClosedCard(failClosed: Boolean, onChange: (Boolean) -> Un
     }
 }
 
-@Preview(widthDp = 380, heightDp = 700)
+@Preview(widthDp = 380, heightDp = 800)
 @Composable
 private fun PreviewIntegrationsSlim() {
     PreviewScaffold {
-        androidx.compose.foundation.layout.Box(Modifier.padding(16.dp)) {
+        androidx.compose.foundation.layout.Box(
+            Modifier
+                .requiredWidth(380.dp)
+                .padding(16.dp)
+        ) {
             IntegrationsSettingsContent(
                 settings = AppSettings(),
                 isHookRegistered = true,
                 isCopilotRegistered = true,
+                isOpenCodeRegistered = true,
+                isPiRegistered = false,
+                isCodexRegistered = false,
                 onSettingsChange = {},
                 onRegisterHook = {},
                 onUnregisterHook = {},
@@ -364,7 +402,7 @@ private fun PreviewIntegrationsSlim() {
     }
 }
 
-@Preview(widthDp = 720, heightDp = 700)
+@Preview(widthDp = 720, heightDp = 800)
 @Composable
 private fun PreviewIntegrationsWide() {
     PreviewScaffold {
@@ -373,6 +411,9 @@ private fun PreviewIntegrationsWide() {
                 settings = AppSettings(),
                 isHookRegistered = true,
                 isCopilotRegistered = true,
+                isOpenCodeRegistered = true,
+                isPiRegistered = false,
+                isCodexRegistered = false,
                 onSettingsChange = {},
                 onRegisterHook = {},
                 onUnregisterHook = {},
@@ -383,7 +424,7 @@ private fun PreviewIntegrationsWide() {
     }
 }
 
-@Preview(widthDp = 380, heightDp = 600)
+@Preview(widthDp = 380, heightDp = 700)
 @Composable
 private fun PreviewIntegrationsUnregistered() {
     PreviewScaffold {
@@ -392,6 +433,9 @@ private fun PreviewIntegrationsUnregistered() {
                 settings = AppSettings(),
                 isHookRegistered = false,
                 isCopilotRegistered = false,
+                isOpenCodeRegistered = false,
+                isPiRegistered = false,
+                isCodexRegistered = false,
                 onSettingsChange = {},
                 onRegisterHook = {},
                 onUnregisterHook = {},

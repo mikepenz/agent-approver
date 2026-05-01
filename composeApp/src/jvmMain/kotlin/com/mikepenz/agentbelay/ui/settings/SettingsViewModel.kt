@@ -38,6 +38,7 @@ import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
@@ -86,6 +87,10 @@ class SettingsViewModel(
 
     val updateState: StateFlow<UpdateUiState> = updateManager.state
     val isUpdateSupported: Boolean get() = updateManager.isSupported
+
+    private val _selectedSubTabIndex = MutableStateFlow(0)
+    val selectedSubTabIndex: StateFlow<Int> = _selectedSubTabIndex.asStateFlow()
+    fun selectSubTab(index: Int) { _selectedSubTabIndex.value = index }
 
     fun checkForUpdates() = updateManager.check()
     fun downloadUpdate() = updateManager.downloadAvailable()
