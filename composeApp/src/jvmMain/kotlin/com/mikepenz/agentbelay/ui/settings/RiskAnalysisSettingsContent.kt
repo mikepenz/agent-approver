@@ -37,8 +37,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
-import androidx.compose.ui.platform.LocalClipboardManager
-import androidx.compose.ui.text.AnnotatedString
+import java.awt.Toolkit
+import java.awt.datatransfer.StringSelection
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
@@ -857,7 +857,6 @@ private fun SystemPromptSection(
     onSettingsChange: (AppSettings) -> Unit,
 ) {
     var show by remember { mutableStateOf(false) }
-    val clipboardManager = LocalClipboardManager.current
     val effectivePrompt = settings.riskAnalysisCustomPrompt.ifBlank { RiskMessageBuilder.DEFAULT_SYSTEM_PROMPT }
 
     SettingSection(
@@ -886,7 +885,7 @@ private fun SystemPromptSection(
                 )
                 GhostButton(
                     text = "Copy default",
-                    onClick = { clipboardManager.setText(AnnotatedString(effectivePrompt)) },
+                    onClick = { Toolkit.getDefaultToolkit().systemClipboard.setContents(StringSelection(effectivePrompt), null) },
                 )
             }
             AnimatedVisibility(visible = show) {

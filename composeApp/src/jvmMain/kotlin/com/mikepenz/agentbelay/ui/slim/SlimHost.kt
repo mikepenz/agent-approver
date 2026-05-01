@@ -8,8 +8,8 @@ import com.mikepenz.agentbelay.model.ApprovalRequest
 import com.mikepenz.agentbelay.model.ToolType
 import com.mikepenz.agentbelay.ui.approvals.ApprovalsViewModel
 import dev.zacsweers.metrox.viewmodel.metroViewModel
-import kotlinx.datetime.Clock
-import kotlinx.datetime.Instant
+import kotlin.time.Clock
+import kotlin.time.Instant
 
 /**
  * Host that binds a live [ApprovalsViewModel] to the chromeless [SlimContent].

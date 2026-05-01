@@ -89,7 +89,7 @@ object GitAwareGuardModule : ProtectionModule {
             val finished = process.waitFor(3, TimeUnit.SECONDS)
             if (!finished) {
                 process.destroyForcibly()
-                Logger.w("GitAwareGuardModule") { "git status timed out in ${gitRoot.path}" }
+                Logger.w(tag = "GitAwareGuardModule") { "git status timed out in ${gitRoot.path}" }
                 return false
             }
             if (process.exitValue() != 0) return false
@@ -97,7 +97,7 @@ object GitAwareGuardModule : ProtectionModule {
             // output is line-oriented, so checking for any non-blank line is sufficient.
             output.isNotBlank()
         } catch (e: Exception) {
-            Logger.w("GitAwareGuardModule", e) { "Failed to run git status in ${gitRoot.path}" }
+            Logger.w(e, tag = "GitAwareGuardModule") { "Failed to run git status in ${gitRoot.path}" }
             false
         }
     }

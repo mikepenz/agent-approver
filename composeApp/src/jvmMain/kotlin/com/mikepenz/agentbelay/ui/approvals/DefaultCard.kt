@@ -28,6 +28,7 @@ import androidx.compose.material3.PlainTooltip
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TooltipBox
+import androidx.compose.material3.TooltipAnchorPosition
 import androidx.compose.material3.TooltipDefaults
 import androidx.compose.material3.rememberTooltipState
 import androidx.compose.runtime.Composable
@@ -60,7 +61,7 @@ import com.mikepenz.markdown.compose.elements.highlightedCodeBlock
 import com.mikepenz.markdown.compose.elements.highlightedCodeFence
 import com.mikepenz.markdown.m3.Markdown
 import com.mikepenz.markdown.m3.markdownColor
-import kotlinx.datetime.Clock
+import kotlin.time.Clock
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
@@ -164,7 +165,7 @@ fun DefaultCard(
                     // Prominent mode: three equal buttons — Deny | Always | Approve
                     val tooltipText = remember(request) { formatPermissionTooltip(request.hookInput.permissionSuggestions) }
                     TooltipBox(
-                        positionProvider = TooltipDefaults.rememberTooltipPositionProvider(),
+                        positionProvider = TooltipDefaults.rememberTooltipPositionProvider(positioning = TooltipAnchorPosition.Above),
                         tooltip = {
                             PlainTooltip {
                                 Text(tooltipText)
@@ -221,7 +222,7 @@ fun DefaultCard(
                                 onDismissRequest = { showMenu = false },
                             ) {
                                 TooltipBox(
-                                    positionProvider = TooltipDefaults.rememberTooltipPositionProvider(),
+                                    positionProvider = TooltipDefaults.rememberTooltipPositionProvider(positioning = TooltipAnchorPosition.Above),
                                     tooltip = {
                                         PlainTooltip {
                                             Text(tooltipText)

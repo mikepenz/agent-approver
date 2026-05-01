@@ -1,6 +1,6 @@
 package com.mikepenz.agentbelay.model
 
-import kotlinx.datetime.Clock
+import kotlin.time.Clock
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonPrimitive
 import kotlin.test.Test

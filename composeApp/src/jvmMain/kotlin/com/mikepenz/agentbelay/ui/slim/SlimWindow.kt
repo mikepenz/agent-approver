@@ -81,7 +81,7 @@ import com.mikepenz.agentbelay.ui.theme.DangerRed
 import com.mikepenz.agentbelay.ui.theme.PreviewScaffold
 import com.mikepenz.agentbelay.ui.theme.WarnYellow
 import com.mikepenz.agentbelay.ui.theme.riskColor
-import kotlinx.datetime.Clock
+import kotlin.time.Clock
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject

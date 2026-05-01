@@ -10,7 +10,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
-import kotlinx.datetime.Clock
+import kotlin.time.Clock
 import kotlinx.serialization.json.JsonElement
 import java.util.concurrent.ConcurrentHashMap
 
@@ -27,7 +27,7 @@ data class AppNotice(
     val id: String,
     val message: String,
     val detail: String? = null,
-    val timestamp: kotlinx.datetime.Instant = Clock.System.now(),
+    val timestamp: kotlin.time.Instant = Clock.System.now(),
 )
 
 class AppStateManager(

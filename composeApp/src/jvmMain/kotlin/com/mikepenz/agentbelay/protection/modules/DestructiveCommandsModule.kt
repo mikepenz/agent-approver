@@ -61,7 +61,7 @@ object DestructiveCommandsModule : ProtectionModule {
                 val targets = sc.args.filter { it.literal?.startsWith("-") != true }
                 val allLiteral = targets.all { it.literal != null }
                 val allTmp = allLiteral && targets.isNotEmpty() &&
-                    targets.all { it.literal!!.startsWith("/tmp") || it.literal!!.startsWith("tmp/") }
+                    targets.all { it.literal?.startsWith("/tmp") == true || it.literal?.startsWith("tmp/") == true }
                 !allTmp
             } ?: return null
             return hit(id, "Recursive force delete: $cmd")

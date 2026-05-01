@@ -2,7 +2,7 @@ package com.mikepenz.agentbelay.storage
 
 import com.mikepenz.agentbelay.model.Source
 import com.mikepenz.agentbelay.model.UsageRecord
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 import java.io.File
 import kotlin.test.AfterTest
 import kotlin.test.BeforeTest

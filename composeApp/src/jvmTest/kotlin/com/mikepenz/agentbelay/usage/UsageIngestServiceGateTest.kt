@@ -9,7 +9,7 @@ import com.mikepenz.agentbelay.usage.pricing.LiteLlmSource
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.runBlocking
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 import java.io.File
 import kotlin.test.AfterTest
 import kotlin.test.BeforeTest

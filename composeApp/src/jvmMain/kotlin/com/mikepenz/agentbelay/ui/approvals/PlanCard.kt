@@ -49,7 +49,7 @@ import com.mikepenz.agentbelay.ui.components.SlimDenyButton
 import com.mikepenz.agentbelay.ui.detail.PopOutSpec
 import com.mikepenz.agentbelay.ui.icons.FeatherExternalLink
 import com.mikepenz.agentbelay.ui.theme.PreviewScaffold
-import kotlinx.datetime.Clock
+import kotlin.time.Clock
 
 class PlanReviewFormState internal constructor(
     internal val feedbackState: androidx.compose.runtime.MutableState<String>,

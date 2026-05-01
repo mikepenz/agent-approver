@@ -13,7 +13,7 @@ import com.mikepenz.agentbelay.model.RiskAnalysisBackend
 import com.mikepenz.agentbelay.model.SpecialToolParser
 import com.mikepenz.agentbelay.model.ToolType
 import kotlinx.coroutines.delay
-import kotlinx.datetime.Clock
+import kotlin.time.Clock
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 import kotlinx.serialization.json.JsonElement

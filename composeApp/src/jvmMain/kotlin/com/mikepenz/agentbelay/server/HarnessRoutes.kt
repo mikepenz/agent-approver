@@ -17,7 +17,7 @@ import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.withTimeoutOrNull
-import kotlinx.datetime.Clock
+import kotlin.time.Clock
 import kotlin.coroutines.cancellation.CancellationException
 
 /**

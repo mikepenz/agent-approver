@@ -169,7 +169,7 @@ fun CommandPaletteHost(
                 )
             }
 
-            Divider(color = MaterialTheme.colorScheme.outline, thickness = 1.dp)
+            HorizontalDivider(color = MaterialTheme.colorScheme.outline, thickness = 1.dp)
 
             // Results
             Box(modifier = Modifier.heightIn(max = 300.dp)) {
@@ -199,7 +199,7 @@ fun CommandPaletteHost(
             }
 
             // Footer
-            Divider(color = MaterialTheme.colorScheme.outline, thickness = 1.dp)
+            HorizontalDivider(color = MaterialTheme.colorScheme.outline, thickness = 1.dp)
             Row(
                 modifier = Modifier
                     .fillMaxWidth()

@@ -32,7 +32,7 @@ import com.mikepenz.agentbelay.protection.ProtectionEngine
 import com.mikepenz.agentbelay.state.PreToolUseEvent
 import com.mikepenz.agentbelay.state.ProtectionLogConclusion
 import com.mikepenz.agentbelay.ui.theme.PreviewScaffold
-import kotlinx.datetime.Clock
+import kotlin.time.Clock
 import kotlinx.serialization.json.JsonPrimitive
 import kotlin.time.Duration.Companion.minutes
 

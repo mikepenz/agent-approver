@@ -5,7 +5,7 @@ import com.mikepenz.agentbelay.model.Source
 import com.mikepenz.agentbelay.model.UsageRecord
 import com.mikepenz.agentbelay.usage.ScanCursor
 import com.mikepenz.agentbelay.usage.UsageScanner
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 import java.io.File
 import java.sql.DriverManager
 

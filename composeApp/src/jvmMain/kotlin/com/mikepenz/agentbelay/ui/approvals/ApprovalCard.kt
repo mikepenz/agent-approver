@@ -29,6 +29,7 @@ import androidx.compose.material3.PlainTooltip
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TooltipBox
+import androidx.compose.material3.TooltipAnchorPosition
 import androidx.compose.material3.TooltipDefaults
 import androidx.compose.material3.rememberTooltipState
 import androidx.compose.runtime.Composable
@@ -61,8 +62,8 @@ import com.mikepenz.agentbelay.ui.theme.sourceColor
 import com.mikepenz.agentbelay.ui.theme.sourceLabel
 import com.mikepenz.agentbelay.ui.theme.toolColor
 import kotlinx.coroutines.delay
-import kotlinx.datetime.Clock
-import kotlinx.datetime.Instant
+import kotlin.time.Clock
+import kotlin.time.Instant
 import kotlinx.serialization.json.JsonElement
 
 enum class RiskStatus { IDLE, ANALYZING, COMPLETED, ERROR }
@@ -363,7 +364,7 @@ fun RiskBadge(riskResult: RiskAnalysis?, riskStatus: RiskStatus, riskError: Stri
             }
             val tooltipState = rememberTooltipState(isPersistent = true)
             TooltipBox(
-                positionProvider = TooltipDefaults.rememberTooltipPositionProvider(),
+                positionProvider = TooltipDefaults.rememberTooltipPositionProvider(positioning = TooltipAnchorPosition.Above),
                 tooltip = {
                     PlainTooltip {
                         Text(tooltipText)

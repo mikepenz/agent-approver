@@ -70,7 +70,7 @@ class InsightAiAnalyzerTest {
         assertEquals("Trim the volatile date stamp from CLAUDE.md", result.title)
         assertTrue(result.body.contains("CLAUDE.md"))
         assertNotNull(result.action)
-        assertTrue(result.action!!.startsWith("rg "))
+        assertTrue(result.action.startsWith("rg "))
 
         // Sent prompts:
         assertNotNull(stub.lastSystemPrompt)

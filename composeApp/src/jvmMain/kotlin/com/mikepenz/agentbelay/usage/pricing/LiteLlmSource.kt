@@ -8,6 +8,7 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import java.io.File
 import java.net.HttpURLConnection
+import java.net.URI
 import java.net.URL
 
 /**
@@ -106,7 +107,7 @@ class LiteLlmSource(
         const val TTL_MILLIS = 24L * 60L * 60L * 1000L
 
         private fun defaultHttpFetch(url: String): String? {
-            val connection = (URL(url).openConnection() as HttpURLConnection).apply {
+            val connection = (URI(url).toURL().openConnection() as HttpURLConnection).apply {
                 connectTimeout = 8_000
                 readTimeout = 12_000
                 requestMethod = "GET"
