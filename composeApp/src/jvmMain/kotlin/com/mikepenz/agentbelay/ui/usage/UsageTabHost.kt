@@ -19,5 +19,7 @@ fun UsageTabHost() {
         range = state.range,
         onRangeChange = viewModel::setRange,
         loading = state.loading,
+        refreshing = state.refreshing,
+        onRefresh = viewModel::refreshNow,
     )
 }

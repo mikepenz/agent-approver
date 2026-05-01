@@ -23,9 +23,14 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.animation.core.animateFloat
+import androidx.compose.foundation.hoverable
+import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.ui.graphics.graphicsLayer
+import com.mikepenz.agentbelay.ui.components.LocalPreviewHoverOverride
+import com.mikepenz.agentbelay.ui.icons.LucideRefreshCw
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -117,13 +122,21 @@ fun UsageScreen(
     range: UsageRange = UsageRange.Last7d,
     onRangeChange: (UsageRange) -> Unit = {},
     loading: Boolean = false,
+    refreshing: Boolean = false,
+    onRefresh: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     BoxWithConstraints(modifier = modifier.fillMaxSize().background(AgentBelayColors.background)) {
         val isCompact = maxWidth < 800.dp
         val stackHeader = maxWidth < 580.dp
         Column(modifier = Modifier.fillMaxSize()) {
-            UsageHeader(range = range, onRangeChange = onRangeChange, stackPill = stackHeader)
+            UsageHeader(
+                range = range,
+                onRangeChange = onRangeChange,
+                stackPill = stackHeader,
+                refreshing = refreshing,
+                onRefresh = onRefresh,
+            )
             if (data.isEmpty && loading) {
                 ScanningState(modifier = Modifier.fillMaxWidth().weight(1f))
             } else if (data.isEmpty) {
@@ -177,6 +190,8 @@ private fun UsageHeader(
     range: UsageRange,
     onRangeChange: (UsageRange) -> Unit,
     stackPill: Boolean,
+    refreshing: Boolean = false,
+    onRefresh: () -> Unit = {},
 ) {
     Column(
         modifier = Modifier
@@ -203,17 +218,23 @@ private fun UsageHeader(
                 )
             }
         }
-        val pill: @Composable () -> Unit = {
-            PillSegmented(
-                options = UsageRange.entries.map { it to it.label },
-                selected = range,
-                onSelect = onRangeChange,
-            )
+        val controls: @Composable () -> Unit = {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                RefreshButton(refreshing = refreshing, onClick = onRefresh)
+                PillSegmented(
+                    options = UsageRange.entries.map { it to it.label },
+                    selected = range,
+                    onSelect = onRangeChange,
+                )
+            }
         }
         if (stackPill) {
             titleBlock()
             Spacer(Modifier.height(10.dp))
-            pill()
+            controls()
         } else {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
@@ -221,7 +242,7 @@ private fun UsageHeader(
                 modifier = Modifier.fillMaxWidth(),
             ) {
                 titleBlock()
-                pill()
+                controls()
             }
         }
         Spacer(Modifier.height(14.dp))
@@ -795,6 +816,67 @@ private fun Sparkline(data: List<Int>, color: Color, modifier: Modifier = Modifi
     )
 }
 
+// ── Refresh button ──────────────────────────────────────────────────────────
+
+/**
+ * Manual "force a scan now" trigger sitting next to the range pill. Spins
+ * while the ingest service is mid-pass; otherwise it's a static icon.
+ * Disabled-while-refreshing prevents back-to-back clicks from queueing
+ * passes (the service's mutex would serialize them anyway, but visually it
+ * looks broken).
+ */
+@Composable
+private fun RefreshButton(refreshing: Boolean, onClick: () -> Unit) {
+    val infinite = androidx.compose.animation.core.rememberInfiniteTransition(label = "refresh-spin")
+    val rotation by infinite.animateFloat(
+        initialValue = 0f,
+        targetValue = 360f,
+        animationSpec = androidx.compose.animation.core.infiniteRepeatable(
+            animation = androidx.compose.animation.core.tween(
+                durationMillis = 900,
+                easing = androidx.compose.animation.core.LinearEasing,
+            ),
+        ),
+        label = "refresh-rotation",
+    )
+    val interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
+    val liveHovered by interactionSource.collectIsHoveredAsState()
+    val isHovered = LocalPreviewHoverOverride.current ?: liveHovered
+
+    Box(
+        modifier = Modifier
+            .size(28.dp)
+            .clip(RoundedCornerShape(6.dp))
+            .background(if (isHovered && !refreshing) AgentBelayColors.surface2 else AgentBelayColors.background)
+            .border(
+                1.dp,
+                if (isHovered && !refreshing) AgentBelayColors.line2 else AgentBelayColors.line1,
+                RoundedCornerShape(6.dp),
+            )
+            .hoverable(interactionSource, enabled = !refreshing)
+            .clickable(
+                interactionSource = interactionSource,
+                indication = null,
+                enabled = !refreshing,
+                role = androidx.compose.ui.semantics.Role.Button,
+                onClickLabel = "Refresh usage",
+            ) { onClick() },
+        contentAlignment = Alignment.Center,
+    ) {
+        androidx.compose.material3.Icon(
+            imageVector = LucideRefreshCw,
+            contentDescription = if (refreshing) "Refreshing usage" else "Refresh usage",
+            tint = if (refreshing) AccentEmerald else AgentBelayColors.inkTertiary,
+            modifier = Modifier
+                .size(13.dp)
+                .then(
+                    if (refreshing) Modifier.graphicsLayer { rotationZ = rotation }
+                    else Modifier,
+                ),
+        )
+    }
+}
+
 // ── Experimental badge ──────────────────────────────────────────────────────
 
 /**
@@ -1064,6 +1146,21 @@ private fun PreviewUsageScreenScanning() {
             onSelectSource = {},
             range = UsageRange.Last7d,
             loading = true,
+        )
+    }
+}
+
+@Preview(widthDp = 1088, heightDp = 1100)
+@Composable
+private fun PreviewUsageScreenRefreshing() {
+    PreviewScaffold {
+        val data = remember { sampleData() }
+        UsageScreen(
+            data = data,
+            selectedSource = Source.CLAUDE_CODE,
+            onSelectSource = {},
+            range = UsageRange.Last7d,
+            refreshing = true,
         )
     }
 }

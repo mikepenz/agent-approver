@@ -81,6 +81,10 @@ class UsageIngestService(
     suspend fun refreshNow(): Int = withContext(Dispatchers.IO) { runOnePass() }
 
     private suspend fun runOnePass(): Int = mutex.withLock {
+        // No gate here on purpose: the `usageTrackingEnabled` setting only
+        // disables the auto-refresh loop. A user-triggered `refreshNow()`
+        // (e.g. the Usage tab's Refresh button) should always run, even when
+        // background scanning is off.
         var totalInserted = 0
         for (scanner in scanners) {
             val cursors = storage.loadUsageCursors(scanner.source)

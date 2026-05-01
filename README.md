@@ -33,6 +33,7 @@ Agent Belay is a **human-in-the-loop gateway** for AI coding agents like [Claude
 - **Always Allow** — Grant persistent permissions for trusted tool patterns
 - **Away Mode** — Disable timeouts for remote/async approval workflows
 - **History** — Searchable log of all past approval decisions
+- **Usage** *(experimental)* — Token usage, cost (USD), and p50/p95 latency per harness, scanned from on-disk session files
 - **System Tray** — Runs in the background with badge notifications for pending approvals
 - **Cross-Platform** — macOS, Windows, and Linux (currently only macOS pre-built packages are provided)
 
@@ -114,6 +115,26 @@ Two backends are supported:
   &nbsp;&nbsp;
   <img src="screenshots/settings_capabilities.png" alt="Session capabilities settings" width="280">
 </p>
+
+## Usage Tracking
+
+> **Experimental.** Parsers depend on per-harness session-file shapes that vary by release.
+
+The **Usage** tab surfaces token usage, cost, and performance across your local agent sessions. A background scanner reads existing on-disk session files — nothing is sent off-device.
+
+| Harness | Source |
+|---------|--------|
+| Claude Code | `~/.claude/projects/**/*.jsonl` |
+| Codex | `~/.codex/sessions/**/rollout-*.jsonl` |
+| Copilot | `~/.copilot/history/**/session-state/events.jsonl` |
+| OpenCode | `~/.opencode/data/opencode.db` (SQLite) |
+| Pi | `~/.pi/agent/sessions/**/log.jsonl` |
+
+Tracked metrics: input / output / cache-read / cache-write / reasoning tokens, request count, and p50/p95 latency. Cost is computed from a bundled [LiteLLM](https://github.com/BerriAI/litellm) pricing snapshot (`composeApp/src/jvmMain/resources/usage/litellm-snapshot.json`) refreshed from the network every 24h with disk fallback — the only outbound network call this feature makes.
+
+The tab shows KPI cards (total cost, tokens in/out, requests), a stacked cost-distribution bar by harness, a per-harness performance table, and a detail panel with token breakdowns, latency, and an activity sparkline. Range selector: 24h / 7d / 30d / All.
+
+Disable via the `usageTrackingEnabled` setting (default on).
 
 ## Tech Stack
 

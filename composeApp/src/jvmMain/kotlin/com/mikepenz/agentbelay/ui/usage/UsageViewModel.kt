@@ -42,6 +42,13 @@ data class UsageUiState(
      * in-flight refresh can still flip it true momentarily.
      */
     val loading: Boolean = true,
+    /**
+     * True only while a manual refresh kicked off via [UsageViewModel.refreshNow]
+     * is in flight. Drives the spinning state on the refresh button. Distinct
+     * from [loading] (which gates the full-screen "scanning…" state) so the
+     * page keeps showing existing data while the spinner overlays the icon.
+     */
+    val refreshing: Boolean = false,
 )
 
 @Inject
@@ -80,11 +87,17 @@ class UsageViewModel(
         _uiState.value = _uiState.value.copy(selectedSource = source)
     }
 
-    /** Manually kicks the scanner — wired to a future Refresh button. */
+    /** Manually triggers a scan pass; wired to the Refresh button in the header. */
     fun refreshNow() {
+        if (_uiState.value.refreshing) return
         viewModelScope.launch {
-            runCatching { ingestService.refreshNow() }
-            refresh()
+            _uiState.value = _uiState.value.copy(refreshing = true)
+            try {
+                runCatching { ingestService.refreshNow() }
+                refresh()
+            } finally {
+                _uiState.value = _uiState.value.copy(refreshing = false)
+            }
         }
     }
 
