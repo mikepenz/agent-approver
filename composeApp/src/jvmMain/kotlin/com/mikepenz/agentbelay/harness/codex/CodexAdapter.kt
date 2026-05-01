@@ -18,7 +18,7 @@ import java.util.UUID
 
 /**
  * Codex CLI envelope. The OpenAI Codex `hooks` crate was deliberately
- * Claude-Code-shaped: event names match (`PreToolUse`, `PermissionRequest`),
+ * Claude-Code-shaped on input: event names match (`PreToolUse`, `PermissionRequest`),
  * matcher group config matches, and `apply_patch` aliases `Write`/`Edit`
  * "for compatibility with hook configurations that describe edits using
  * Claude Code-style names" (codex-rs/core/src/tools/hook_names.rs).
@@ -115,12 +115,7 @@ class CodexAdapter : HarnessAdapter {
         })
     }.toString())
 
-    override fun buildPreToolUseAllowResponse(): HarnessResponse = HarnessResponse(buildJsonObject {
-        put("hookSpecificOutput", buildJsonObject {
-            put("hookEventName", "PreToolUse")
-            put("permissionDecision", "allow")
-        })
-    }.toString())
+    override fun buildPreToolUseAllowResponse(): HarnessResponse = HarnessResponse("{}")
 
     override fun buildPreToolUseDenyResponse(reason: String): HarnessResponse = HarnessResponse(buildJsonObject {
         put("hookSpecificOutput", buildJsonObject {

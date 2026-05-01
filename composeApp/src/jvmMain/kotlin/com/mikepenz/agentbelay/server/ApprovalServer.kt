@@ -4,6 +4,7 @@ import co.touchlab.kermit.Logger
 import com.mikepenz.agentbelay.capability.CapabilityEngine
 import com.mikepenz.agentbelay.harness.Harness
 import com.mikepenz.agentbelay.harness.HarnessRouteDeps
+import com.mikepenz.agentbelay.harness.HookEvent
 import com.mikepenz.agentbelay.harness.claudecode.ClaudeCodeAdapter
 import com.mikepenz.agentbelay.harness.claudecode.ClaudeCodeHarness
 import com.mikepenz.agentbelay.harness.codex.CodexHarness
@@ -49,6 +50,7 @@ class ApprovalServer(
 
     private val claudeCode = harnesses.first { it is ClaudeCodeHarness }
     private val claudeAdapter = claudeCode.adapter as ClaudeCodeAdapter
+    private val codex = harnesses.first { it is CodexHarness }
 
     private var server: EmbeddedServer<NettyApplicationEngine, NettyApplicationEngine.Configuration>? = null
 
@@ -110,6 +112,15 @@ class ApprovalServer(
                         redactionEngine = redactionEngine,
                         supportsOutputRedaction = claudeCode.capabilities.supportsOutputRedaction,
                     )
+                    codex.transport.endpoints()[HookEvent.POST_TOOL_USE]?.let { path ->
+                        postToolUseRoute(
+                            stateManager = stateManager,
+                            adapter = codex.adapter,
+                            redactionEngine = redactionEngine,
+                            supportsOutputRedaction = codex.capabilities.supportsOutputRedaction,
+                            path = path,
+                        )
+                    }
                     capabilityRoute(capabilityEngine)
                 }
             },

@@ -4,18 +4,19 @@ import com.mikepenz.agentbelay.harness.HarnessTransport
 import com.mikepenz.agentbelay.harness.HookEvent
 
 /**
- * Codex's hooks crate POSTs to HTTP endpoints (`type = "http"` in the
- * TOML config). Routes are namespaced with a `-codex` suffix to coexist
- * with the other harnesses on the same Ktor server.
+ * Codex runs command hooks, so [com.mikepenz.agentbelay.hook.CodexBridgeInstaller]
+ * installs small shell bridge scripts that POST stdin JSON to these routes.
+ * Routes are namespaced with a `-codex` suffix to coexist with the other
+ * harnesses on the same Ktor server.
  *
- * `POST_TOOL_USE` is intentionally absent: PostToolUse output redaction
- * for Codex is gated on a future PR that generalises [PostToolUseRoute]
- * (currently Claude-only). The capability flag on [CodexHarness] mirrors
- * this — supportsOutputRedaction stays false until then.
+ * PostToolUse is mounted for correlation cleanup/observability, but
+ * supportsOutputRedaction stays false until Codex output mutation is wired
+ * through.
  */
 class CodexTransport : HarnessTransport {
     override fun endpoints(): Map<HookEvent, String> = mapOf(
         HookEvent.PERMISSION_REQUEST to "/approve-codex",
         HookEvent.PRE_TOOL_USE to "/pre-tool-use-codex",
+        HookEvent.POST_TOOL_USE to "/post-tool-use-codex",
     )
 }

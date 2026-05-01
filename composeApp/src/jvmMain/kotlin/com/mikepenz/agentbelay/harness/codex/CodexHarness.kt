@@ -16,9 +16,9 @@ import com.mikepenz.agentbelay.model.Source
  * via a managed-block read-modify-write) and the route namespace.
  *
  * Shipped as **experimental** — see Settings → Integrations. The
- * adapter is unverified against a live Codex install and PostToolUse
- * output redaction is gated on a follow-up PR that generalises the
- * Claude-only `PostToolUseRoute`.
+ * adapter is unverified against a live Codex install. PostToolUse events
+ * are received for cleanup/observability, but output redaction stays off
+ * until Codex output mutation is wired through.
  */
 class CodexHarness(
     override val adapter: HarnessAdapter = CodexAdapter(),
@@ -33,7 +33,7 @@ class CodexHarness(
         // Codex doesn't surface a write-through "always-allow" persistence
         // primitive in its hooks crate today.
         supportsAlwaysAllowWriteThrough = false,
-        // PostToolUse redaction is gated on generalising PostToolUseRoute.
+        // PostToolUse is mounted, but redaction output mutation is not.
         // Flip to true once the Codex output schema is wired through.
         supportsOutputRedaction = false,
         // No `defer` analogue.

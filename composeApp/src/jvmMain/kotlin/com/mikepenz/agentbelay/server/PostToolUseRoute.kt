@@ -43,8 +43,9 @@ fun Route.postToolUseRoute(
     adapter: HarnessAdapter,
     redactionEngine: RedactionEngine,
     supportsOutputRedaction: Boolean,
+    path: String = "/post-tool-use",
 ) {
-    post("/post-tool-use") {
+    post(path) {
         val rawBody = call.receiveText()
         var redactedResponse: HarnessResponse? = null
 

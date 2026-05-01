@@ -1,6 +1,7 @@
 package com.mikepenz.agentbelay.ui
 
 import com.mikepenz.agentbelay.di.AppEnvironment
+import com.mikepenz.agentbelay.hook.CodexBridge
 import com.mikepenz.agentbelay.hook.CopilotBridge
 import com.mikepenz.agentbelay.hook.HookRegistry
 import com.mikepenz.agentbelay.hook.OpenCodeBridge
@@ -85,6 +86,12 @@ class AppViewModelTest {
         override fun unregister(port: Int) {}
     }
 
+    private class FakeCodexBridge(private val registered: Boolean = false) : CodexBridge {
+        override fun isRegistered(port: Int): Boolean = registered
+        override fun register(port: Int) {}
+        override fun unregister(port: Int) {}
+    }
+
     private fun fakeUpdateManager() = UpdateManager(scope = CoroutineScope(SupervisorJob()))
 
     private fun newRequest(id: String = "r-1") = ApprovalRequest(
@@ -106,6 +113,7 @@ class AppViewModelTest {
             FakeCopilotBridge,
             FakeOpenCodeBridge,
             FakePiBridge,
+            FakeCodexBridge(),
             RegistrationEvents(),
             fakeUpdateManager(),
         )
@@ -136,6 +144,7 @@ class AppViewModelTest {
             FakeCopilotBridge,
             FakeOpenCodeBridge,
             FakePiBridge,
+            FakeCodexBridge(),
             RegistrationEvents(),
             fakeUpdateManager(),
         )
@@ -155,6 +164,7 @@ class AppViewModelTest {
             FakeCopilotBridge,
             FakeOpenCodeBridge,
             FakePiBridge,
+            FakeCodexBridge(),
             RegistrationEvents(),
             fakeUpdateManager(),
         )
@@ -176,5 +186,24 @@ class AppViewModelTest {
         assertEquals(AppTab.Statistics, resolveTab(2, devMode = true))
         assertEquals(AppTab.ProtectionLog, resolveTab(3, devMode = true))
         assertEquals(AppTab.Settings, resolveTab(4, devMode = true))
+    }
+
+    @Test
+    fun `tabState includes Codex registration for sidebar`() = runTest {
+        val vm = AppViewModel(
+            AppStateManager(),
+            env(),
+            FakeHookRegistry,
+            FakeCopilotBridge,
+            FakeOpenCodeBridge,
+            FakePiBridge,
+            FakeCodexBridge(registered = true),
+            RegistrationEvents(),
+            fakeUpdateManager(),
+        )
+        runCurrent()
+
+        val codex = vm.tabState.value.agentRegistrations.single { it.name == "Codex" }
+        assertTrue(codex.registered)
     }
 }
