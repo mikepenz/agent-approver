@@ -52,6 +52,7 @@ fun CommandPaletteHost(
             CommandItem("Go to Approvals", LucideInbox, "Jump to pending tool requests") { onNavigate(AppTab.Approvals) },
             CommandItem("Go to History", LucideHistory, "View past tool decisions") { onNavigate(AppTab.History) },
             CommandItem("Go to Stats", LucideChart, "View usage statistics") { onNavigate(AppTab.Statistics) },
+            CommandItem("Go to Usage", LucideZap, "Token usage, cost & performance") { onNavigate(AppTab.Usage) },
             CommandItem("Go to Settings", LucideGear, "Configure app and integrations") { onNavigate(AppTab.Settings) },
             CommandItem("Show Licenses", LucideShield, "View open source licenses") { onShowLicenses() },
         ).filter { it.label.contains(searchQuery, ignoreCase = true) }

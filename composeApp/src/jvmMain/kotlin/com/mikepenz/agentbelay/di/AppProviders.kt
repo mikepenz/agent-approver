@@ -158,6 +158,27 @@ interface AppProviders {
 
     @Provides
     @SingleIn(AppScope::class)
+    fun provideUsageIngestService(
+        env: AppEnvironment,
+        databaseStorage: DatabaseStorage,
+        stateManager: AppStateManager,
+    ): com.mikepenz.agentbelay.usage.UsageIngestService =
+        com.mikepenz.agentbelay.usage.UsageIngestService(
+            scope = env.appScope,
+            scanners = listOf(
+                com.mikepenz.agentbelay.usage.scanner.ClaudeCodeUsageScanner(),
+                com.mikepenz.agentbelay.usage.scanner.CodexUsageScanner(),
+                com.mikepenz.agentbelay.usage.scanner.CopilotUsageScanner(),
+                com.mikepenz.agentbelay.usage.scanner.OpenCodeUsageScanner(),
+                com.mikepenz.agentbelay.usage.scanner.PiUsageScanner(),
+            ),
+            storage = databaseStorage,
+            stateManager = stateManager,
+            pricingSource = com.mikepenz.agentbelay.usage.pricing.LiteLlmSource(env.dataDir),
+        )
+
+    @Provides
+    @SingleIn(AppScope::class)
     fun provideClaudeAnalyzer(stateManager: AppStateManager): ClaudeCliRiskAnalyzer {
         val settings = stateManager.state.value.settings
         return ClaudeCliRiskAnalyzer(

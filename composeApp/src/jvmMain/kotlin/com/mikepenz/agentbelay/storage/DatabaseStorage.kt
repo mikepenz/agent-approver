@@ -101,6 +101,40 @@ open class DatabaseStorage(
             stmt.executeUpdate("CREATE INDEX IF NOT EXISTS idx_history_decided_at ON history(decided_at)")
             stmt.executeUpdate("CREATE INDEX IF NOT EXISTS idx_history_type ON history(type)")
             stmt.executeUpdate("CREATE INDEX IF NOT EXISTS idx_history_session_id ON history(session_id)")
+            stmt.executeUpdate(
+                """
+                CREATE TABLE IF NOT EXISTS usage_records (
+                    id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+                    harness             TEXT NOT NULL,
+                    session_id          TEXT NOT NULL,
+                    ts_millis           INTEGER NOT NULL,
+                    model               TEXT,
+                    input_tokens        INTEGER NOT NULL DEFAULT 0,
+                    output_tokens       INTEGER NOT NULL DEFAULT 0,
+                    cache_read_tokens   INTEGER NOT NULL DEFAULT 0,
+                    cache_write_tokens  INTEGER NOT NULL DEFAULT 0,
+                    reasoning_tokens    INTEGER NOT NULL DEFAULT 0,
+                    cost_usd            REAL,
+                    duration_ms         INTEGER,
+                    source_file         TEXT NOT NULL,
+                    source_offset       INTEGER NOT NULL,
+                    dedup_key           TEXT NOT NULL UNIQUE
+                )
+                """.trimIndent()
+            )
+            stmt.executeUpdate("CREATE INDEX IF NOT EXISTS idx_usage_ts ON usage_records(ts_millis)")
+            stmt.executeUpdate("CREATE INDEX IF NOT EXISTS idx_usage_harness_ts ON usage_records(harness, ts_millis)")
+            stmt.executeUpdate(
+                """
+                CREATE TABLE IF NOT EXISTS usage_scan_cursor (
+                    harness         TEXT NOT NULL,
+                    source_file     TEXT NOT NULL,
+                    last_offset     INTEGER NOT NULL,
+                    last_mtime_ms   INTEGER NOT NULL,
+                    PRIMARY KEY (harness, source_file)
+                )
+                """.trimIndent()
+            )
         }
         // Migrate older databases that pre-date the tool_input_json column.
         if (!hasColumn("history", "tool_input_json")) {
@@ -518,6 +552,210 @@ open class DatabaseStorage(
         if (isEmpty()) return 0.0
         val rank = kotlin.math.ceil(p * size).toInt().coerceIn(1, size)
         return this[rank - 1]
+    }
+
+    // ── Usage records ──────────────────────────────────────────────────────
+    //
+    // Stored alongside `history` but in a separate table so the existing
+    // approval-history schema is untouched. Inserts use `INSERT OR IGNORE` on
+    // `dedup_key` so re-scanning the same source file is idempotent.
+
+    /**
+     * Bulk-inserts [records], skipping any whose `dedupKey` already exists.
+     * Returns the number of newly-inserted rows.
+     */
+    fun insertUsageRecords(records: List<com.mikepenz.agentbelay.model.UsageRecord>): Int =
+        synchronized(connectionLock) {
+            if (records.isEmpty()) return 0
+            val sql = """
+                INSERT OR IGNORE INTO usage_records (
+                    harness, session_id, ts_millis, model,
+                    input_tokens, output_tokens, cache_read_tokens, cache_write_tokens, reasoning_tokens,
+                    cost_usd, duration_ms, source_file, source_offset, dedup_key
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """.trimIndent()
+            var inserted = 0
+            connection.prepareStatement(sql).use { ps ->
+                for (rec in records) {
+                    ps.setString(1, rec.harness.name)
+                    ps.setString(2, rec.sessionId)
+                    ps.setLong(3, rec.timestamp.toEpochMilliseconds())
+                    if (rec.model == null) ps.setNull(4, java.sql.Types.VARCHAR) else ps.setString(4, rec.model)
+                    ps.setLong(5, rec.inputTokens)
+                    ps.setLong(6, rec.outputTokens)
+                    ps.setLong(7, rec.cacheReadTokens)
+                    ps.setLong(8, rec.cacheWriteTokens)
+                    ps.setLong(9, rec.reasoningTokens)
+                    if (rec.costUsd == null) ps.setNull(10, java.sql.Types.REAL) else ps.setDouble(10, rec.costUsd)
+                    if (rec.durationMs == null) ps.setNull(11, java.sql.Types.INTEGER) else ps.setLong(11, rec.durationMs)
+                    ps.setString(12, rec.sourceFile)
+                    ps.setLong(13, rec.sourceOffset)
+                    ps.setString(14, rec.dedupKey)
+                    ps.addBatch()
+                }
+                inserted = ps.executeBatch().count { it >= 0 || it == java.sql.Statement.SUCCESS_NO_INFO }
+            }
+            inserted
+        }
+
+    fun loadUsageCursors(harness: com.mikepenz.agentbelay.model.Source): Map<String, com.mikepenz.agentbelay.usage.ScanCursor> =
+        synchronized(connectionLock) {
+            val out = mutableMapOf<String, com.mikepenz.agentbelay.usage.ScanCursor>()
+            connection.prepareStatement(
+                "SELECT source_file, last_offset, last_mtime_ms FROM usage_scan_cursor WHERE harness = ?"
+            ).use { ps ->
+                ps.setString(1, harness.name)
+                ps.executeQuery().use { rs ->
+                    while (rs.next()) {
+                        val file = rs.getString("source_file")
+                        out[file] = com.mikepenz.agentbelay.usage.ScanCursor(
+                            sourceFile = file,
+                            lastOffset = rs.getLong("last_offset"),
+                            lastMtimeMillis = rs.getLong("last_mtime_ms"),
+                        )
+                    }
+                }
+            }
+            out
+        }
+
+    fun upsertUsageCursor(
+        harness: com.mikepenz.agentbelay.model.Source,
+        cursor: com.mikepenz.agentbelay.usage.ScanCursor,
+    ): Unit = synchronized(connectionLock) {
+        connection.prepareStatement(
+            """
+            INSERT INTO usage_scan_cursor (harness, source_file, last_offset, last_mtime_ms)
+            VALUES (?, ?, ?, ?)
+            ON CONFLICT(harness, source_file) DO UPDATE SET
+                last_offset = excluded.last_offset,
+                last_mtime_ms = excluded.last_mtime_ms
+            """.trimIndent()
+        ).use { ps ->
+            ps.setString(1, harness.name)
+            ps.setString(2, cursor.sourceFile)
+            ps.setLong(3, cursor.lastOffset)
+            ps.setLong(4, cursor.lastMtimeMillis)
+            ps.executeUpdate()
+        }
+    }
+
+    /**
+     * Aggregate token / cost / request totals per harness within an optional
+     * time window. Time bounds are epoch-millis; pass `null` for unbounded.
+     */
+    fun queryUsageTotals(
+        sinceMillis: Long? = null,
+        untilMillis: Long? = null,
+    ): List<UsageHarnessTotals> = synchronized(connectionLock) {
+        val conditions = buildList {
+            if (sinceMillis != null) add("ts_millis >= ?")
+            if (untilMillis != null) add("ts_millis < ?")
+        }
+        val where = if (conditions.isEmpty()) "" else "WHERE ${conditions.joinToString(" AND ")}"
+        val sql = """
+            SELECT
+                harness,
+                COUNT(*)                 AS requests,
+                COUNT(DISTINCT session_id) AS sessions,
+                COALESCE(SUM(input_tokens), 0)        AS input_tokens,
+                COALESCE(SUM(output_tokens), 0)       AS output_tokens,
+                COALESCE(SUM(cache_read_tokens), 0)   AS cache_read_tokens,
+                COALESCE(SUM(cache_write_tokens), 0)  AS cache_write_tokens,
+                COALESCE(SUM(reasoning_tokens), 0)    AS reasoning_tokens,
+                COALESCE(SUM(cost_usd), 0)            AS cost_usd
+            FROM usage_records
+            $where
+            GROUP BY harness
+        """.trimIndent()
+        val out = mutableListOf<UsageHarnessTotals>()
+        connection.prepareStatement(sql).use { ps ->
+            var idx = 1
+            if (sinceMillis != null) ps.setLong(idx++, sinceMillis)
+            if (untilMillis != null) ps.setLong(idx++, untilMillis)
+            ps.executeQuery().use { rs ->
+                while (rs.next()) {
+                    val harnessStr = rs.getString("harness") ?: continue
+                    val source = runCatching {
+                        com.mikepenz.agentbelay.model.Source.valueOf(harnessStr)
+                    }.getOrNull() ?: continue
+                    out.add(
+                        UsageHarnessTotals(
+                            harness = source,
+                            requests = rs.getInt("requests"),
+                            sessions = rs.getInt("sessions"),
+                            inputTokens = rs.getLong("input_tokens"),
+                            outputTokens = rs.getLong("output_tokens"),
+                            cacheReadTokens = rs.getLong("cache_read_tokens"),
+                            cacheWriteTokens = rs.getLong("cache_write_tokens"),
+                            reasoningTokens = rs.getLong("reasoning_tokens"),
+                            costUsd = rs.getDouble("cost_usd"),
+                        )
+                    )
+                }
+            }
+        }
+        out
+    }
+
+    /**
+     * Per-day request volume per harness within the window, used to render the
+     * Activity sparkline on the Usage detail panel. Returned as
+     * `harness -> ordered (epochDayUtc, requests)`.
+     */
+    fun queryUsagePerDay(
+        sinceMillis: Long? = null,
+        untilMillis: Long? = null,
+    ): Map<com.mikepenz.agentbelay.model.Source, List<UsageDailyCount>> = synchronized(connectionLock) {
+        val conditions = buildList {
+            if (sinceMillis != null) add("ts_millis >= ?")
+            if (untilMillis != null) add("ts_millis < ?")
+        }
+        val where = if (conditions.isEmpty()) "" else "WHERE ${conditions.joinToString(" AND ")}"
+        val sql = """
+            SELECT
+                harness,
+                CAST(ts_millis / 86400000 AS INTEGER) AS day,
+                COUNT(*) AS requests
+            FROM usage_records
+            $where
+            GROUP BY harness, day
+            ORDER BY harness, day
+        """.trimIndent()
+        val out = mutableMapOf<com.mikepenz.agentbelay.model.Source, MutableList<UsageDailyCount>>()
+        connection.prepareStatement(sql).use { ps ->
+            var idx = 1
+            if (sinceMillis != null) ps.setLong(idx++, sinceMillis)
+            if (untilMillis != null) ps.setLong(idx++, untilMillis)
+            ps.executeQuery().use { rs ->
+                while (rs.next()) {
+                    val harnessStr = rs.getString("harness") ?: continue
+                    val source = runCatching {
+                        com.mikepenz.agentbelay.model.Source.valueOf(harnessStr)
+                    }.getOrNull() ?: continue
+                    out.getOrPut(source) { mutableListOf() }.add(
+                        UsageDailyCount(rs.getLong("day"), rs.getInt("requests"))
+                    )
+                }
+            }
+        }
+        out
+    }
+
+    fun clearUsage(): Unit = synchronized(connectionLock) {
+        connection.createStatement().use { stmt ->
+            stmt.executeUpdate("DELETE FROM usage_records")
+            stmt.executeUpdate("DELETE FROM usage_scan_cursor")
+        }
+    }
+
+    fun usageRecordCount(): Int = synchronized(connectionLock) {
+        connection.createStatement().use { stmt ->
+            stmt.executeQuery("SELECT COUNT(*) FROM usage_records").use { rs ->
+                rs.next()
+                rs.getInt(1)
+            }
+        }
     }
 
     fun close(): Unit = synchronized(connectionLock) {

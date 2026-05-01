@@ -54,6 +54,7 @@ interface AppGraph : ViewModelGraph {
     val approvalServerRunner: ApprovalServerRunner
     val updateManager: UpdateManager
     val autoUpdateChecker: AutoUpdateChecker
+    val usageIngestService: com.mikepenz.agentbelay.usage.UsageIngestService
 
     @DependencyGraph.Factory
     fun interface Factory {
