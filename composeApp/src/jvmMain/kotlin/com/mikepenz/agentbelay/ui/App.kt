@@ -109,6 +109,7 @@ fun App(
                                 AppTab.Approvals -> ApprovalsTabHost(onPopOut = onPopOut)
                                 AppTab.History -> HistoryTabHost(onJumpToApprovals = { appViewModel.selectTab(0) })
                                 AppTab.Statistics -> StatisticsTabHost()
+                                AppTab.Usage -> com.mikepenz.agentbelay.ui.usage.UsageTabHost()
                                 AppTab.ProtectionLog -> ProtectionLogTabHost()
                                 AppTab.Settings -> SettingsTabHost(onShowLicenses = onShowLicenses)
                             }
@@ -140,6 +141,7 @@ private fun TabLabel(tab: AppTab, tabState: TabState) {
         AppTab.Approvals -> LabelWithOptionalBadge("Approvals", tabState.pendingCount)
         AppTab.History -> SingleLineTabText("History")
         AppTab.Statistics -> SingleLineTabText("Stats")
+        AppTab.Usage -> SingleLineTabText("Usage")
         AppTab.ProtectionLog -> LabelWithOptionalBadge("Protection", tabState.protectionLogCount)
         AppTab.Settings -> SingleLineTabText("Settings")
     }

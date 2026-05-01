@@ -100,6 +100,11 @@ fun main(args: Array<String>) {
     // Production builds never enter this branch.
     if (devMode) graph.updateManager.simulateAvailable("dev-${System.currentTimeMillis() / 1000}")
 
+    // Start the Usage tab's session-file scanner. It honours the
+    // `usageTrackingEnabled` setting per-pass, so the loop stays running but
+    // becomes a no-op when the user disables tracking.
+    graph.usageIngestService.start()
+
     application {
         AgentBelayShell(graph = graph, devMode = devMode, exitApplication = ::exitApplication)
     }

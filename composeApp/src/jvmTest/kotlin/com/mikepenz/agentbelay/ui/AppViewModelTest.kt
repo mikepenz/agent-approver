@@ -164,17 +164,19 @@ class AppViewModelTest {
 
     @Test
     fun `resolveTab maps indexes correctly in dev and non-dev`() {
-        // Non-dev: Approvals, History, Statistics, Settings
+        // Non-dev: Approvals, History, Statistics, Usage, Settings
         assertEquals(AppTab.Approvals, resolveTab(0, devMode = false))
         assertEquals(AppTab.History, resolveTab(1, devMode = false))
         assertEquals(AppTab.Statistics, resolveTab(2, devMode = false))
-        assertEquals(AppTab.Settings, resolveTab(3, devMode = false))
+        assertEquals(AppTab.Usage, resolveTab(3, devMode = false))
+        assertEquals(AppTab.Settings, resolveTab(4, devMode = false))
 
-        // Dev: Approvals, History, Statistics, ProtectionLog, Settings
+        // Dev: Approvals, History, Statistics, Usage, ProtectionLog, Settings
         assertEquals(AppTab.Approvals, resolveTab(0, devMode = true))
         assertEquals(AppTab.History, resolveTab(1, devMode = true))
         assertEquals(AppTab.Statistics, resolveTab(2, devMode = true))
-        assertEquals(AppTab.ProtectionLog, resolveTab(3, devMode = true))
-        assertEquals(AppTab.Settings, resolveTab(4, devMode = true))
+        assertEquals(AppTab.Usage, resolveTab(3, devMode = true))
+        assertEquals(AppTab.ProtectionLog, resolveTab(4, devMode = true))
+        assertEquals(AppTab.Settings, resolveTab(5, devMode = true))
     }
 }

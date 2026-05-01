@@ -97,4 +97,11 @@ data class AppSettings(
      * UpToDate, or Failed). Default 0 means "never checked".
      */
     val lastUpdateCheckEpochMillis: Long = 0L,
+    /**
+     * When true, the Usage tab's background scanner ingests harness session
+     * files to compute token / cost / performance metrics. Disabling stops
+     * the scanner entirely and skips all on-disk reads of harness files.
+     * Default on — the feature is opt-out, not opt-in.
+     */
+    val usageTrackingEnabled: Boolean = true,
 )

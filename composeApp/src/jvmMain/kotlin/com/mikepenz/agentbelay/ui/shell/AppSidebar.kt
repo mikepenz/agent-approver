@@ -55,6 +55,7 @@ import com.mikepenz.agentbelay.ui.icons.LucideHistory
 import com.mikepenz.agentbelay.ui.icons.LucideInbox
 import com.mikepenz.agentbelay.ui.icons.LucideSearch
 import com.mikepenz.agentbelay.ui.icons.LucideShield
+import com.mikepenz.agentbelay.ui.icons.LucideZap
 import com.mikepenz.agentbelay.ui.theme.AccentEmerald
 import com.mikepenz.agentbelay.ui.theme.AgentBelayColors
 import com.mikepenz.agentbelay.ui.theme.AgentBelayTheme
@@ -82,7 +83,8 @@ fun AppSidebar(
         NavItem(AppTab.Approvals, "Approvals", LucideInbox, "1", badge = pendingCount),
         NavItem(AppTab.History, "History", LucideHistory, "2"),
         NavItem(AppTab.Statistics, "Stats", LucideChart, "3"),
-        NavItem(AppTab.Settings, "Settings", LucideGear, "4"),
+        NavItem(AppTab.Usage, "Usage", LucideZap, "4"),
+        NavItem(AppTab.Settings, "Settings", LucideGear, "5"),
     )
 
     val sidebarWidth by animateDpAsState(

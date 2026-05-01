@@ -1,0 +1,68 @@
+{
+  "_metadata": {
+    "source": "https://raw.githubusercontent.com/BerriAI/litellm/main/model_prices_and_context_window.json",
+    "fetched_at": "2026-04-01T00:00:00Z",
+    "note": "Trimmed snapshot: only models the agent-belay scanners can encounter. Costs are USD per token."
+  },
+  "claude-sonnet-4-5": {
+    "input_cost_per_token": 3.0e-6,
+    "output_cost_per_token": 1.5e-5,
+    "cache_creation_input_token_cost": 3.75e-6,
+    "cache_read_input_token_cost": 3.0e-7
+  },
+  "claude-sonnet-4-6": {
+    "input_cost_per_token": 3.0e-6,
+    "output_cost_per_token": 1.5e-5,
+    "cache_creation_input_token_cost": 3.75e-6,
+    "cache_read_input_token_cost": 3.0e-7
+  },
+  "claude-opus-4-5": {
+    "input_cost_per_token": 5.0e-6,
+    "output_cost_per_token": 2.5e-5,
+    "cache_creation_input_token_cost": 6.25e-6,
+    "cache_read_input_token_cost": 5.0e-7
+  },
+  "claude-opus-4-6": {
+    "input_cost_per_token": 5.0e-6,
+    "output_cost_per_token": 2.5e-5,
+    "cache_creation_input_token_cost": 6.25e-6,
+    "cache_read_input_token_cost": 5.0e-7
+  },
+  "claude-opus-4-7": {
+    "input_cost_per_token": 5.0e-6,
+    "output_cost_per_token": 2.5e-5,
+    "cache_creation_input_token_cost": 6.25e-6,
+    "cache_read_input_token_cost": 5.0e-7
+  },
+  "claude-haiku-4-5": {
+    "input_cost_per_token": 1.0e-6,
+    "output_cost_per_token": 5.0e-6,
+    "cache_creation_input_token_cost": 1.25e-6,
+    "cache_read_input_token_cost": 1.0e-7
+  },
+  "gpt-5": {
+    "input_cost_per_token": 1.25e-6,
+    "output_cost_per_token": 1.0e-5,
+    "cache_read_input_token_cost": 1.25e-7
+  },
+  "gpt-5-codex": {
+    "input_cost_per_token": 1.25e-6,
+    "output_cost_per_token": 1.0e-5,
+    "cache_read_input_token_cost": 1.25e-7
+  },
+  "gpt-4.1": {
+    "input_cost_per_token": 2.0e-6,
+    "output_cost_per_token": 8.0e-6,
+    "cache_read_input_token_cost": 5.0e-7
+  },
+  "gpt-4.1-mini": {
+    "input_cost_per_token": 4.0e-7,
+    "output_cost_per_token": 1.6e-6,
+    "cache_read_input_token_cost": 1.0e-7
+  },
+  "o4-mini": {
+    "input_cost_per_token": 1.1e-6,
+    "output_cost_per_token": 4.4e-6,
+    "cache_read_input_token_cost": 2.75e-7
+  }
+}
