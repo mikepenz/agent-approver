@@ -56,7 +56,6 @@ import com.mikepenz.agentbelay.ui.components.HorizontalHairline
 import kotlinx.serialization.json.JsonElement
 import com.mikepenz.agentbelay.ui.components.LocalPreviewHoverOverride
 import com.mikepenz.agentbelay.ui.components.PillSegmented
-import com.mikepenz.agentbelay.ui.components.PillSegmentedSize
 import com.mikepenz.agentbelay.ui.components.RedactionPill
 import com.mikepenz.agentbelay.ui.components.RiskPill
 import com.mikepenz.agentbelay.ui.components.SourceTag
@@ -478,7 +477,8 @@ private fun HistoryHeader(
         HorizontalHairline()
         // Sort + harness filter row — applies to both compact and wide
         // layouts so the new multi-select replaces the old All/Claude/Copilot
-        // chip strip everywhere.
+        // chip strip everywhere. Both controls forced to 34.dp so the pill
+        // and the dropdown share the same baseline.
         Spacer(Modifier.height(12.dp))
         androidx.compose.foundation.layout.FlowRow(
             modifier = Modifier.fillMaxWidth(),
@@ -489,7 +489,7 @@ private fun HistoryHeader(
                 options = HistorySort.entries.map { it to it.label },
                 selected = sort,
                 onSelect = onSortChange,
-                size = PillSegmentedSize.SM,
+                modifier = Modifier.height(34.dp),
             )
             com.mikepenz.agentbelay.ui.components.MultiSelectDropdown(
                 options = availableHarnesses.map { it to historySourceLabel(it) },
@@ -499,6 +499,8 @@ private fun HistoryHeader(
                 leadingDot = ::historySourceColor,
             )
         }
+        // Breathing room between the filter row and the table headers below.
+        Spacer(Modifier.height(14.dp))
     }
 }
 
