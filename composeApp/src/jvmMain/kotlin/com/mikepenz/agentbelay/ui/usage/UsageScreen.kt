@@ -993,22 +993,6 @@ internal fun fmtTok(n: Long): String = when {
 internal fun fmtCost(n: Double): String = "$" + "%.2f".format(n)
 internal fun fmtSec(n: Double): String = "${"%.1f".format(n)}s"
 
-internal fun colorForSource(source: Source): Color = when (source) {
-    Source.CLAUDE_CODE -> SourceClaudeColor
-    Source.COPILOT -> SourceCopilotColor
-    Source.OPENCODE -> InfoBlue
-    Source.PI -> VioletPurple
-    Source.CODEX -> WarnYellow
-}
-
-internal fun displayNameForSource(source: Source): String = when (source) {
-    Source.CLAUDE_CODE -> "Claude Code"
-    Source.COPILOT -> "GitHub Copilot"
-    Source.OPENCODE -> "OpenCode"
-    Source.PI -> "Pi"
-    Source.CODEX -> "Codex"
-}
-
 // ── Previews ────────────────────────────────────────────────────────────────
 
 private fun sampleData(): UsageScreenData {

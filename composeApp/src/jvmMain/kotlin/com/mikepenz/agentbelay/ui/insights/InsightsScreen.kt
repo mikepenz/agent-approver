@@ -51,13 +51,12 @@ import com.mikepenz.agentbelay.model.Source
 import com.mikepenz.agentbelay.storage.SessionSummary
 import com.mikepenz.agentbelay.ui.components.AgentBelayCard
 import com.mikepenz.agentbelay.ui.components.HorizontalHairline
+import com.mikepenz.agentbelay.ui.components.sourceAccentColor
+import com.mikepenz.agentbelay.ui.components.sourceDisplayName
 import com.mikepenz.agentbelay.ui.theme.AccentEmerald
 import com.mikepenz.agentbelay.ui.theme.AgentBelayColors
 import com.mikepenz.agentbelay.ui.theme.DangerRed
 import com.mikepenz.agentbelay.ui.theme.PreviewScaffold
-import com.mikepenz.agentbelay.ui.theme.SourceClaudeColor
-import com.mikepenz.agentbelay.ui.theme.SourceCopilotColor
-import com.mikepenz.agentbelay.ui.theme.VioletPurple
 import com.mikepenz.agentbelay.ui.theme.WarnYellow
 import com.mikepenz.agentbelay.ui.theme.InfoBlue
 
@@ -283,10 +282,10 @@ private fun SessionsToolbar(
         sortOptions = SessionSort.entries.map { it to it.label },
         sortSelected = sortBy,
         onSortChange = onSortChange,
-        harnessOptions = availableHarnesses.map { it to displayNameForSource(it) },
+        harnessOptions = availableHarnesses.map { it to sourceDisplayName(it) },
         harnessSelected = harnessFilter,
         onHarnessChange = onHarnessFilterChange,
-        harnessLeadingDot = ::colorForSource,
+        harnessLeadingDot = ::sourceAccentColor,
     )
 }
 
@@ -301,10 +300,10 @@ private fun SessionRow(s: SessionSummary, isSelected: Boolean, onClick: () -> Un
         horizontalArrangement = Arrangement.spacedBy(10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Box(modifier = Modifier.size(7.dp).clip(CircleShape).background(colorForSource(s.harness)))
+        Box(modifier = Modifier.size(7.dp).clip(CircleShape).background(sourceAccentColor(s.harness)))
         Column(modifier = Modifier.weight(1f)) {
             Text(
-                text = displayNameForSource(s.harness),
+                text = sourceDisplayName(s.harness),
                 color = AgentBelayColors.inkPrimary,
                 fontSize = 12.5.sp,
                 fontWeight = FontWeight.Medium,
@@ -618,22 +617,6 @@ private fun formatTokens(n: Long): String = when {
     else -> n.toString()
 }
 
-internal fun colorForSource(source: Source): Color = when (source) {
-    Source.CLAUDE_CODE -> SourceClaudeColor
-    Source.COPILOT -> SourceCopilotColor
-    Source.OPENCODE -> InfoBlue
-    Source.PI -> VioletPurple
-    Source.CODEX -> WarnYellow
-}
-
-internal fun displayNameForSource(source: Source): String = when (source) {
-    Source.CLAUDE_CODE -> "Claude Code"
-    Source.COPILOT -> "GitHub Copilot"
-    Source.OPENCODE -> "OpenCode"
-    Source.PI -> "Pi"
-    Source.CODEX -> "Codex"
-}
-
 // ── Previews ────────────────────────────────────────────────────────────────
 
 private fun sampleSessions() = listOf(
@@ -937,7 +920,7 @@ private fun PreviewMultiSelectDropdownOpen() {
                 selected = setOf(Source.CLAUDE_CODE, Source.CODEX),
                 onChange = {},
                 allLabel = "All harnesses",
-                leadingDot = ::colorForSource,
+                leadingDot = ::sourceAccentColor,
                 initiallyOpen = true,
             )
         }
@@ -958,7 +941,7 @@ private fun PreviewMultiSelectDropdownLight() {
                 selected = null,
                 onChange = {},
                 allLabel = "All harnesses",
-                leadingDot = ::colorForSource,
+                leadingDot = ::sourceAccentColor,
                 initiallyOpen = true,
             )
         }

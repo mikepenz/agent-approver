@@ -7,6 +7,8 @@ import com.mikepenz.agentbelay.model.Source
 import com.mikepenz.agentbelay.state.AppStateManager
 import com.mikepenz.agentbelay.storage.DatabaseStorage
 import com.mikepenz.agentbelay.storage.UsageHarnessTotals
+import com.mikepenz.agentbelay.ui.components.sourceAccentColor
+import com.mikepenz.agentbelay.ui.components.sourceDisplayName
 import com.mikepenz.agentbelay.usage.UsageIngestService
 import dev.zacsweers.metro.ContributesIntoMap
 import dev.zacsweers.metro.Inject
@@ -167,9 +169,9 @@ class UsageViewModel(
                 .ifEmpty { listOf(0) }
             HarnessUsageRow(
                 source = source,
-                displayName = displayNameForSource(source),
+                displayName = sourceDisplayName(source),
                 model = null,
-                accent = colorForSource(source),
+                accent = sourceAccentColor(source),
                 active = dailyForSource.isNotEmpty() &&
                     dailyForSource.last().epochDay >=
                     (System.currentTimeMillis() / 86_400_000L) - 1L,

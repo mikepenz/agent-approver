@@ -14,9 +14,9 @@ interface RiskAnalyzer {
      * caller through the [HookInput] shape (which is rigidly typed for
      * tool-call risk classification).
      *
-     * Default returns a failure so analyzers can be added incrementally —
-     * implementations override when the backend supports a generic prompt.
+     * Every shipped analyzer overrides this — Claude CLI, Copilot, Ollama,
+     * and OpenAI-compat all support the generic prompt path against the
+     * same connection / process they use for risk analysis.
      */
-    suspend fun analyzeText(systemPrompt: String, userPrompt: String): Result<String> =
-        Result.failure(UnsupportedOperationException("analyzeText not implemented for ${this::class.simpleName}"))
+    suspend fun analyzeText(systemPrompt: String, userPrompt: String): Result<String>
 }

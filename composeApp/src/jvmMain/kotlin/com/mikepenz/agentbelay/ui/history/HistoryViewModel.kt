@@ -46,13 +46,11 @@ class HistoryViewModel(
         .stateIn(viewModelScope, SharingStarted.Eagerly, stateManager.state.value.history)
 
     private val _scope = MutableStateFlow(HistoryScope.All)
-    private val _sourceFilter = MutableStateFlow(HistorySourceFilter.All)
     private val _query = MutableStateFlow("")
     private val _sort = MutableStateFlow(HistorySort.Recent)
     private val _harnessFilter = MutableStateFlow<Set<Source>?>(null)
 
     fun setScope(scope: HistoryScope) { _scope.value = scope }
-    fun setSourceFilter(filter: HistorySourceFilter) { _sourceFilter.value = filter }
     fun setQuery(query: String) { _query.value = query }
     fun setSort(sort: HistorySort) { _sort.value = sort }
     fun setHarnessFilter(filter: Set<Source>?) {
@@ -73,16 +71,15 @@ class HistoryViewModel(
         .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
     val uiState: StateFlow<HistoryUiState> = combine(
-        listOf(projected, _scope, _sourceFilter, _query, _sort, _harnessFilter),
+        listOf(projected, _scope, _query, _sort, _harnessFilter),
     ) { array ->
         @Suppress("UNCHECKED_CAST")
         val entries = array[0] as List<HistoryEntry>
         val scope = array[1] as HistoryScope
-        val sourceFilter = array[2] as HistorySourceFilter
-        val query = array[3] as String
-        val sort = array[4] as HistorySort
+        val query = array[2] as String
+        val sort = array[3] as HistorySort
         @Suppress("UNCHECKED_CAST")
-        val harnessFilter = array[5] as Set<Source>?
+        val harnessFilter = array[4] as Set<Source>?
 
         val filtered = entries.filter { e ->
             val scopeMatch = when (scope) {
@@ -91,7 +88,6 @@ class HistoryViewModel(
                 HistoryScope.Protections -> e.status in protectionStatuses
             }
             scopeMatch &&
-                e.matchesSource(sourceFilter) &&
                 e.matchesHarnessFilter(harnessFilter) &&
                 e.matchesQuery(query)
         }
@@ -112,7 +108,6 @@ class HistoryViewModel(
             total = entries.size,
             counts = counts,
             scope = scope,
-            sourceFilter = sourceFilter,
             query = query,
             sort = sort,
             harnessFilter = harnessFilter,

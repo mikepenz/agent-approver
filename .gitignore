@@ -12,3 +12,5 @@ docs/
 .claude/
 .autoresearch/
 /tmp/
+# Local-only TODO scratchpads kept at the repo root.
+/TODO*.md

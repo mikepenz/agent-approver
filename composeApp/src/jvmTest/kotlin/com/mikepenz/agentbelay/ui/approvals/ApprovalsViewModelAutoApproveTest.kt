@@ -60,6 +60,9 @@ class ApprovalsViewModelAutoApproveTest {
     private class StubAnalyzer(private val analysis: RiskAnalysis) : RiskAnalyzer {
         override suspend fun analyze(hookInput: HookInput): Result<RiskAnalysis> =
             Result.success(analysis)
+        // Not exercised by these tests, but the interface requires it.
+        override suspend fun analyzeText(systemPrompt: String, userPrompt: String): Result<String> =
+            error("not used")
     }
 
     @Test

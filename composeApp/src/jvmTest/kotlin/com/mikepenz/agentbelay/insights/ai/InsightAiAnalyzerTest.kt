@@ -100,19 +100,6 @@ class InsightAiAnalyzerTest {
     }
 
     @Test
-    fun elevate_fails_when_analyzer_does_not_implement_analyzeText() = runBlocking {
-        val noopAnalyzer = object : RiskAnalyzer {
-            override suspend fun analyze(hookInput: HookInput): Result<RiskAnalysis> =
-                error("not used")
-            // Inherits default analyzeText that returns failure.
-        }
-        val holder = ActiveRiskAnalyzerHolder().also { it.set(noopAnalyzer) }
-        val result = InsightAiAnalyzer(holder).elevate(sampleInsight(), sampleSession())
-        assertTrue(result.isFailure)
-        assertTrue(result.exceptionOrNull() is UnsupportedOperationException)
-    }
-
-    @Test
     fun elevate_handles_action_none_as_null() = runBlocking {
         val stub = StubAnalyzer(
             """
