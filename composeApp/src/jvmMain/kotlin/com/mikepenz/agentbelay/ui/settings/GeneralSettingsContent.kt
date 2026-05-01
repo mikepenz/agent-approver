@@ -320,6 +320,22 @@ fun GeneralSettingsContent(
             },
         )
         SettingItem(
+            label = "Include pre-releases",
+            desc = if (isUpdateSupported) {
+                "Offer alpha, beta, and release-candidate builds in addition to stable releases. " +
+                    "Pre-releases may contain bugs and breaking changes."
+            } else {
+                "Auto-update is unavailable in this build, but the preference is preserved " +
+                    "for when you switch to an installed release."
+            },
+            right = {
+                DesignToggle(
+                    checked = settings.allowPrerelease,
+                    onCheckedChange = { onSettingsChange(settings.copy(allowPrerelease = it)) },
+                )
+            },
+        )
+        SettingItem(
             label = "Open source libraries",
             desc = "View third-party licenses bundled with Agent Belay.",
             right = { OutlineButton(text = "View\u2026", onClick = onShowLicenses) },

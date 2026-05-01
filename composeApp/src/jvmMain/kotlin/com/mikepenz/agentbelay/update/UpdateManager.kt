@@ -31,15 +31,34 @@ sealed class UpdateUiState {
  * to a malicious host. SHA-512 verification of the downloaded installer happens
  * inside [NucleusUpdater.downloadUpdate]; the UI never sees the bytes.
  */
-open class UpdateManager(private val scope: CoroutineScope) {
+open class UpdateManager(
+    private val scope: CoroutineScope,
+    private val allowPrereleaseProvider: () -> Boolean = { false },
+) {
 
-    private val updater = NucleusUpdater {
+    @Volatile
+    private var cachedAllowPrerelease: Boolean = allowPrereleaseProvider()
+
+    @Volatile
+    private var _updater: NucleusUpdater = buildUpdater(cachedAllowPrerelease)
+
+    private fun buildUpdater(allowPrerelease: Boolean) = NucleusUpdater {
         provider = GitHubProvider(owner = "mikepenz", repo = "agent-belay")
         currentVersion = VERSION
         channel = "latest"
         allowDowngrade = false
-        allowPrerelease = false
+        this.allowPrerelease = allowPrerelease
     }
+
+    private val updater: NucleusUpdater
+        get() {
+            val current = allowPrereleaseProvider()
+            if (current != cachedAllowPrerelease) {
+                cachedAllowPrerelease = current
+                _updater = buildUpdater(current)
+            }
+            return _updater
+        }
 
     private val _state = MutableStateFlow<UpdateUiState>(UpdateUiState.Idle)
     open val state: StateFlow<UpdateUiState> = _state.asStateFlow()

@@ -140,8 +140,11 @@ interface AppProviders {
 
     @Provides
     @SingleIn(AppScope::class)
-    fun provideUpdateManager(env: AppEnvironment): UpdateManager =
-        UpdateManager(scope = env.appScope)
+    fun provideUpdateManager(env: AppEnvironment, stateManager: AppStateManager): UpdateManager =
+        UpdateManager(
+            scope = env.appScope,
+            allowPrereleaseProvider = { stateManager.state.value.settings.allowPrerelease },
+        )
 
     @Provides
     @SingleIn(AppScope::class)

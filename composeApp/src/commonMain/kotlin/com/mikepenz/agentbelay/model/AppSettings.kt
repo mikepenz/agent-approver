@@ -98,6 +98,13 @@ data class AppSettings(
      */
     val lastUpdateCheckEpochMillis: Long = 0L,
     /**
+     * When true, the updater accepts pre-release GitHub releases (alpha /
+     * beta / rc) in addition to stable ones. Default off so users opt in
+     * explicitly to less-tested builds. Read at check time, so toggling
+     * takes effect on the next `check()` without an app restart.
+     */
+    val allowPrerelease: Boolean = false,
+    /**
      * When true, the Usage tab's background scanner ingests harness session
      * files to compute token / cost / performance metrics. Disabling stops
      * the scanner entirely and skips all on-disk reads of harness files.
