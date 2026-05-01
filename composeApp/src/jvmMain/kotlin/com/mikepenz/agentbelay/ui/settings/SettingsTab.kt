@@ -52,6 +52,8 @@ import com.mikepenz.agentbelay.redaction.builtInRedactionModules
 import com.mikepenz.agentbelay.risk.CopilotInitState
 import com.mikepenz.agentbelay.risk.OllamaInitState
 import com.mikepenz.agentbelay.risk.OllamaMetrics
+import com.mikepenz.agentbelay.risk.OpenaiApiInitState
+import com.mikepenz.agentbelay.risk.OpenaiApiMetrics
 import com.mikepenz.agentbelay.ui.components.LocalPreviewHoverOverride
 import com.mikepenz.agentbelay.ui.components.SectionLabel
 import com.mikepenz.agentbelay.ui.icons.LucideBrain
@@ -89,6 +91,11 @@ fun SettingsTab(
     ollamaLastError: String? = null,
     ollamaLastMetrics: OllamaMetrics? = null,
     ollamaVersion: String? = null,
+    openaiApiModels: List<String> = emptyList(),
+    openaiApiInitState: OpenaiApiInitState = OpenaiApiInitState.IDLE,
+    openaiApiLastError: String? = null,
+    openaiApiLastMetrics: OpenaiApiMetrics? = null,
+    onRefreshOpenaiApiModels: () -> Unit = {},
     approveHotkeyError: String? = null,
     denyHotkeyError: String? = null,
     onRefreshOllamaModels: () -> Unit = {},
@@ -195,6 +202,11 @@ fun SettingsTab(
                     ollamaLastMetrics = ollamaLastMetrics,
                     ollamaVersion = ollamaVersion,
                     onRefreshOllamaModels = onRefreshOllamaModels,
+                    openaiApiModels = openaiApiModels,
+                    openaiApiInitState = openaiApiInitState,
+                    openaiApiLastError = openaiApiLastError,
+                    openaiApiLastMetrics = openaiApiLastMetrics,
+                    onRefreshOpenaiApiModels = onRefreshOpenaiApiModels,
                     onSettingsChange = onSettingsChange,
                 )
                 SettingsSubTab.Protections -> ProtectionsSettingsContent(

@@ -5,6 +5,7 @@ import com.mikepenz.agentbelay.model.RiskAnalysisBackend
 import com.mikepenz.agentbelay.risk.ActiveRiskAnalyzerHolder
 import com.mikepenz.agentbelay.risk.ClaudeCliRiskAnalyzer
 import com.mikepenz.agentbelay.risk.CopilotStateHolder
+import com.mikepenz.agentbelay.risk.OpenaiApiStateHolder
 import com.mikepenz.agentbelay.risk.OllamaStateHolder
 import com.mikepenz.agentbelay.risk.RiskMessageBuilder
 import com.mikepenz.agentbelay.state.AppStateManager
@@ -37,7 +38,7 @@ class RiskAnalyzerLifecycleTest {
         val claude = ClaudeCliRiskAnalyzer()
         val holder = ActiveRiskAnalyzerHolder()
         val copilotState = CopilotStateHolder()
-        val lifecycle = RiskAnalyzerLifecycle(state, claude, holder, copilotState, OllamaStateHolder(), env(this))
+        val lifecycle = RiskAnalyzerLifecycle(state, claude, holder, copilotState, OllamaStateHolder(), OpenaiApiStateHolder(), env(this))
 
         lifecycle.start()
         runCurrent()
@@ -56,13 +57,13 @@ class RiskAnalyzerLifecycleTest {
             ActiveRiskAnalyzerHolder(),
             CopilotStateHolder(),
             OllamaStateHolder(),
+            OpenaiApiStateHolder(),
             env(this),
         )
 
         lifecycle.start()
         runCurrent()
 
-        // Default settings → default prompt
         val customPrompt = "You are a security auditor."
         state.updateSettings(
             state.state.value.settings.copy(
@@ -87,13 +88,13 @@ class RiskAnalyzerLifecycleTest {
             ActiveRiskAnalyzerHolder(),
             CopilotStateHolder(),
             OllamaStateHolder(),
+            OpenaiApiStateHolder(),
             env(this),
         )
 
         lifecycle.start()
         runCurrent()
 
-        // Update something else (the model) so the collector emits with a blank prompt.
         state.updateSettings(state.state.value.settings.copy(riskAnalysisModel = "opus"))
         runCurrent()
 
@@ -112,6 +113,7 @@ class RiskAnalyzerLifecycleTest {
             holder,
             CopilotStateHolder(),
             OllamaStateHolder(),
+            OpenaiApiStateHolder(),
             env(this),
         )
 
@@ -135,6 +137,7 @@ class RiskAnalyzerLifecycleTest {
             ActiveRiskAnalyzerHolder(),
             CopilotStateHolder(),
             OllamaStateHolder(),
+            OpenaiApiStateHolder(),
             env(this),
         )
         // Calling shutdown without starting must not throw and must be idempotent.

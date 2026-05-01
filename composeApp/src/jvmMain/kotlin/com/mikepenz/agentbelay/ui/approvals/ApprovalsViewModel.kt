@@ -213,6 +213,7 @@ class ApprovalsViewModel(
             RiskAnalysisBackend.CLAUDE -> "claude"
             RiskAnalysisBackend.COPILOT -> "copilot"
             RiskAnalysisBackend.OLLAMA -> "ollama"
+            RiskAnalysisBackend.OPENAI_API -> "openai"
         }
         return RiskAnalysis(
             risk = 0,

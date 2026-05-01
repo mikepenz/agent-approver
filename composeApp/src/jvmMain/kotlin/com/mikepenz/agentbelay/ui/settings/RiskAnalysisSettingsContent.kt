@@ -45,6 +45,8 @@ import androidx.compose.ui.unit.sp
 import com.mikepenz.agentbelay.model.AppSettings
 import com.mikepenz.agentbelay.model.RiskAnalysisBackend
 import com.mikepenz.agentbelay.risk.CopilotInitState
+import com.mikepenz.agentbelay.risk.OpenaiApiInitState
+import com.mikepenz.agentbelay.risk.OpenaiApiMetrics
 import com.mikepenz.agentbelay.risk.OllamaInitState
 import com.mikepenz.agentbelay.risk.OllamaMetrics
 import com.mikepenz.agentbelay.risk.RiskMessageBuilder
@@ -81,6 +83,11 @@ fun RiskAnalysisSettingsContent(
     ollamaLastError: String? = null,
     ollamaLastMetrics: OllamaMetrics? = null,
     ollamaVersion: String? = null,
+    openaiApiModels: List<String> = emptyList(),
+    openaiApiInitState: OpenaiApiInitState = OpenaiApiInitState.IDLE,
+    openaiApiLastError: String? = null,
+    openaiApiLastMetrics: OpenaiApiMetrics? = null,
+    onRefreshOpenaiApiModels: () -> Unit = {},
     onRefreshOllamaModels: () -> Unit = {},
     onSettingsChange: (AppSettings) -> Unit,
 ) {
@@ -105,6 +112,7 @@ fun RiskAnalysisSettingsContent(
                     RiskAnalysisBackend.CLAUDE to "Claude",
                     RiskAnalysisBackend.COPILOT to "Copilot",
                     RiskAnalysisBackend.OLLAMA to "Ollama",
+                    RiskAnalysisBackend.OPENAI_API to "OpenAI API",
                 ),
                 selected = settings.riskAnalysisBackend,
                 onSelect = { onSettingsChange(settings.copy(riskAnalysisBackend = it)) },
@@ -116,7 +124,10 @@ fun RiskAnalysisSettingsContent(
                 copilotModels = copilotModels,
                 ollamaModels = ollamaModels,
                 ollamaReady = ollamaInitState == OllamaInitState.READY,
+                openaiApiModels = openaiApiModels,
+                openaiApiReady = openaiApiInitState == OpenaiApiInitState.READY,
                 onRefreshOllamaModels = onRefreshOllamaModels,
+                onRefreshOpenaiApiModels = onRefreshOpenaiApiModels,
                 onSettingsChange = onSettingsChange,
             )
         })
@@ -156,6 +167,20 @@ fun RiskAnalysisSettingsContent(
             ollamaLastMetrics = ollamaLastMetrics,
             ollamaVersion = ollamaVersion,
             onRefreshOllamaModels = onRefreshOllamaModels,
+            onSettingsChange = onSettingsChange,
+        )
+    }
+
+    AnimatedVisibility(
+        visible = settings.riskAnalysisBackend == RiskAnalysisBackend.OPENAI_API &&
+            settings.riskAnalysisEnabled,
+    ) {
+        OpenaiApiSection(
+            settings = settings,
+            openaiApiInitState = openaiApiInitState,
+            openaiApiLastError = openaiApiLastError,
+            openaiApiLastMetrics = openaiApiLastMetrics,
+            onRefreshOpenaiApiModels = onRefreshOpenaiApiModels,
             onSettingsChange = onSettingsChange,
         )
     }
@@ -245,6 +270,9 @@ private fun ModelPicker(
     copilotModels: List<Pair<String, String>>,
     ollamaModels: List<String>,
     ollamaReady: Boolean,
+    openaiApiModels: List<String> = emptyList(),
+    openaiApiReady: Boolean = false,
+    onRefreshOpenaiApiModels: () -> Unit = {},
     onRefreshOllamaModels: () -> Unit,
     onSettingsChange: (AppSettings) -> Unit,
 ) {
@@ -305,6 +333,44 @@ private fun ModelPicker(
                     Icon(
                         imageVector = LucideRefreshCw,
                         contentDescription = "Refresh Ollama models",
+                        tint = AgentBelayColors.inkSecondary,
+                        modifier = Modifier.size(14.dp),
+                    )
+                }
+            }
+        }
+        RiskAnalysisBackend.OPENAI_API -> {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                if (openaiApiReady && openaiApiModels.isNotEmpty()) {
+                    DropdownField(
+                        value = settings.riskAnalysisOpenaiApiModel,
+                        options = openaiApiModels.map { it to it },
+                        onSelect = { onSettingsChange(settings.copy(riskAnalysisOpenaiApiModel = it)) },
+                        width = 184.dp,
+                    )
+                } else {
+                    SettingsTextInput(
+                        value = settings.riskAnalysisOpenaiApiModel,
+                        onChange = { onSettingsChange(settings.copy(riskAnalysisOpenaiApiModel = it)) },
+                        width = 184.dp,
+                        mono = true,
+                    )
+                }
+                Box(
+                    modifier = Modifier
+                        .size(30.dp)
+                        .clip(RoundedCornerShape(7.dp))
+                        .background(AgentBelayColors.surface)
+                        .border(1.dp, AgentBelayColors.line1, RoundedCornerShape(7.dp))
+                        .clickable { onRefreshOpenaiApiModels() },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        imageVector = LucideRefreshCw,
+                        contentDescription = "Refresh OpenAI API models",
                         tint = AgentBelayColors.inkSecondary,
                         modifier = Modifier.size(14.dp),
                     )
@@ -623,6 +689,134 @@ private fun OllamaSection(
         }
     }
     } // end Column wrapper
+}
+
+@Composable
+private fun OpenaiApiSection(
+    settings: AppSettings,
+    openaiApiInitState: OpenaiApiInitState,
+    openaiApiLastError: String?,
+    openaiApiLastMetrics: OpenaiApiMetrics?,
+    onRefreshOpenaiApiModels: () -> Unit,
+    onSettingsChange: (AppSettings) -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+
+    AnimatedVisibility(visible = openaiApiLastError != null) {
+        NoticeBanner(
+            text = "OpenAI API error: ${openaiApiLastError.orEmpty()}",
+            color = DangerRed,
+        )
+    }
+
+    SettingSection(title = "OpenAI API backend") {
+        SettingItem(label = "Connection", first = true, right = {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                when (openaiApiInitState) {
+                    OpenaiApiInitState.CONNECTING -> CircularProgressIndicator(
+                        modifier = Modifier.size(14.dp), strokeWidth = 2.dp,
+                    )
+                    OpenaiApiInitState.READY -> StatusPill(
+                        status = DecisionStatus.APPROVED, size = TagSize.SMALL, text = "Connected",
+                    )
+                    OpenaiApiInitState.ERROR -> StatusPill(
+                        status = DecisionStatus.TIMEOUT, size = TagSize.SMALL,
+                    )
+                    OpenaiApiInitState.IDLE -> Text(
+                        text = "Idle", color = AgentBelayColors.inkMuted, fontSize = 11.5.sp,
+                    )
+                }
+                Box(
+                    modifier = Modifier
+                        .size(28.dp)
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(AgentBelayColors.surface)
+                        .border(1.dp, AgentBelayColors.line1, RoundedCornerShape(6.dp))
+                        .clickable { onRefreshOpenaiApiModels() },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        imageVector = LucideRefreshCw,
+                        contentDescription = "Retry OpenAI API connection",
+                        tint = AgentBelayColors.inkSecondary,
+                        modifier = Modifier.size(13.dp),
+                    )
+                }
+            }
+        })
+        SettingItem(
+            label = "Base URL",
+            desc = "URL for your llama.cpp or compatible server.",
+            right = {
+                SettingsTextInput(
+                    value = settings.riskAnalysisOpenaiApiUrl,
+                    onChange = { onSettingsChange(settings.copy(riskAnalysisOpenaiApiUrl = it)) },
+                    width = 220.dp,
+                    mono = true,
+                )
+            },
+        )
+        SettingItem(
+            label = "Request timeout",
+            desc = "Per-call deadline in seconds. Cold-start CPU eval may need 60+.",
+            right = {
+                SettingsTextInput(
+                    value = settings.riskAnalysisOpenaiApiTimeoutSeconds.toString(),
+                    onChange = { raw ->
+                        val parsed = raw.filter { it.isDigit() }.toIntOrNull()?.coerceIn(5, 600)
+                        if (parsed != null) {
+                            onSettingsChange(settings.copy(riskAnalysisOpenaiApiTimeoutSeconds = parsed))
+                        }
+                    },
+                    width = 80.dp,
+                    mono = true,
+                )
+            },
+        )
+        SettingItem(
+            label = "Context size",
+            desc = "Override context window. 0 = use server default.",
+            right = {
+                SettingsTextInput(
+                    value = settings.riskAnalysisOpenaiApiNumCtx.toString(),
+                    onChange = { raw ->
+                        val parsed = raw.filter { it.isDigit() }.toIntOrNull()?.coerceIn(0, 131072)
+                        if (parsed != null) {
+                            onSettingsChange(settings.copy(riskAnalysisOpenaiApiNumCtx = parsed))
+                        }
+                    },
+                    width = 80.dp,
+                    mono = true,
+                )
+            },
+        )
+    }
+
+    AnimatedVisibility(visible = openaiApiLastMetrics != null) {
+        val m = openaiApiLastMetrics
+        if (m != null) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .widthIn(max = 780.dp)
+                    .clip(RoundedCornerShape(7.dp))
+                    .background(AgentBelayColors.surface)
+                    .border(1.dp, AgentBelayColors.line1, RoundedCornerShape(7.dp))
+                    .padding(horizontal = 12.dp, vertical = 10.dp),
+            ) {
+                Text(
+                    text = "Last call: ${m.totalMs}ms total · prompt ${m.promptTokens}t · eval ${m.evalTokens}t",
+                    color = AgentBelayColors.inkSecondary,
+                    fontSize = 11.5.sp,
+                    fontFamily = FontFamily.Monospace,
+                )
+            }
+        }
+    }
+    }
 }
 
 @Composable
