@@ -147,6 +147,15 @@ class HarnessCapabilitiesTest {
     }
 
     @Test
+    fun `Codex pre-tool-use allow emits no permission decision`() {
+        val h = CodexHarness()
+        val response = h.adapter.buildPreToolUseAllowResponse()
+        val obj = kotlinx.serialization.json.Json.parseToJsonElement(response.body).jsonObject
+        assertFalse(obj.containsKey("hookSpecificOutput"))
+        assertFalse(response.body.contains("permissionDecision"))
+    }
+
+    @Test
     fun `Copilot always-allow falls back to plain allow`() {
         val h = CopilotHarness()
         val response = h.adapter.buildPermissionAlwaysAllowResponse(fakeRequest(Source.COPILOT), suggestions = emptyList())

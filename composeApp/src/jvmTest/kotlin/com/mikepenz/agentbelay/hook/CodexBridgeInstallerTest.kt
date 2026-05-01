@@ -23,8 +23,12 @@ class CodexBridgeInstallerTest {
 
         val extracted = CodexBridgeInstaller.extractManagedBlock(combined)
         assertNotNull(extracted, "marker block must be extractable")
-        assertTrue(extracted.contains("/approve-codex"))
-        assertTrue(extracted.contains("/pre-tool-use-codex"))
+        assertTrue(extracted.contains("[[hooks.PermissionRequest.hooks]]"))
+        assertTrue(extracted.contains("[[hooks.PreToolUse.hooks]]"))
+        assertTrue(extracted.contains("[[hooks.PostToolUse.hooks]]"))
+        assertTrue(extracted.contains("codex-approve.sh"))
+        assertTrue(extracted.contains("codex-pre-tool-use.sh"))
+        assertTrue(extracted.contains("codex-post-tool-use.sh"))
 
         val stripped = CodexBridgeInstaller.stripManagedBlock(combined)
         assertFalse(stripped.contains(">>> agent-belay >>>"), "begin marker must be gone")
@@ -43,9 +47,11 @@ class CodexBridgeInstallerTest {
     }
 
     @Test
-    fun `port is embedded in both endpoint URLs`() {
+    fun `managed block uses Codex command hook shape`() {
         val block = CodexBridgeInstaller.buildManagedBlock(port = 24680)
-        assertTrue(block.contains("http://localhost:24680/approve-codex"))
-        assertTrue(block.contains("http://localhost:24680/pre-tool-use-codex"))
+        assertFalse(block.contains("type    = \"http\""))
+        assertFalse(block.contains("url     = "))
+        assertTrue(block.contains("type = \"command\""))
+        assertTrue(block.contains("timeout = 300"))
     }
 }

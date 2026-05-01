@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.mikepenz.agentbelay.VERSION
 import com.mikepenz.agentbelay.di.AppEnvironment
 import com.mikepenz.agentbelay.di.AppScope
+import com.mikepenz.agentbelay.hook.CodexBridge
 import com.mikepenz.agentbelay.hook.CopilotBridge
 import com.mikepenz.agentbelay.hook.HookRegistry
 import com.mikepenz.agentbelay.hook.OpenCodeBridge
@@ -46,6 +47,7 @@ class AppViewModel(
     private val copilotBridge: CopilotBridge,
     private val openCodeBridge: OpenCodeBridge,
     private val piBridge: PiBridge,
+    private val codexBridge: CodexBridge,
     private val registrationEvents: RegistrationEvents,
     private val updateManager: UpdateManager,
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
@@ -71,14 +73,28 @@ class AppViewModel(
     private val copilotRegistered = MutableStateFlow(false)
     private val openCodeRegistered = MutableStateFlow(false)
     private val piRegistered = MutableStateFlow(false)
+    private val codexRegistered = MutableStateFlow(false)
 
-    val tabState: StateFlow<TabState> = combine(
-        stateManager.state,
+    private val registrations = combine(
         claudeRegistered,
         copilotRegistered,
         openCodeRegistered,
         piRegistered,
-    ) { state, claude, copilot, openCode, pi ->
+        codexRegistered,
+    ) { claude, copilot, openCode, pi, codex ->
+        AppRegistrations(
+            claude = claude,
+            copilot = copilot,
+            openCode = openCode,
+            pi = pi,
+            codex = codex,
+        )
+    }
+
+    val tabState: StateFlow<TabState> = combine(
+        stateManager.state,
+        registrations,
+    ) { state, registrations ->
         TabState(
             pendingCount = state.pendingApprovals.size,
             protectionLogCount = state.preToolUseLog.size,
@@ -87,10 +103,11 @@ class AppViewModel(
             appVersion = VERSION,
             serverPort = state.settings.serverPort,
             agentRegistrations = listOf(
-                AgentRegistration("Claude Code", claude),
-                AgentRegistration("GitHub Copilot", copilot),
-                AgentRegistration("OpenCode", openCode),
-                AgentRegistration("Pi", pi),
+                AgentRegistration("Claude Code", registrations.claude),
+                AgentRegistration("GitHub Copilot", registrations.copilot),
+                AgentRegistration("OpenCode", registrations.openCode),
+                AgentRegistration("Pi", registrations.pi),
+                AgentRegistration("Codex", registrations.codex),
             ),
         )
     }.stateIn(
@@ -135,6 +152,7 @@ class AppViewModel(
             copilot = copilotBridge.isRegistered(port),
             openCode = openCodeBridge.isRegistered(port),
             pi = piBridge.isRegistered(port),
+            codex = codexBridge.isRegistered(port),
         )
     }
 
@@ -143,6 +161,7 @@ class AppViewModel(
         copilotRegistered.value = registrations.copilot
         openCodeRegistered.value = registrations.openCode
         piRegistered.value = registrations.pi
+        codexRegistered.value = registrations.codex
     }
 
     fun selectTab(index: Int) {
@@ -177,4 +196,5 @@ private data class AppRegistrations(
     val copilot: Boolean,
     val openCode: Boolean,
     val pi: Boolean,
+    val codex: Boolean,
 )
