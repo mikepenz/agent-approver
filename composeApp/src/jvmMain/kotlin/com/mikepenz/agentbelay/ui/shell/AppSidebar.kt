@@ -203,8 +203,9 @@ fun AppSidebar(
 
         Spacer(Modifier.weight(1f))
 
-        if (!compact) {
-            // Connected agents — only in full mode
+        val registeredAgents = agentRegistrations.filter { it.registered }
+        if (!compact && registeredAgents.isNotEmpty()) {
+            // Connected agents — only in full mode, only when at least one is registered
             Spacer(Modifier.height(8.dp))
             Box(
                 modifier = Modifier
@@ -222,7 +223,7 @@ fun AppSidebar(
                     modifier = Modifier.padding(horizontal = 8.dp),
                 )
                 Spacer(Modifier.height(10.dp))
-                agentRegistrations.forEachIndexed { index, agent ->
+                registeredAgents.forEachIndexed { index, agent ->
                     if (index > 0) Spacer(Modifier.height(7.dp))
                     AgentStatusRow(agent.name, registered = agent.registered)
                 }
