@@ -3,7 +3,7 @@ package com.mikepenz.agentbelay.state
 import com.mikepenz.agentbelay.model.ApprovalRequest
 import com.mikepenz.agentbelay.model.ProtectionHit
 import com.mikepenz.agentbelay.model.ProtectionMode
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 
 data class PreToolUseEvent(
     val request: ApprovalRequest,

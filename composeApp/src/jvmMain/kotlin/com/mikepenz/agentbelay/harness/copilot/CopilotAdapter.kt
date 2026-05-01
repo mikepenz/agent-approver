@@ -8,8 +8,8 @@ import com.mikepenz.agentbelay.model.HookInput
 import com.mikepenz.agentbelay.model.PermissionSuggestion
 import com.mikepenz.agentbelay.model.Source
 import com.mikepenz.agentbelay.model.ToolType
-import kotlinx.datetime.Clock
-import kotlinx.datetime.Instant
+import kotlin.time.Clock
+import kotlin.time.Instant
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject

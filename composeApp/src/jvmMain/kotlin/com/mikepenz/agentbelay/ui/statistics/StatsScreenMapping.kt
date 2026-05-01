@@ -9,7 +9,7 @@ import com.mikepenz.agentbelay.ui.theme.DangerRed
 import com.mikepenz.agentbelay.ui.theme.InfoBlue
 import com.mikepenz.agentbelay.ui.theme.ToolRead
 import com.mikepenz.agentbelay.ui.theme.WarnYellow
-import kotlinx.datetime.Clock
+import kotlin.time.Clock
 import kotlinx.datetime.DateTimeUnit
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone
@@ -84,7 +84,7 @@ internal fun StatsSummary.toScreenData(
     val daily = dailyDates.map { date ->
         val groups = byDate[date].orEmpty()
         DailyStat(
-            day = "%02d-%02d".format(date.monthNumber, date.dayOfMonth),
+            day = "%02d-%02d".format(date.month.ordinal + 1, date.day),
             auto = (groups[DecisionGroup.RISK_APPROVE] ?: 0) + (groups[DecisionGroup.MANUAL_APPROVE] ?: 0),
             deny = (groups[DecisionGroup.MANUAL_DENY] ?: 0) + (groups[DecisionGroup.RISK_DENY] ?: 0),
             protect = groups[DecisionGroup.PROTECTION_BLOCK] ?: 0,

@@ -9,7 +9,7 @@ import com.mikepenz.agentbelay.model.Decision
 import com.mikepenz.agentbelay.model.ToolType
 import com.mikepenz.agentbelay.ui.components.DecisionStatus
 import dev.zacsweers.metrox.viewmodel.metroViewModel
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 import com.mikepenz.agentbelay.util.asStringOrNull
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.days

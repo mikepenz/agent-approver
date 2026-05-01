@@ -4,7 +4,7 @@ import com.mikepenz.agentbelay.model.Source
 import com.mikepenz.agentbelay.model.UsageRecord
 import com.mikepenz.agentbelay.usage.ScanCursor
 import com.mikepenz.agentbelay.usage.UsageScanner
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonObject

@@ -40,7 +40,7 @@ import com.mikepenz.agentbelay.protection.RuleEvalResult
 import com.mikepenz.agentbelay.state.PreToolUseEvent
 import com.mikepenz.agentbelay.state.ProtectionLogConclusion
 import com.mikepenz.agentbelay.ui.approvals.ToolBadge
-import kotlinx.datetime.Clock
+import kotlin.time.Clock
 import com.mikepenz.agentbelay.util.asStringOrNull
 import kotlin.time.Duration.Companion.hours
 import kotlin.time.Duration.Companion.minutes

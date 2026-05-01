@@ -38,7 +38,7 @@ import com.mikepenz.agentbelay.model.UserQuestionData
 import com.mikepenz.agentbelay.ui.components.SlimAllowButton
 import com.mikepenz.agentbelay.ui.components.SlimDenyButton
 import com.mikepenz.agentbelay.ui.theme.PreviewScaffold
-import kotlinx.datetime.Clock
+import kotlin.time.Clock
 import com.mikepenz.agentbelay.util.asArrayOrNull
 import com.mikepenz.agentbelay.util.asObjectOrNull
 import com.mikepenz.agentbelay.util.asStringOrNull

@@ -1211,7 +1211,7 @@ private fun sampleAskUserQuestion(): ApprovalQueueItem {
             toolInput = input,
             cwd = "/Users/mike/dev/agent-belay",
         ),
-        timestamp = kotlinx.datetime.Clock.System.now(),
+        timestamp = kotlin.time.Clock.System.now(),
         rawRequestJson = "{}",
     )
     val qd = com.mikepenz.agentbelay.model.SpecialToolParser.parseUserQuestion(input)
@@ -1251,7 +1251,7 @@ private fun samplePlan(): ApprovalQueueItem {
             toolInput = input,
             cwd = "/Users/mike/dev/agent-belay",
         ),
-        timestamp = kotlinx.datetime.Clock.System.now(),
+        timestamp = kotlin.time.Clock.System.now(),
         rawRequestJson = "{}",
     )
     val pd = com.mikepenz.agentbelay.model.SpecialToolParser.parsePlanReview(input)

@@ -1191,7 +1191,7 @@ private fun PreviewHistoryCompactLight() {
 @Preview(widthDp = 1088, heightDp = 860)
 @Composable
 private fun PreviewHistoryFromApprovalResults() {
-    val now = kotlinx.datetime.Clock.System.now()
+    val now = kotlin.time.Clock.System.now()
     fun mins(n: Int) = now - kotlin.time.Duration.parse("PT${n}M")
     fun jstr(s: String) = kotlinx.serialization.json.JsonPrimitive(s)
     fun req(

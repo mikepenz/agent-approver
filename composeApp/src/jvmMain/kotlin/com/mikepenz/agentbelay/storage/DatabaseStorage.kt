@@ -2,7 +2,7 @@ package com.mikepenz.agentbelay.storage
 
 import co.touchlab.kermit.Logger
 import com.mikepenz.agentbelay.model.*
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 import kotlinx.datetime.LocalDate
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.builtins.MapSerializer
@@ -772,7 +772,7 @@ open class DatabaseStorage(
                             com.mikepenz.agentbelay.model.UsageRecord(
                                 harness = source,
                                 sessionId = rs.getString("session_id"),
-                                timestamp = kotlinx.datetime.Instant.fromEpochMilliseconds(rs.getLong("ts_millis")),
+                                timestamp = kotlin.time.Instant.fromEpochMilliseconds(rs.getLong("ts_millis")),
                                 model = rs.getString("model"),
                                 inputTokens = rs.getLong("input_tokens"),
                                 outputTokens = rs.getLong("output_tokens"),

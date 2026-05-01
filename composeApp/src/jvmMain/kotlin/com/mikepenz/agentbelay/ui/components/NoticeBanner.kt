@@ -12,11 +12,11 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalClipboardManager
-import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import com.mikepenz.agentbelay.state.AppNotice
+import java.awt.Toolkit
+import java.awt.datatransfer.StringSelection
 
 private const val LOG_HINT = "~/.agent-belay/logs/agent-belay.log"
 
@@ -39,7 +39,6 @@ fun NoticeBannerStack(
 
 @Composable
 private fun NoticeBanner(notice: AppNotice, onDismiss: () -> Unit) {
-    val clipboard = LocalClipboardManager.current
     Surface(
         modifier = Modifier.fillMaxWidth(),
         color = MaterialTheme.colorScheme.errorContainer,
@@ -71,7 +70,7 @@ private fun NoticeBanner(notice: AppNotice, onDismiss: () -> Unit) {
                         notice.detail?.let { appendLine(it) }
                         append("Log: ").append(LOG_HINT)
                     }
-                    clipboard.setText(AnnotatedString(payload))
+                    Toolkit.getDefaultToolkit().systemClipboard.setContents(StringSelection(payload), null)
                 }) { Text("Copy details") }
                 TextButton(onClick = onDismiss) { Text("Dismiss") }
             }

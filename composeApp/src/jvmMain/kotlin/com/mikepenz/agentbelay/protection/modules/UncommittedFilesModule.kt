@@ -115,7 +115,7 @@ object UncommittedFilesModule : ProtectionModule {
                 val completed = process.waitFor(5, TimeUnit.SECONDS)
                 if (!completed) {
                     process.destroyForcibly()
-                    Logger.w("UncommittedFilesModule") { "git status timed out in $cwd" }
+                    Logger.w(tag = "UncommittedFilesModule") { "git status timed out in $cwd" }
                     return null
                 }
                 if (process.exitValue() != 0) return null
@@ -123,7 +123,7 @@ object UncommittedFilesModule : ProtectionModule {
                     .filter { it.length > 3 }
                     .map { it.substring(3) }
             } catch (e: Exception) {
-                Logger.w("UncommittedFilesModule", e) { "Failed to run git status in $cwd" }
+                Logger.w(e, tag = "UncommittedFilesModule") { "Failed to run git status in $cwd" }
                 null
             }
         }

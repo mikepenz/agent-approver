@@ -28,7 +28,7 @@ class SettingsStorage(private val dataDir: String) {
             val migrated = migrateLegacyAutoRiskFields(json.parseToJsonElement(f.readText()).jsonObject)
             json.decodeFromJsonElement(AppSettings.serializer(), migrated)
         } catch (e: Exception) {
-            Logger.w("SettingsStorage") { "Failed to load settings, using defaults: ${e.message}" }
+            Logger.w(tag = "SettingsStorage") { "Failed to load settings, using defaults: ${e.message}" }
             AppSettings()
         }
     }
@@ -58,7 +58,7 @@ class SettingsStorage(private val dataDir: String) {
             tmp.writeText(json.encodeToString(AppSettings.serializer(), settings))
             Files.move(tmp.toPath(), file.toPath(), StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE)
         } catch (e: Exception) {
-            Logger.e("SettingsStorage") { "Failed to save settings: ${e.message}" }
+            Logger.e(tag = "SettingsStorage") { "Failed to save settings: ${e.message}" }
         }
     }
 }
