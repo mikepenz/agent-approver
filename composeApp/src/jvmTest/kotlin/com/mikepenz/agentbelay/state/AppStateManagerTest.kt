@@ -4,7 +4,7 @@ import com.mikepenz.agentbelay.model.*
 import com.mikepenz.agentbelay.storage.DatabaseStorage
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.runBlocking
-import kotlinx.datetime.Clock
+import kotlin.time.Clock
 import kotlinx.serialization.json.JsonPrimitive
 import java.io.File
 import kotlin.test.AfterTest

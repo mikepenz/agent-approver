@@ -1,7 +1,7 @@
 package com.mikepenz.agentbelay.storage
 
 import com.mikepenz.agentbelay.model.*
-import kotlinx.datetime.Clock
+import kotlin.time.Clock
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonPrimitive
@@ -278,7 +278,7 @@ class DatabaseStorageTest {
             feedback = "Auto-approved: risk level 1",
             riskAnalysis = RiskAnalysis(risk = 1, label = "Safe", message = "Read-only"),
             rawResponseJson = """{"behavior":"allow"}""",
-            decidedAt = kotlinx.datetime.Clock.System.now(),
+            decidedAt = kotlin.time.Clock.System.now(),
         )
 
         storage.insert(result)
@@ -321,7 +321,7 @@ class DatabaseStorageTest {
             feedback = "Auto-approved: risk level 1",
             riskAnalysis = null,
             rawResponseJson = null,
-            decidedAt = kotlinx.datetime.Clock.System.now(),
+            decidedAt = kotlin.time.Clock.System.now(),
         )
 
         storage.insert(result)
@@ -430,8 +430,8 @@ class DatabaseStorageTest {
         conn.prepareStatement(insertSql).use { ps ->
             ps.setString(1, "backfill-1")
             ps.setString(2, rawJson)
-            ps.setString(3, kotlinx.datetime.Clock.System.now().toString())
-            ps.setString(4, kotlinx.datetime.Clock.System.now().toString())
+            ps.setString(3, kotlin.time.Clock.System.now().toString())
+            ps.setString(4, kotlin.time.Clock.System.now().toString())
             ps.executeUpdate()
         }
         conn.close()

@@ -1,8 +1,8 @@
 package com.mikepenz.agentbelay.storage
 
 import com.mikepenz.agentbelay.model.*
-import kotlinx.datetime.Clock
-import kotlinx.datetime.Instant
+import kotlin.time.Clock
+import kotlin.time.Instant
 import java.io.File
 import kotlin.test.AfterTest
 import kotlin.test.BeforeTest

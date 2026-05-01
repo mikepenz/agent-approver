@@ -7,7 +7,7 @@ import com.mikepenz.agentbelay.model.HookInput
 import com.mikepenz.agentbelay.model.Source
 import com.mikepenz.agentbelay.model.ToolType
 import com.mikepenz.agentbelay.model.UsageRecord
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonPrimitive
 
