@@ -14,6 +14,7 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import java.util.UUID
 import kotlin.test.Test
+import kotlin.test.assertContains
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
@@ -88,7 +89,9 @@ class HarnessCapabilitiesTest {
                 put("stdout", JsonPrimitive("anything"))
             }
         )
-        assertNull(response, "Copilot's postToolUse cannot modify output — adapter must return null")
+        // SDK declares modifiedResult but live CLI does not honor it —
+        // adapter returns null so callers pass-through original output.
+        assertNull(response, "Copilot's postToolUse modifiedResult is not honored end-to-end — adapter must return null")
     }
 
     @Test

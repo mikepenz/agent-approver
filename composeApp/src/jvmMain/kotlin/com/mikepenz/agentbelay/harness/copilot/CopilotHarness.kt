@@ -20,7 +20,13 @@ class CopilotHarness(
         // Copilot has no permission write-through equivalent; trust patterns
         // are managed via Copilot's own rules file, not via the hook envelope.
         supportsAlwaysAllowWriteThrough = false,
-        // Copilot's `postToolUse` does not allow modifying the result.
+        // Copilot SDK types declare a top-level `modifiedResult` on
+        // `PostToolUseHookOutput`, but end-to-end smoke against a live
+        // Copilot CLI install showed the field is NOT honored — the
+        // model still reads the original tool output. CLI is closed
+        // source so we can't verify why; until upstream confirms, leave
+        // this off and pass-through. The PostToolUse endpoint stays
+        // mounted for race-cleanup parity with the other harnesses.
         supportsOutputRedaction = false,
         // No `defer` analogue.
         supportsDefer = false,

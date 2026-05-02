@@ -234,9 +234,22 @@ class CopilotAdapter : HarnessAdapter {
     }.toString())
 
     /**
-     * Copilot CLI's `postToolUse` hook does not honor result modification
-     * (per the docs.github.com hooks-configuration reference). Returning
-     * null tells callers to pass-through the original output untouched.
+     * Copilot SDK types declare a flat `{modifiedResult, additionalContext,
+     * suppressOutput}` envelope on `PostToolUseHookOutput`
+     * (`github/copilot-sdk` `nodejs/src/types.ts`), but end-to-end smoke
+     * against a live Copilot CLI showed `modifiedResult` is not honored
+     * — the model still reads the original tool output. Returning null
+     * tells the route to pass-through the original output untouched.
+     * The PostToolUse endpoint stays mounted for race-cleanup.
      */
     override fun buildPostToolUseRedactedResponse(updatedOutput: JsonObject): HarnessResponse? = null
+
+    /**
+     * Copilot's `PostToolUseHookInput` carries the tool result under
+     * `toolResult` (camelCase). The PascalCase / snake_case variants
+     * Copilot ships for Claude-format interop reuse `tool_response` /
+     * `tool_output` — fall back to those for resilience across versions.
+     */
+    override fun extractToolResponse(payload: JsonObject): JsonElement? =
+        payload["toolResult"] ?: payload["tool_response"] ?: payload["tool_output"]
 }

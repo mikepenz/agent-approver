@@ -43,15 +43,15 @@ class CopilotCapabilityHookInstallerTest {
     }
 
     @Test
-    fun `register-then-registerCapability surfaces all three entries`() = withTempHome { home ->
+    fun `register-then-registerCapability surfaces all four entries`() = withTempHome { home ->
         CopilotBridgeInstaller.register(port, failClosed = false)
         CopilotBridgeInstaller.registerCapabilityHook(port, failClosed = false)
 
         val hooks = readHooks(home)
         assertEquals(
-            setOf("preToolUse", "permissionRequest", "sessionStart"),
+            setOf("preToolUse", "permissionRequest", "postToolUse", "sessionStart"),
             hooks.keys,
-            "all three event keys must coexist",
+            "all four event keys must coexist",
         )
         assertTrue(CopilotBridgeInstaller.isRegistered(port))
         assertTrue(CopilotBridgeInstaller.isCapabilityHookRegistered(port))
@@ -68,7 +68,7 @@ class CopilotCapabilityHookInstallerTest {
         assertTrue(belay.resolve("copilot-hook.sh").exists(), "approval shim survives")
 
         val hooks = readHooks(home)
-        assertEquals(setOf("preToolUse", "permissionRequest"), hooks.keys)
+        assertEquals(setOf("preToolUse", "permissionRequest", "postToolUse"), hooks.keys)
         assertFalse(CopilotBridgeInstaller.isCapabilityHookRegistered(port))
         assertTrue(CopilotBridgeInstaller.isRegistered(port))
     }

@@ -38,9 +38,13 @@ class CopilotRegistrar(
                 path = File(belayDir, "copilot-pre-tool-use.sh").toPath(),
                 contents = "(installed by CopilotBridgeInstaller — bridges preToolUse stdin/stdout to /pre-tool-use-copilot)",
             ),
+            OutboardArtifact.ShellScript(
+                path = File(belayDir, "copilot-post.sh").toPath(),
+                contents = "(installed by CopilotBridgeInstaller — bridges postToolUse stdin/stdout to /post-tool-use-copilot for output redaction)",
+            ),
             OutboardArtifact.JsonFile(
                 path = copilotHooks.toPath(),
-                contents = "(merged hook entries for permissionRequest + preToolUse pointing at the shim scripts)",
+                contents = "(merged hook entries for permissionRequest + preToolUse + postToolUse pointing at the shim scripts)",
             ),
         )
     }

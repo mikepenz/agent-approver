@@ -45,10 +45,12 @@ object CopilotBridgeInstaller {
 
     private const val PRE_TOOL_USE_SCRIPT_NAME = "copilot-hook.sh"
     private const val PERMISSION_REQUEST_SCRIPT_NAME = "copilot-approve.sh"
+    private const val POST_TOOL_USE_SCRIPT_NAME = "copilot-post.sh"
     private const val CAPABILITY_SCRIPT_NAME = "copilot-capability.sh"
 
     private const val PRE_TOOL_USE_ENDPOINT = "pre-tool-use-copilot"
     private const val PERMISSION_REQUEST_ENDPOINT = "approve-copilot"
+    private const val POST_TOOL_USE_ENDPOINT = "post-tool-use-copilot"
     private const val CAPABILITY_ENDPOINT = "capability/inject-copilot"
 
     // Hook event keys in Copilot CLI hooks.json. We use **camelCase** because
@@ -64,6 +66,7 @@ object CopilotBridgeInstaller {
     // PascalCase variant doesn't fire from this location.
     private const val HOOK_PRE_TOOL_USE_KEY = "preToolUse"
     private const val HOOK_PERMISSION_REQUEST_KEY = "permissionRequest"
+    private const val HOOK_POST_TOOL_USE_KEY = "postToolUse"
 
     // Capability context injection is wired to `sessionStart` — NOT
     // `userPromptSubmitted` — because Copilot CLI's command-type
@@ -84,6 +87,7 @@ object CopilotBridgeInstaller {
 
     private fun preToolUseScriptFile(): File = File(scriptDir(), PRE_TOOL_USE_SCRIPT_NAME)
     private fun permissionRequestScriptFile(): File = File(scriptDir(), PERMISSION_REQUEST_SCRIPT_NAME)
+    private fun postToolUseScriptFile(): File = File(scriptDir(), POST_TOOL_USE_SCRIPT_NAME)
     private fun capabilityScriptFile(): File = File(scriptDir(), CAPABILITY_SCRIPT_NAME)
 
     private fun hookFile(): File {
@@ -95,6 +99,7 @@ object CopilotBridgeInstaller {
     // so Copilot CLI can resolve them regardless of cwd.
     private fun preToolUseScriptPath(): String = preToolUseScriptFile().absolutePath
     private fun permissionRequestScriptPath(): String = permissionRequestScriptFile().absolutePath
+    private fun postToolUseScriptPath(): String = postToolUseScriptFile().absolutePath
     private fun capabilityScriptPath(): String = capabilityScriptFile().absolutePath
 
     /**
@@ -197,8 +202,10 @@ object CopilotBridgeInstaller {
     fun isRegistered(@Suppress("UNUSED_PARAMETER") port: Int): Boolean {
         val pre = preToolUseScriptFile()
         val perm = permissionRequestScriptFile()
+        val post = postToolUseScriptFile()
         if (!pre.exists() || !pre.canExecute()) return false
         if (!perm.exists() || !perm.canExecute()) return false
+        if (!post.exists() || !post.canExecute()) return false
 
         val hooks = hookFile()
         if (!hooks.exists()) return false
@@ -206,7 +213,8 @@ object CopilotBridgeInstaller {
             val root = json.parseToJsonElement(hooks.readText()).jsonObject
             val hooksObj = root["hooks"]?.jsonObject ?: return false
             hasHookEntry(hooksObj, HOOK_PRE_TOOL_USE_KEY, preToolUseScriptPath()) &&
-                hasHookEntry(hooksObj, HOOK_PERMISSION_REQUEST_KEY, permissionRequestScriptPath())
+                hasHookEntry(hooksObj, HOOK_PERMISSION_REQUEST_KEY, permissionRequestScriptPath()) &&
+                hasHookEntry(hooksObj, HOOK_POST_TOOL_USE_KEY, postToolUseScriptPath())
         } catch (e: Exception) {
             logger.w(e) { "Failed to read $HOOK_FILE_NAME" }
             false
@@ -260,7 +268,7 @@ object CopilotBridgeInstaller {
     fun registerCapabilityHook(port: Int, failClosed: Boolean = false) {
         writeCapabilityScript(port, failClosed)
         // Preserve existing approval hooks if their scripts are still on disk.
-        val keepApproval = preToolUseScriptFile().exists() && permissionRequestScriptFile().exists()
+        val keepApproval = preToolUseScriptFile().exists() && permissionRequestScriptFile().exists() && postToolUseScriptFile().exists()
         writeHookFile(includeApproval = keepApproval, includeCapability = true)
         logger.i { "Registered Copilot capability hook for port $port (failClosed=$failClosed)" }
     }
@@ -276,7 +284,7 @@ object CopilotBridgeInstaller {
             cap.delete()
             logger.i { "Removed capability bridge script ${cap.absolutePath}" }
         }
-        val keepApproval = preToolUseScriptFile().exists() && permissionRequestScriptFile().exists()
+        val keepApproval = preToolUseScriptFile().exists() && permissionRequestScriptFile().exists() && postToolUseScriptFile().exists()
         if (keepApproval) {
             writeHookFile(includeApproval = true, includeCapability = false)
         } else {
@@ -296,7 +304,11 @@ object CopilotBridgeInstaller {
      * removed too.
      */
     fun unregister(@Suppress("UNUSED_PARAMETER") port: Int) {
-        listOf(preToolUseScriptFile(), permissionRequestScriptFile()).forEach { file ->
+        listOf(
+            preToolUseScriptFile(),
+            permissionRequestScriptFile(),
+            postToolUseScriptFile(),
+        ).forEach { file ->
             if (file.exists()) {
                 file.delete()
                 logger.i { "Removed bridge script ${file.absolutePath}" }
@@ -335,6 +347,13 @@ object CopilotBridgeInstaller {
                 "bash": "~/.agent-belay/$PERMISSION_REQUEST_SCRIPT_NAME",
                 "timeoutSec": 300
               }
+            ],
+            "postToolUse": [
+              {
+                "type": "command",
+                "bash": "~/.agent-belay/$POST_TOOL_USE_SCRIPT_NAME",
+                "timeoutSec": 300
+              }
             ]
           }
         }
@@ -351,6 +370,15 @@ object CopilotBridgeInstaller {
 
         atomicWriteExecutable(permissionRequestScriptFile(), buildScriptContent(PERMISSION_REQUEST_ENDPOINT, port, failClosed))
         logger.i { "Installed bridge script ${permissionRequestScriptFile().absolutePath}" }
+
+        // PostToolUse runs the redaction engine. We always honor a
+        // server-unreachable failure as fail-OPEN regardless of the
+        // approval-side fail-closed flag — blocking *output* of an
+        // already-executed tool would gate the model's read on Belay
+        // being up, which is a different blast radius than blocking
+        // tool execution. The redaction script never returns deny.
+        atomicWriteExecutable(postToolUseScriptFile(), buildScriptContent(POST_TOOL_USE_ENDPOINT, port, failClosed = false))
+        logger.i { "Installed bridge script ${postToolUseScriptFile().absolutePath}" }
     }
 
     private fun writeCapabilityScript(port: Int, failClosed: Boolean) {
@@ -376,6 +404,7 @@ object CopilotBridgeInstaller {
                 if (includeApproval) {
                     put(HOOK_PRE_TOOL_USE_KEY, buildJsonArray { add(buildHookEntry(preToolUseScriptPath())) })
                     put(HOOK_PERMISSION_REQUEST_KEY, buildJsonArray { add(buildHookEntry(permissionRequestScriptPath())) })
+                    put(HOOK_POST_TOOL_USE_KEY, buildJsonArray { add(buildHookEntry(postToolUseScriptPath())) })
                 }
                 if (includeCapability) {
                     put(HOOK_SESSION_START_KEY, buildJsonArray { add(buildHookEntry(capabilityScriptPath())) })
